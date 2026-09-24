@@ -6,7 +6,7 @@ Import each listed **Aura** before its associated **Spell**. These entries use t
 
 ## Authoring notes
 
-- Druid uses **Mana** (`f82db71a:4c8mfm99`).
+- Balance Druid uses **Mana** (`f82db71a:4c8mfm99`); the Feral abilities in this document use **Energy** (`f82db71a:c3gaf7dd`) where applicable.
 - Main Action = cooldown channel 1; Bonus Action = channel 2; Buff Action = channel 3.
 - Balance damage scales from **Spell Power** (`f82db71a:7t7xgzcx`).
 - Damage schools used here are Nature (`f82db71a:qtr10qyj`), Arcane (`f82db71a:dtxhglqg`) and Fire (`f82db71a:esjguw6d`).
@@ -1265,6 +1265,1490 @@ RPE_DATASET_ENTRY_V1
                                     },
                         mainText = "Apply Solar Beam to up to 5 enemies on the same raid marker for 1 turn.",
                         tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+## Feral
+
+### Energy-cost notes
+
+The Feral abilities below use the requested WoW Classic Energy costs rather than the RPE calculator's generated Energy costs. Their damage/effect budgets still follow the current RPE2 spell-authoring specification or the explicitly named current RPE analogue.
+
+| Spell | Energy cost | RPE implementation basis |
+|---|---:|---|
+| Prowl | 0 | Copy Rogue Stealth; Classic Prowl has no Energy cost. |
+| Pounce | 50 | Bonus Action stealth opener; 1-turn stun, direct Physical damage, 2 Combo Points. |
+| Rake | 40 | Rend-like 5-turn bleed plus 1 Combo Point. |
+| Shred | 60 | Copy current Rogue Backstab damage shape; 2 Combo Points. |
+| Ferocious Bite | 35 | Copy current Rogue Eviscerate; consumes 5 Combo Points. |
+| Claw | 45 | Copy current Rogue Sinister Strike; 1 Combo Point. |
+| Rip | 30 | Copy current Rogue Rupture; consumes 5 Combo Points. |
+| Tiger's Fury | 30 | Fixed +30% Melee Attack Power for 1 turn; Buff Action. |
+| Ravage | 60 | Copy current Rogue Ambush; requires Prowl and generates 2 Combo Points. |
+| Swipe | 50 | Copy current Warrior Cleave; Cat-form Energy cost uses the WoW Classic Season of Discovery Cat Swipe because original vanilla Cat Form had no Energy-based Swipe. |
+
+Authoring details:
+
+- Energy: `f82db71a:c3gaf7dd`; Combo Points: `f82db71a:1h7yfxff`; Melee Attack Power: `f82db71a:u7b49vs9`.
+- Prowl copies the current Rogue Stealth runtime shape exactly: self-hide, Buff Action, 10-turn RPE cooldown, and no resource cost.
+- Pounce uses the current hidden-caster condition used by Ambush. Its direct weapon-attack output uses the Bonus Action budget with the 0.85 secondary-effect modifier: 41.4375 flat + 0.1934 Melee Attack Power + 0.5525 main-hand weapon damage. The stun is 1 turn and the spell generates the requested 2 Combo Points.
+- Rake has no separate upfront damage component: it applies a Rend-like 5-turn bleed and generates 1 Combo Point. Because the Combo Point generation is a meaningful secondary output, the periodic budget is 17.68 + 0.3094 Melee Attack Power each turn.
+- Shred, Ferocious Bite, Claw, Rip, Ravage and Swipe intentionally copy the current RPE analogue's numerical damage/effect shape. Only the icon/name/category, explicit Druid mechanics, and requested Classic Energy costs are changed.
+- Shred and Ravage generate 2 Combo Points in this RPE design. This is deliberate and follows the requested design/current RPE analogue rather than original Classic's combo-point award.
+- Ferocious Bite and Rip follow the current RPE finisher convention and consume 5 Combo Points.
+- Tiger's Fury is a fixed percentage buff and therefore does not scale with spell rank.
+
+### Prowl
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            canTargetHiddenUnits = false,
+            castTime = 0,
+            casterEvents = {  },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            targetEvents = {  },
+                                                            type = "hide",
+                                                        },
+                                        key = "prowlhd1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 10,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            doesNotRevealCaster = true,
+            icon = "interface/icons/ability_ambush.blp",
+            id = "drprowl1",
+            cooldownChannel = 3,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = false,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Prowl",
+            range = 0,
+            resourceCosts = {  },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Hide yourself.",
+                        tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Pounce
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+            description = "",
+            duration = 1,
+            effects = {
+                        {
+                                        cancelOnDamage = false,
+                                        forceAutoHitAgainstTarget = true,
+                                        movementRangeOverride = 0,
+                                        preventCasting = true,
+                                        statScaling = {  },
+                                        type = "control",
+                                    },
+                    },
+            events = {  },
+            icon = "interface/icons/ability_druid_supriseattack.blp",
+            id = "drpncau1",
+            maxStacks = 1,
+            name = "Pounce",
+            stackBehavior = "refresh_duration",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                        bodyTokens = {  },
+                        stackingText = "",
+                        stackingTokens = {  },
+                        version = 1,
+                    },
+        },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            canTargetHiddenUnits = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            alwaysHits = false,
+                                                            amountMode = "flat",
+                                                            applyAura = true,
+                                                            auraStacks = 1,
+                                                            baseDamage = 41.4375,
+                                                            damageSchoolRefs = {
+                                                                                    "f82db71a:v1azo4j6",
+                                                                                },
+                                                            damageType = "melee",
+                                                            hitType = "ability",
+                                                            projectilePath = "",
+                                                            projectileSpeed = 0,
+                                                            statScaling = {
+                                                                                    {
+                                                                                                                coefficient = 0.1934,
+                                                                                                                statRef = "f82db71a:u7b49vs9",
+                                                                                                            },
+                                                                                },
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            threatCoefficient = 1,
+                                                            type = "damage",
+                                                            usesProjectile = false,
+                                                            weaponDamageCoefficient = 0.5525,
+                                                            weaponDamageMode = "main_hand",
+                                                            auraRef = "6e4d2a91:drpncau1",
+                                                        },
+                                        key = "pouncedm",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            amount = 2,
+                                                            amountMode = "flat",
+                                                            resourceRef = "f82db71a:1h7yfxff",
+                                                            targetEvents = {  },
+                                                            type = "resource",
+                                                        },
+                                        key = "pouncecp",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
+                    },
+            conditions = {
+                        {
+                                        invert = false,
+                                        showOnTooltip = true,
+                                        tooltipTextOverride = "Requires Prowl",
+                                        type = "hidden",
+                                        unit = "caster",
+                                    },
+                    },
+            cooldown = 1,
+            cooldownGroup = "stun",
+            cooldownScalesWithHaste = false,
+            description = "",
+            doesNotRevealCaster = false,
+            icon = "interface/icons/ability_druid_supriseattack.blp",
+            id = "drpounc1",
+            cooldownChannel = 2,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Pounce",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 50,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:c3gaf7dd",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {
+                                        {
+                                                            auraRef = "6e4d2a91:drpncau1",
+                                                            datasetId = "6e4d2a91",
+                                                            descriptionText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                                                            duration = 1,
+                                                            icon = "interface/icons/ability_druid_supriseattack.blp",
+                                                            nameText = "Pounce",
+                                                            powerLevel = 0,
+                                                            spellDatasetId = "6e4d2a91",
+                                                            stacks = 1,
+                                                            targetContext = {
+                                                                                    object = "the affected enemy",
+                                                                                    possessive = "the affected enemy's",
+                                                                                    reflexive = "itself",
+                                                                                    subject = "the affected enemy",
+                                                                                },
+                                                            tokens = {  },
+                                                        },
+                                    },
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy, stun it for 1 turn, and restore {RESOURCE_AMOUNT_1} to yourself.",
+                        tokens = {
+                                        {
+                                                            applyMode = "damage_range",
+                                                            componentIndex = 1,
+                                                            key = "DAMAGE_1",
+                                                            tokenType = "spell_damage_range",
+                                                        },
+                                        {
+                                                            applyMode = "resource_gain_amount",
+                                                            componentIndex = 2,
+                                                            key = "RESOURCE_AMOUNT_1",
+                                                            tokenType = "spell_resource_amount",
+                                                        },
+                                    },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Rake
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+            description = "",
+            duration = 5,
+            effects = {
+                        {
+                                        amountMode = "flat",
+                                        baseDamage = 17.68,
+                                        damageSchoolRefs = {
+                                                            "f82db71a:v1azo4j6",
+                                                        },
+                                        statScaling = {
+                                                            {
+                                                                                    coefficient = 0.3094,
+                                                                                    statRef = "f82db71a:u7b49vs9",
+                                                                                },
+                                                        },
+                                        type = "damage",
+                                    },
+                    },
+            events = {  },
+            icon = "interface/icons/ability_druid_disembowel.blp",
+            id = "drrakea1",
+            maxStacks = 1,
+            name = "Rake",
+            stackBehavior = "refresh_duration",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        bodyText = "Deals {AURA_DAMAGE_1} Physical damage each turn.",
+                        bodyTokens = {
+                                        {
+                                                            applyMode = "damage_amount",
+                                                            baseField = "baseDamage",
+                                                            effectIndex = 1,
+                                                            key = "AURA_DAMAGE_1",
+                                                            tokenType = "aura_amount",
+                                                        },
+                                    },
+                        stackingText = "",
+                        stackingTokens = {  },
+                        version = 1,
+                    },
+        },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            auraRef = "6e4d2a91:drrakea1",
+                                                            basePower = 0,
+                                                            duration = 5,
+                                                            stacks = 1,
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            type = "apply_aura",
+                                                        },
+                                        key = "rakeaur1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            amount = 1,
+                                                            amountMode = "flat",
+                                                            resourceRef = "f82db71a:1h7yfxff",
+                                                            targetEvents = {  },
+                                                            type = "resource",
+                                                        },
+                                        key = "rakecp01",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_druid_disembowel.blp",
+            id = "drrake01",
+            cooldownChannel = 2,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Rake",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 40,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:c3gaf7dd",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {
+                                        {
+                                                            auraRef = "6e4d2a91:drrakea1",
+                                                            datasetId = "6e4d2a91",
+                                                            descriptionText = "Deals {AURA_DAMAGE_1} Physical damage each turn.",
+                                                            duration = 5,
+                                                            icon = "interface/icons/ability_druid_disembowel.blp",
+                                                            nameText = "Rake",
+                                                            powerLevel = 0,
+                                                            spellDatasetId = "6e4d2a91",
+                                                            stacks = 1,
+                                                            targetContext = {
+                                                                                    object = "the affected enemy",
+                                                                                    possessive = "the affected enemy's",
+                                                                                    reflexive = "itself",
+                                                                                    subject = "the affected enemy",
+                                                                                },
+                                                            tokens = {
+                                                                                    {
+                                                                                                                applyMode = "damage_amount",
+                                                                                                                baseField = "baseDamage",
+                                                                                                                effectIndex = 1,
+                                                                                                                key = "AURA_DAMAGE_1",
+                                                                                                                tokenType = "aura_amount",
+                                                                                                            },
+                                                                                },
+                                                        },
+                                    },
+                        mainText = "Apply Rake to an enemy for 5 turns and restore {RESOURCE_AMOUNT_1} to yourself.",
+                        tokens = {
+                                        {
+                                                            applyMode = "resource_gain_amount",
+                                                            componentIndex = 2,
+                                                            key = "RESOURCE_AMOUNT_1",
+                                                            tokenType = "spell_resource_amount",
+                                                        },
+                                    },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Shred
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            alwaysHits = false,
+                                                            amountMode = "flat",
+                                                            applyAura = false,
+                                                            auraStacks = 1,
+                                                            baseDamage = 63.75,
+                                                            damageSchoolRefs = {
+                                                                                    "f82db71a:v1azo4j6",
+                                                                                },
+                                                            damageType = "melee",
+                                                            hitType = "ability",
+                                                            projectilePath = "",
+                                                            projectileSpeed = 0,
+                                                            statScaling = {
+                                                                                    {
+                                                                                                                coefficient = 0.2975,
+                                                                                                                statRef = "f82db71a:u7b49vs9",
+                                                                                                            },
+                                                                                },
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            threatCoefficient = 1,
+                                                            type = "damage",
+                                                            usesProjectile = false,
+                                                            weaponDamageCoefficient = 0.85,
+                                                            weaponDamageMode = "main_hand",
+                                                        },
+                                        key = "shreddm",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            amount = 2,
+                                                            amountMode = "flat",
+                                                            resourceRef = "f82db71a:1h7yfxff",
+                                                            targetEvents = {  },
+                                                            type = "resource",
+                                                        },
+                                        key = "shredcp",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/spell_shadow_vampiricaura.blp",
+            id = "drshred1",
+            cooldownChannel = 1,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Shred",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 60,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:c3gaf7dd",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                        tokens = {
+                                        {
+                                                            applyMode = "damage_range",
+                                                            componentIndex = 1,
+                                                            key = "DAMAGE_1",
+                                                            tokenType = "spell_damage_range",
+                                                        },
+                                        {
+                                                            applyMode = "resource_gain_amount",
+                                                            componentIndex = 2,
+                                                            key = "RESOURCE_AMOUNT_1",
+                                                            tokenType = "spell_resource_amount",
+                                                        },
+                                    },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Ferocious Bite
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            alwaysHits = false,
+                                                            amountMode = "flat",
+                                                            applyAura = false,
+                                                            auraStacks = 1,
+                                                            baseDamage = 225,
+                                                            damageSchoolRefs = {
+                                                                                    "f82db71a:v1azo4j6",
+                                                                                },
+                                                            damageType = "melee",
+                                                            hitType = "ability",
+                                                            projectilePath = "",
+                                                            projectileSpeed = 0,
+                                                            statScaling = {
+                                                                                    {
+                                                                                                                coefficient = 0.7875,
+                                                                                                                statRef = "f82db71a:u7b49vs9",
+                                                                                                            },
+                                                                                },
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            threatCoefficient = 1,
+                                                            type = "damage",
+                                                            usesProjectile = false,
+                                                            weaponDamageCoefficient = 0,
+                                                            weaponDamageMode = "none",
+                                                        },
+                                        key = "fbitedmg",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_druid_ferociousbite.blp",
+            id = "drfbite1",
+            cooldownChannel = 2,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Ferocious Bite",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 35,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:c3gaf7dd",
+                                    },
+                        {
+                                        amount = 5,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:1h7yfxff",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy.",
+                        tokens = {
+                                        {
+                                                            applyMode = "damage_range",
+                                                            componentIndex = 1,
+                                                            key = "DAMAGE_1",
+                                                            tokenType = "spell_damage_range",
+                                                        },
+                                    },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Claw
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            alwaysHits = false,
+                                                            amountMode = "flat",
+                                                            applyAura = false,
+                                                            auraStacks = 1,
+                                                            baseDamage = 63.75,
+                                                            damageSchoolRefs = {
+                                                                                    "f82db71a:v1azo4j6",
+                                                                                },
+                                                            damageType = "melee",
+                                                            hitType = "ability",
+                                                            projectilePath = "",
+                                                            projectileSpeed = 0,
+                                                            statScaling = {
+                                                                                    {
+                                                                                                                coefficient = 0.2975,
+                                                                                                                statRef = "f82db71a:u7b49vs9",
+                                                                                                            },
+                                                                                },
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            threatCoefficient = 1,
+                                                            type = "damage",
+                                                            usesProjectile = false,
+                                                            weaponDamageCoefficient = 0.85,
+                                                            weaponDamageMode = "main_hand",
+                                                        },
+                                        key = "clawdm",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            amount = 1,
+                                                            amountMode = "flat",
+                                                            resourceRef = "f82db71a:1h7yfxff",
+                                                            targetEvents = {  },
+                                                            type = "resource",
+                                                        },
+                                        key = "clawcp",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_druid_rake.blp",
+            id = "drclaw01",
+            cooldownChannel = 1,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Claw",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 45,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:c3gaf7dd",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                        tokens = {
+                                        {
+                                                            applyMode = "damage_range",
+                                                            componentIndex = 1,
+                                                            key = "DAMAGE_1",
+                                                            tokenType = "spell_damage_range",
+                                                        },
+                                        {
+                                                            applyMode = "resource_gain_amount",
+                                                            componentIndex = 2,
+                                                            key = "RESOURCE_AMOUNT_1",
+                                                            tokenType = "spell_resource_amount",
+                                                        },
+                                    },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Rip
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+            description = "",
+            duration = 5,
+            effects = {
+                        {
+                                        amountMode = "flat",
+                                        baseDamage = 20.8,
+                                        damageSchoolRefs = {
+                                                            "f82db71a:v1azo4j6",
+                                                        },
+                                        statScaling = {
+                                                            {
+                                                                                    coefficient = 0.364,
+                                                                                    statRef = "f82db71a:u7b49vs9",
+                                                                                },
+                                                        },
+                                        type = "damage",
+                                    },
+                    },
+            events = {  },
+            icon = "interface/icons/ability_ghoulfrenzy.blp",
+            id = "drripau1",
+            maxStacks = 1,
+            name = "Rip",
+            stackBehavior = "refresh_duration",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        bodyText = "Deals {AURA_DAMAGE_1} Physical damage each turn.",
+                        bodyTokens = {
+                                        {
+                                                            applyMode = "damage_amount",
+                                                            baseField = "baseDamage",
+                                                            effectIndex = 1,
+                                                            key = "AURA_DAMAGE_1",
+                                                            tokenType = "aura_amount",
+                                                        },
+                                    },
+                        stackingText = "",
+                        stackingTokens = {  },
+                        version = 1,
+                    },
+        },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            auraRef = "6e4d2a91:drripau1",
+                                                            basePower = 0,
+                                                            duration = 5,
+                                                            stacks = 1,
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            type = "apply_aura",
+                                                        },
+                                        key = "ripaur01",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_ghoulfrenzy.blp",
+            id = "drrip001",
+            cooldownChannel = 2,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Rip",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 30,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:c3gaf7dd",
+                                    },
+                        {
+                                        amount = 5,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:1h7yfxff",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {
+                                        {
+                                                            auraRef = "6e4d2a91:drripau1",
+                                                            datasetId = "6e4d2a91",
+                                                            descriptionText = "Deals {AURA_DAMAGE_1} Physical damage each turn.",
+                                                            duration = 5,
+                                                            icon = "interface/icons/ability_ghoulfrenzy.blp",
+                                                            nameText = "Rip",
+                                                            powerLevel = 0,
+                                                            spellDatasetId = "6e4d2a91",
+                                                            stacks = 1,
+                                                            targetContext = {
+                                                                                    object = "the affected enemy",
+                                                                                    possessive = "the affected enemy's",
+                                                                                    reflexive = "itself",
+                                                                                    subject = "the affected enemy",
+                                                                                },
+                                                            tokens = {
+                                                                                    {
+                                                                                                                applyMode = "damage_amount",
+                                                                                                                baseField = "baseDamage",
+                                                                                                                effectIndex = 1,
+                                                                                                                key = "AURA_DAMAGE_1",
+                                                                                                                tokenType = "aura_amount",
+                                                                                                            },
+                                                                                },
+                                                        },
+                                    },
+                        mainText = "Apply Rip to an enemy for 5 turns.",
+                        tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Tiger's Fury
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+            description = "",
+            duration = 1,
+            effects = {
+                        {
+                                        baseAmount = 30,
+                                        operation = "percent",
+                                        scaleWithRank = false,
+                                        statRef = "f82db71a:u7b49vs9",
+                                        statScaling = {  },
+                                        type = "stat",
+                                    },
+                    },
+            events = {  },
+            icon = "interface/icons/ability_mount_jungletiger.blp",
+            id = "drtgfra1",
+            maxStacks = 1,
+            name = "Tiger's Fury",
+            stackBehavior = "refresh_duration",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        bodyText = "Increases Melee Attack Power by 30%.",
+                        bodyTokens = {  },
+                        stackingText = "",
+                        stackingTokens = {  },
+                        version = 1,
+                    },
+        },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {  },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            auraRef = "6e4d2a91:drtgfra1",
+                                                            basePower = 0,
+                                                            duration = 1,
+                                                            stacks = 1,
+                                                            targetEvents = {  },
+                                                            type = "apply_aura",
+                                                        },
+                                        key = "tgrfapp1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            doesNotRevealCaster = true,
+            icon = "interface/icons/ability_mount_jungletiger.blp",
+            id = "drtgfry1",
+            cooldownChannel = 3,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = false,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Tiger's Fury",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 30,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:c3gaf7dd",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {
+                                        {
+                                                            auraRef = "6e4d2a91:drtgfra1",
+                                                            datasetId = "6e4d2a91",
+                                                            descriptionText = "Increases Melee Attack Power by 30%.",
+                                                            duration = 1,
+                                                            icon = "interface/icons/ability_mount_jungletiger.blp",
+                                                            nameText = "Tiger's Fury",
+                                                            powerLevel = 0,
+                                                            spellDatasetId = "6e4d2a91",
+                                                            stacks = 1,
+                                                            targetContext = {
+                                                                                    object = "you",
+                                                                                    possessive = "your",
+                                                                                    reflexive = "yourself",
+                                                                                    subject = "you",
+                                                                                },
+                                                            tokens = {  },
+                                                        },
+                                    },
+                        mainText = "Apply Tiger's Fury to yourself for 1 turn.",
+                        tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Ravage
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            alwaysHits = false,
+                                                            amountMode = "flat",
+                                                            applyAura = false,
+                                                            auraStacks = 1,
+                                                            baseDamage = 143.438,
+                                                            damageSchoolRefs = {
+                                                                                    "f82db71a:v1azo4j6",
+                                                                                },
+                                                            damageType = "melee",
+                                                            hitType = "ability",
+                                                            projectilePath = "",
+                                                            projectileSpeed = 0,
+                                                            statScaling = {
+                                                                                    {
+                                                                                                                coefficient = 0.6694,
+                                                                                                                statRef = "f82db71a:u7b49vs9",
+                                                                                                            },
+                                                                                },
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            threatCoefficient = 1,
+                                                            type = "damage",
+                                                            usesProjectile = false,
+                                                            weaponDamageCoefficient = 1.9125,
+                                                            weaponDamageMode = "main_hand",
+                                                        },
+                                        key = "ravagedm",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            amount = 2,
+                                                            amountMode = "flat",
+                                                            resourceRef = "f82db71a:1h7yfxff",
+                                                            targetEvents = {  },
+                                                            type = "resource",
+                                                        },
+                                        key = "ravagecp",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
+                    },
+            conditions = {
+                        {
+                                        invert = false,
+                                        showOnTooltip = true,
+                                        tooltipTextOverride = "Requires Prowl",
+                                        type = "hidden",
+                                        unit = "caster",
+                                    },
+                    },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_druid_ravage.blp",
+            id = "drravge1",
+            cooldownChannel = 1,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Ravage",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 60,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:c3gaf7dd",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                        tokens = {
+                                        {
+                                                            applyMode = "damage_range",
+                                                            componentIndex = 1,
+                                                            key = "DAMAGE_1",
+                                                            tokenType = "spell_damage_range",
+                                                        },
+                                        {
+                                                            applyMode = "resource_gain_amount",
+                                                            componentIndex = 2,
+                                                            key = "RESOURCE_AMOUNT_1",
+                                                            tokenType = "spell_resource_amount",
+                                                        },
+                                    },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+            canTargetHiddenUnits = false,
+            doesNotRevealCaster = false,
+        },
+}
+```
+
+### Swipe
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            alwaysHits = false,
+                                                            amountMode = "flat",
+                                                            applyAura = false,
+                                                            auraStacks = 1,
+                                                            baseDamage = 75,
+                                                            damageSchoolRefs = {
+                                                                                    "f82db71a:v1azo4j6",
+                                                                                },
+                                                            damageType = "melee",
+                                                            hitType = "ability",
+                                                            projectilePath = "",
+                                                            projectileSpeed = 0,
+                                                            statScaling = {
+                                                                                    {
+                                                                                                                coefficient = 0.35,
+                                                                                                                statRef = "f82db71a:u7b49vs9",
+                                                                                                            },
+                                                                                },
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            threatCoefficient = 1,
+                                                            type = "damage",
+                                                            usesProjectile = false,
+                                                            weaponDamageCoefficient = 1,
+                                                            weaponDamageMode = "main_hand",
+                                                        },
+                                        key = "swipedmg",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 2,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "raid_marker",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/inv_misc_monsterclaw_03.blp",
+            id = "drswipe1",
+            cooldownChannel = 1,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Swipe",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 50,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:c3gaf7dd",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Deal {DAMAGE_1} Physical damage to up to 2 enemies. Targets must share the same raid marker.",
+                        tokens = {
+                                        {
+                                                            applyMode = "damage_range",
+                                                            componentIndex = 1,
+                                                            key = "DAMAGE_1",
+                                                            tokenType = "spell_damage_range",
+                                                        },
+                                    },
                         version = 1,
                     },
             totalTicks = 0,
