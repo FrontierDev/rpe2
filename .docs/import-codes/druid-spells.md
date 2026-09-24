@@ -13,8 +13,8 @@ Import each listed **Aura** before its associated **Spell**. These entries use t
 - **Wrath** intentionally copies the current Priest **Smite** low-threat budget: 70 base damage, 0.70 Spell Power, 0.50 threat coefficient and 5% base Mana, converted from Holy to Nature.
 - **Starfire** is the standard one-turn, single-target Main Action DPS budget: 135 base damage + 1.40 Spell Power, 6.8% base Mana.
 - **Starsurge** is the standard instant single-target Bonus Action DPS budget: 65 base damage + 0.65 Spell Power, 0.75 threat coefficient, 6.3% base Mana.
-- **Moonfire** and **Sunfire** have two independently useful numerical outputs, so both direct and periodic components use the 0.85 secondary-effect modifier. Direct damage is 55.25 + 0.5525 Spell Power; the 5-turn DoT is 17.68 + 0.884 Spell Power per turn. Each costs 6.3% base Mana.
-- **Thorns** is reactive and therefore is not forced through the direct/periodic calculator. Its reactive damage copies the current **Molten Armor** event budget (28.1667 + 0.845 Spell Power), converted to Nature. The fixed +8% Threat Generated effect does not rank-scale; reactive damage does. It responds to auto attacks, melee abilities, ranged abilities and spell attacks so the authored wording "attackers" is implemented literally.
+- **Moonfire** and **Sunfire** have two independently useful numerical outputs. Their direct component remains the secondary-output Bonus Action budget at 55.25 + 0.5525 Spell Power. Their 5-turn periodic component remains 17.68 base damage per turn, but its authored per-tick coefficient follows the corrected hybrid-DoT convention and current Fireball DoT reference: **0.22 Spell Power per turn** (1.10 Spell Power over five ticks). Each costs 6.3% base Mana.
+- **Thorns** is reactive and therefore is not forced through the direct/periodic calculator. Its reactive damage copies the current **Molten Armor** event budget (28.1667 + 0.845 Spell Power), converted to Nature. The fixed +8% Threat Generated effect does not rank-scale; reactive damage does. Use `on_melee_taken`, `on_ranged_taken` and `on_spell_taken`. Do **not** also register `on_auto_attack_taken`: current combat-event filtering treats a melee auto attack as both `hitType = "auto"` and `attackType = "melee"`, so registering both would retaliate twice against the same melee auto attack.
 - **Thorns** uses the current 5% base-Mana utility/reactive-buff convention, lasts 10 turns, uses Buff Action and has the requested 1-turn personal cooldown.
 - **Entangling Roots** copies the current Polymorph/Freezing-Trap control shape but does **not** prevent spellcasting: it breaks on damage, sets movement range to 0 and causes attacks against the target to automatically hit. It costs 5% base Mana.
 - **Solar Beam** uses the implemented `raid_marker` targeter with `maxTargets = 5`. Control-only mechanics are outside the numerical output calculator; its 18.1% base-Mana cost follows the current multi-target control analogue (Psychic Scream), while keeping the requested Bonus Action channel, 1-turn duration and 10-turn cooldown.
@@ -381,7 +381,7 @@ RPE_DATASET_ENTRY_V1
                                                         },
                                         statScaling = {
                                                             {
-                                                                                    coefficient = 0.884,
+                                                                                    coefficient = 0.22,
                                                                                     statRef = "f82db71a:7t7xgzcx",
                                                                                 },
                                                         },
@@ -576,7 +576,7 @@ RPE_DATASET_ENTRY_V1
                                                         },
                                         statScaling = {
                                                             {
-                                                                                    coefficient = 0.884,
+                                                                                    coefficient = 0.22,
                                                                                     statRef = "f82db71a:7t7xgzcx",
                                                                                 },
                                                         },
@@ -773,27 +773,6 @@ RPE_DATASET_ENTRY_V1
                                     },
                     },
             events = {
-                        {
-                                        combatEventId = "on_auto_attack_taken",
-                                        effects = {
-                                                            {
-                                                                                    amountMode = "flat",
-                                                                                    baseDamage = 28.1667,
-                                                                                    damageSchoolRefs = {
-                                                                                                                "f82db71a:qtr10qyj",
-                                                                                                            },
-                                                                                    scaleWithRank = true,
-                                                                                    statScaling = {
-                                                                                                                {
-                                                                                                                                                coefficient = 0.845,
-                                                                                                                                                statRef = "f82db71a:7t7xgzcx",
-                                                                                                                                            },
-                                                                                                            },
-                                                                                    type = "damage",
-                                                                                },
-                                                        },
-                                        triggerTarget = "event_source",
-                                    },
                         {
                                         combatEventId = "on_melee_taken",
                                         effects = {
@@ -1297,8 +1276,8 @@ Authoring details:
 - Energy: `f82db71a:c3gaf7dd`; Combo Points: `f82db71a:1h7yfxff`; Melee Attack Power: `f82db71a:u7b49vs9`.
 - Prowl copies the current Rogue Stealth runtime shape exactly: self-hide, Buff Action, 10-turn RPE cooldown, and no resource cost.
 - Pounce uses the current hidden-caster condition used by Ambush. Its direct weapon-attack output uses the Bonus Action budget with the 0.85 secondary-effect modifier: 41.4375 flat + 0.1934 Melee Attack Power + 0.5525 main-hand weapon damage. The stun is 1 turn and the spell generates the requested 2 Combo Points.
-- Rake has no separate upfront damage component: it applies a Rend-like 5-turn bleed and generates 1 Combo Point. Because the Combo Point generation is a meaningful secondary output, the periodic budget is 17.68 + 0.3094 Melee Attack Power each turn.
-- Shred, Ferocious Bite, Claw, Rip, Ravage and Swipe intentionally copy the current RPE analogue's numerical damage/effect shape. Only the icon/name/category, explicit Druid mechanics, and requested Classic Energy costs are changed.
+- Rake has no separate upfront damage component: it applies a Rend-like 5-turn bleed and generates 1 Combo Point. The flat periodic base remains the 0.85 secondary-output version of Rend at 17.68 per turn. Under the corrected per-tick DoT convention, current Rend is 0.15 Melee Attack Power per turn; applying the same 0.85 secondary-output allowance gives Rake **0.1275 Melee Attack Power per turn** (0.6375 over five ticks).
+- Shred, Ferocious Bite, Claw, Rip, Ravage and Swipe intentionally copy the current RPE analogue's numerical damage/effect shape. In particular, **Rip now follows the current Rupture periodic coefficient of 0.20 Melee Attack Power per turn**, not the superseded 0.364 value. Only the icon/name/category, explicit Druid mechanics, and requested Classic Energy costs are changed.
 - Shred and Ravage generate 2 Combo Points in this RPE design. This is deliberate and follows the requested design/current RPE analogue rather than original Classic's combo-point award.
 - Ferocious Bite and Rip follow the current RPE finisher convention and consume 5 Combo Points.
 - Tiger's Fury is a fixed percentage buff and therefore does not scale with spell rank.
@@ -1607,7 +1586,7 @@ RPE_DATASET_ENTRY_V1
                                                         },
                                         statScaling = {
                                                             {
-                                                                                    coefficient = 0.3094,
+                                                                                    coefficient = 0.1275,
                                                                                     statRef = "f82db71a:u7b49vs9",
                                                                                 },
                                                         },
@@ -2201,7 +2180,7 @@ RPE_DATASET_ENTRY_V1
                                                         },
                                         statScaling = {
                                                             {
-                                                                                    coefficient = 0.364,
+                                                                                    coefficient = 0.2,
                                                                                     statRef = "f82db71a:u7b49vs9",
                                                                                 },
                                                         },
