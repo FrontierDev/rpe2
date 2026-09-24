@@ -14,6 +14,7 @@ local Addon = { Data = {} }
 loadAddonFile("data/default/Datasets.lua", Addon)
 
 local datasets = {
+    { path = "data/default/classes/druid.lua", id = "6e4d2a91", version = 1 },
     { path = "data/default/classes/hunter.lua", id = "a93f7c12", version = 10 },
     { path = "data/default/classes/mage.lua", id = "d7c874c4", version = 38 },
     { path = "data/default/classes/paladin.lua", id = "b0211ab3", version = 49 },
@@ -33,6 +34,12 @@ for _, definition in ipairs(datasets) do
 end
 
 local expected = {
+    ["6e4d2a91"] = {
+        ["Moonfire"] = { duration = 5, baseDamage = 17.68, coefficient = 0.22, statRef = "f82db71a:7t7xgzcx" },
+        ["Sunfire"] = { duration = 5, baseDamage = 17.68, coefficient = 0.22, statRef = "f82db71a:7t7xgzcx" },
+        ["Rake"] = { duration = 5, baseDamage = 17.68, coefficient = 0.1275, statRef = "f82db71a:u7b49vs9" },
+        ["Rip"] = { duration = 5, baseDamage = 20.8, coefficient = 0.2, statRef = "f82db71a:u7b49vs9" },
+    },
     ["a93f7c12"] = {
         ["Serpent Sting"] = { duration = 5, baseDamage = 20.8, coefficient = 0.15, statRef = "f82db71a:v2rs9cpy" },
         ["Explosive Shot"] = { duration = 2, baseDamage = 19.06125, coefficient = 0.08, statRef = "f82db71a:v2rs9cpy" },

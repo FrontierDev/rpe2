@@ -36,6 +36,7 @@ jobs:
           set -euo pipefail
           lua5.1 tests/DefaultRulesetImportTest.lua
           lua5.1 tests/DefaultDatasetStartupTest.lua
+          lua5.1 tests/DruidDatasetTest.lua
           lua5.1 tests/PeriodicAuraAuthoringTest.lua
           lua5.1 tests/ClassSetRestrictionTest.lua
           lua5.1 tests/RuntimeExternalManagerStartupTest.lua
