@@ -2757,3 +2757,976 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
+## Feral — Bear Abilities
+
+These abilities are authored as the Druid's Bear/tank toolkit but, by design, **do not require Bear Form**. They remain in the `Feral` spellbook category and use Rage where appropriate.
+
+### Bear authoring notes
+
+| Spell | Rage | RPE implementation |
+|---|---:|---|
+| Maul | 15 | Tank-role Bonus Action weapon attack; moderate threat. |
+| Swipe (Bear) | 20 | Tank-role Main Action, up to 3 enemies on one raid marker; high threat. |
+| Growl | 0 | Copy Warrior Taunt: 3-turn taunt, 3-turn cooldown. |
+| Demoralizing Roar | 10 | Copy Demoralizing Shout: -10% Melee Attack Power to up to 5 enemies for 2 turns. |
+| Enrage | 0 | Generates 20 Rage over 5 RPE turns (4/turn) while reducing Armor by 27%; 10-turn cooldown. |
+| Bash | 10 | 1-turn stun/control, Bonus Action, 10-turn cooldown. |
+| Challenging Roar | 15 | Up to 5 same-marker enemies taunted for 2 turns; 10-turn cooldown. |
+| Frenzied Regeneration | 50 | RPE-safe conversion: upfront Rage cost, then heals 5% Max Health/turn for 5 turns; 10-turn cooldown. |
+
+Damage/scaling notes:
+
+- **Maul** uses the Tank-role instant Bonus Action weapon budget: **39 base + 0.182 Melee Attack Power + 0.52 main-hand weapon damage**, with **1.5 threat coefficient**. This is the same numerical shape as current Warrior Heroic Strike and matches Maul's high-threat Rage-spender role.
+- **Swipe (Bear)** is not modeled as a weapon strike because Classic Swipe is a direct Physical area attack rather than an empowered weapon swing. The current RPE Tank/Main Action/3-target budget gives **48 base + 0.168 Melee Attack Power per target**, with **2.0 threat coefficient**.
+- Fixed control, taunt, stat-debuff, and resource-generation effects do not rank-scale. Maul and Swipe use normal 8-level ranks.
+- **Frenzied Regeneration** is intentionally an RPE adaptation. The current aura runtime can drain Rage each turn, but it cannot condition the heal amount on how much Rage was successfully consumed; implementing the Classic conversion literally would therefore permit free healing after Rage reaches zero. The upfront 50-Rage version avoids that invalid fallback.
+
+### Maul
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            alwaysHits = false,
+                                                            amountMode = "flat",
+                                                            applyAura = false,
+                                                            auraStacks = 1,
+                                                            baseDamage = 39,
+                                                            damageSchoolRefs = {
+                                                                                    "f82db71a:v1azo4j6",
+                                                                                },
+                                                            damageType = "melee",
+                                                            hitType = "ability",
+                                                            projectilePath = "",
+                                                            projectileSpeed = 0,
+                                                            statScaling = {
+                                                                                    {
+                                                                                                                coefficient = 0.182,
+                                                                                                                statRef = "f82db71a:u7b49vs9",
+                                                                                                            },
+                                                                                },
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            threatCoefficient = 1.5,
+                                                            type = "damage",
+                                                            usesProjectile = false,
+                                                            weaponDamageCoefficient = 0.52,
+                                                            weaponDamageMode = "main_hand",
+                                                        },
+                                        key = "mauldmg1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_druid_maul.blp",
+            id = "drmaul01",
+            cooldownChannel = 2,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Maul",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 15,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:e2tfklq7",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generates a moderate amount of threat.",
+                        tokens = {
+                                        {
+                                                            applyMode = "damage_range",
+                                                            componentIndex = 1,
+                                                            key = "DAMAGE_1",
+                                                            tokenType = "spell_damage_range",
+                                                        },
+                                    },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Swipe (Bear)
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {
+                        "on_melee_hit",
+                        "on_critical_hit",
+                    },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            alwaysHits = false,
+                                                            amountMode = "flat",
+                                                            applyAura = false,
+                                                            auraStacks = 1,
+                                                            baseDamage = 48,
+                                                            damageSchoolRefs = {
+                                                                                    "f82db71a:v1azo4j6",
+                                                                                },
+                                                            damageType = "melee",
+                                                            hitType = "ability",
+                                                            projectilePath = "",
+                                                            projectileSpeed = 0,
+                                                            statScaling = {
+                                                                                    {
+                                                                                                                coefficient = 0.168,
+                                                                                                                statRef = "f82db71a:u7b49vs9",
+                                                                                                            },
+                                                                                },
+                                                            targetEvents = {
+                                                                                    "on_melee_taken",
+                                                                                    "on_critical_hit_taken",
+                                                                                },
+                                                            threatCoefficient = 2,
+                                                            type = "damage",
+                                                            usesProjectile = false,
+                                                            weaponDamageCoefficient = 0,
+                                                            weaponDamageMode = "none",
+                                                        },
+                                        key = "swpbdmg1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = true,
+                                                            maxTargets = 3,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "raid_marker",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 0,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/inv_misc_monsterclaw_03.blp",
+            id = "drswpbr1",
+            cooldownChannel = 1,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = true,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Swipe (Bear)",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 20,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:e2tfklq7",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Deal {DAMAGE_1} Physical damage to up to 3 enemies. Targets must share the same raid marker. Generates a high amount of threat.",
+                        tokens = {
+                                        {
+                                                            applyMode = "damage_range",
+                                                            componentIndex = 1,
+                                                            key = "DAMAGE_1",
+                                                            tokenType = "spell_damage_range",
+                                                        },
+                                    },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Growl
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {  },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            duration = 3,
+                                                            targetEvents = {  },
+                                                            type = "taunt",
+                                                        },
+                                        key = "growltnt",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 3,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_physical_taunt.blp",
+            id = "drgrowl1",
+            cooldownChannel = 2,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = false,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Growl",
+            range = 0,
+            resourceCosts = {  },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Taunt an enemy for 3 turns.",
+                        tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Demoralizing Roar
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+            description = "",
+            duration = 2,
+            effects = {
+                        {
+                                        baseAmount = -10,
+                                        operation = "percent",
+                                        scaleWithRank = false,
+                                        statRef = "f82db71a:u7b49vs9",
+                                        statScaling = {  },
+                                        type = "stat",
+                                    },
+                    },
+            events = {  },
+            icon = "interface/icons/ability_druid_demoralizingroar.blp",
+            id = "drdmrau1",
+            maxStacks = 1,
+            name = "Demoralizing Roar",
+            stackBehavior = "refresh_duration",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        bodyText = "Reduces Melee Attack Power by 10%.",
+                        bodyTokens = {  },
+                        stackingText = "",
+                        stackingTokens = {  },
+                        version = 1,
+                    },
+        },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {  },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            auraRef = "6e4d2a91:drdmrau1",
+                                                            basePower = 0,
+                                                            duration = 2,
+                                                            stacks = 1,
+                                                            targetEvents = {  },
+                                                            type = "apply_aura",
+                                                        },
+                                        key = "dmroapp1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = true,
+                                                            maxTargets = 5,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "multi",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 2,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_druid_demoralizingroar.blp",
+            id = "drdmror1",
+            cooldownChannel = 1,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = false,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Demoralizing Roar",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 10,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:e2tfklq7",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {
+                                        {
+                                                            auraRef = "6e4d2a91:drdmrau1",
+                                                            datasetId = "6e4d2a91",
+                                                            descriptionText = "Reduces Melee Attack Power by 10%.",
+                                                            duration = 2,
+                                                            icon = "interface/icons/ability_druid_demoralizingroar.blp",
+                                                            nameText = "Demoralizing Roar",
+                                                            powerLevel = 0,
+                                                            spellDatasetId = "6e4d2a91",
+                                                            stacks = 1,
+                                                            targetContext = {
+                                                                                    object = "the affected enemy",
+                                                                                    possessive = "the affected enemy's",
+                                                                                    reflexive = "itself",
+                                                                                    subject = "the affected enemy",
+                                                                                },
+                                                            tokens = {  },
+                                                        },
+                                    },
+                        mainText = "Apply Demoralizing Roar to up to 5 enemies for 2 turns.",
+                        tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Enrage
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+            description = "",
+            duration = 5,
+            effects = {
+                        {
+                                        amount = 4,
+                                        amountMode = "flat",
+                                        resourceRef = "f82db71a:e2tfklq7",
+                                        scaleWithRank = false,
+                                        type = "resource",
+                                    },
+                        {
+                                        baseAmount = -27,
+                                        operation = "percent",
+                                        scaleWithRank = false,
+                                        statRef = "f82db71a:v42albuv",
+                                        statScaling = {  },
+                                        type = "stat",
+                                    },
+                    },
+            events = {  },
+            icon = "interface/icons/ability_druid_enrage.blp",
+            id = "drenrau1",
+            maxStacks = 1,
+            name = "Enrage",
+            stackBehavior = "refresh_duration",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        bodyText = "Restores {AURA_RESOURCE_GAIN_1} Rage each turn. Reduces Armor by 27%.",
+                        bodyTokens = {
+                                        {
+                                                            applyMode = "resource_gain_amount",
+                                                            effectIndex = 1,
+                                                            key = "AURA_RESOURCE_GAIN_1",
+                                                            tokenType = "aura_amount",
+                                                        },
+                                    },
+                        stackingText = "",
+                        stackingTokens = {  },
+                        version = 1,
+                    },
+        },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {  },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            auraRef = "6e4d2a91:drenrau1",
+                                                            basePower = 0,
+                                                            duration = 5,
+                                                            stacks = 1,
+                                                            targetEvents = {  },
+                                                            type = "apply_aura",
+                                                        },
+                                        key = "enrgapp1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 10,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            doesNotRevealCaster = true,
+            icon = "interface/icons/ability_druid_enrage.blp",
+            id = "drenrag1",
+            cooldownChannel = 3,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = false,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Enrage",
+            range = 0,
+            resourceCosts = {  },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {
+                                        {
+                                                            auraRef = "6e4d2a91:drenrau1",
+                                                            datasetId = "6e4d2a91",
+                                                            descriptionText = "Restores {AURA_RESOURCE_GAIN_1} Rage each turn. Reduces Armor by 27%.",
+                                                            duration = 5,
+                                                            icon = "interface/icons/ability_druid_enrage.blp",
+                                                            nameText = "Enrage",
+                                                            powerLevel = 0,
+                                                            spellDatasetId = "6e4d2a91",
+                                                            stacks = 1,
+                                                            targetContext = {
+                                                                                    object = "you",
+                                                                                    possessive = "your",
+                                                                                    reflexive = "yourself",
+                                                                                    subject = "you",
+                                                                                },
+                                                            tokens = {
+                                                                                    {
+                                                                                                                applyMode = "resource_gain_amount",
+                                                                                                                effectIndex = 1,
+                                                                                                                key = "AURA_RESOURCE_GAIN_1",
+                                                                                                                tokenType = "aura_amount",
+                                                                                                            },
+                                                                                },
+                                                        },
+                                    },
+                        mainText = "Apply Enrage to yourself for 5 turns.",
+                        tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Bash
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+            description = "",
+            duration = 1,
+            effects = {
+                        {
+                                        cancelOnDamage = false,
+                                        forceAutoHitAgainstTarget = true,
+                                        movementRangeOverride = 0,
+                                        preventCasting = true,
+                                        statScaling = {  },
+                                        type = "control",
+                                    },
+                    },
+            events = {  },
+            icon = "interface/icons/ability_druid_bash.blp",
+            id = "drbashau",
+            maxStacks = 1,
+            name = "Bash",
+            stackBehavior = "refresh_duration",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                        bodyTokens = {  },
+                        stackingText = "",
+                        stackingTokens = {  },
+                        version = 1,
+                    },
+        },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {  },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            auraRef = "6e4d2a91:drbashau",
+                                                            basePower = 0,
+                                                            duration = 1,
+                                                            stacks = 1,
+                                                            targetEvents = {  },
+                                                            type = "apply_aura",
+                                                        },
+                                        key = "bashapp1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 1,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "single",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 10,
+            cooldownGroup = "stun",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_druid_bash.blp",
+            id = "drbash01",
+            cooldownChannel = 2,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = false,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Bash",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 10,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:e2tfklq7",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {
+                                        {
+                                                            auraRef = "6e4d2a91:drbashau",
+                                                            datasetId = "6e4d2a91",
+                                                            descriptionText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                                                            duration = 1,
+                                                            icon = "interface/icons/ability_druid_bash.blp",
+                                                            nameText = "Bash",
+                                                            powerLevel = 0,
+                                                            spellDatasetId = "6e4d2a91",
+                                                            stacks = 1,
+                                                            targetContext = {
+                                                                                    object = "the affected enemy",
+                                                                                    possessive = "the affected enemy's",
+                                                                                    reflexive = "itself",
+                                                                                    subject = "the affected enemy",
+                                                                                },
+                                                            tokens = {  },
+                                                        },
+                                    },
+                        mainText = "Apply Bash to an enemy for 1 turn.",
+                        tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Challenging Roar
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {  },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            duration = 2,
+                                                            targetEvents = {  },
+                                                            type = "taunt",
+                                                        },
+                                        key = "chaltnt1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = true,
+                                                            maxTargets = 5,
+                                                            minTargets = 1,
+                                                            requiresTarget = true,
+                                                            targetDisposition = "enemy",
+                                                            type = "raid_marker",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 10,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_druid_challangingroar.blp",
+            id = "drchalr1",
+            cooldownChannel = 1,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = false,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Challenging Roar",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 15,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:e2tfklq7",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {  },
+                        mainText = "Taunt up to 5 enemies on the same raid marker for 2 turns.",
+                        tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
+### Frenzied Regeneration
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+            description = "",
+            duration = 5,
+            effects = {
+                        {
+                                        amountMode = "max_percent",
+                                        baseHealing = 5,
+                                        scaleWithRank = false,
+                                        statScaling = {  },
+                                        type = "heal",
+                                    },
+                    },
+            events = {  },
+            icon = "interface/icons/ability_bullrush.blp",
+            id = "drfrgau1",
+            maxStacks = 1,
+            name = "Frenzied Regeneration",
+            stackBehavior = "refresh_duration",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        bodyText = "Heals for 5% of Max health each turn.",
+                        bodyTokens = {  },
+                        stackingText = "",
+                        stackingTokens = {  },
+                        version = 1,
+                    },
+        },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+            allowDeadTargets = false,
+            canMoveWhileCasting = false,
+            castTime = 0,
+            casterEvents = {  },
+            charges = 0,
+            components = {
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            auraRef = "6e4d2a91:drfrgau1",
+                                                            basePower = 0,
+                                                            duration = 5,
+                                                            stacks = 1,
+                                                            targetEvents = {  },
+                                                            type = "apply_aura",
+                                                        },
+                                        key = "fregapp1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
+                    },
+            conditions = {  },
+            cooldown = 10,
+            cooldownGroup = "",
+            cooldownScalesWithHaste = false,
+            description = "",
+            icon = "interface/icons/ability_bullrush.blp",
+            id = "drfreg01",
+            cooldownChannel = 2,
+            learnMode = "always_learned",
+            learnLevel = 1,
+            usesRanks = false,
+            rankInterval = 8,
+            mountedCombatOnly = false,
+            name = "Frenzied Regeneration",
+            range = 0,
+            resourceCosts = {
+                        {
+                                        amount = 50,
+                                        amountMode = "flat",
+                                        castPhase = "on_cast_end",
+                                        refundOnInterrupt = 0,
+                                        resourceRef = "f82db71a:e2tfklq7",
+                                    },
+                    },
+            seedNPCSpell = false,
+            spellbookCategory = "Feral",
+            tags = {  },
+            tooltipTemplate = true,
+            tooltipTemplateData = {
+                        auraSections = {
+                                        {
+                                                            auraRef = "6e4d2a91:drfrgau1",
+                                                            datasetId = "6e4d2a91",
+                                                            descriptionText = "Heals for 5% of Max health each turn.",
+                                                            duration = 5,
+                                                            icon = "interface/icons/ability_bullrush.blp",
+                                                            nameText = "Frenzied Regeneration",
+                                                            powerLevel = 0,
+                                                            spellDatasetId = "6e4d2a91",
+                                                            stacks = 1,
+                                                            targetContext = {
+                                                                                    object = "you",
+                                                                                    possessive = "your",
+                                                                                    reflexive = "yourself",
+                                                                                    subject = "you",
+                                                                                },
+                                                            tokens = {  },
+                                                        },
+                                    },
+                        mainText = "Apply Frenzied Regeneration to yourself for 5 turns.",
+                        tokens = {  },
+                        version = 1,
+                    },
+            totalTicks = 0,
+            useCooldownCharges = false,
+        },
+}
+```
+
