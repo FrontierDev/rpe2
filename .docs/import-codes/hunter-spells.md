@@ -22,9 +22,14 @@ Import each listed **Aura** before its associated **Spell**. All entries use the
 | Serpent Sting | 6.3% |
 | Arcane Shot | 5.0% |
 | Rapid Fire | 5.0% |
+| Bursting Shot | 5.0% |
+| Kill Shot | 13.6% |
 | Explosive Shot | 18.1% |
 | Multi Shot | 18.1% |
 | Volley | 12.3% |
+| Survival of the Fittest | 5.0% |
+| Hatchet Toss | 6.3% |
+| Carve | 10.0% |
 | Raptor Strike | 5.0% |
 | Mongoose Bite | 13.6% |
 | Freezing Trap | 5.0% |
@@ -35,6 +40,12 @@ Import each listed **Aura** before its associated **Spell**. All entries use the
 - **Mongoose Bite** uses the **Spender** damage budget from the spell-authoring specification but remains on Bonus Action (channel 2), as requested. It requires Raptor Strike but does not consume Raptor Strike stacks because consumption was not specified.
 - The current `dev` Mage dataset contains no spell or aura named **Blizzard**. The current Aura damage schema also does not support periodic weapon-damage coefficients. **Volley** is therefore represented as the closest supported current equivalent: a 1-turn Main Action, up-to-5-target, same-raid-marker Physical ranged-weapon attack using the current multi-target weapon-damage budget. No unsupported periodic weapon-damage aura is invented.
 - **Intimidation** copies the current Hammer of Justice control behavior, cooldown and action channel, with Hunter name/icon/aura.
+- **Survival of the Fittest** copies Divine Protection: 30% Damage Reduction for 1 turn, 5-turn cooldown, Reaction channel.
+- **Hatchet Toss** copies Heroic Throw's damage, thrown-weapon requirement and high-threat behavior; its Rage cost is replaced with 6.3% base Mana.
+- **Carve** copies Cleave's two-target same-raid-marker melee attack; its Rage cost is replaced with 10% base Mana.
+- **Rapid Fire** now lasts 2 turns and deals additional Physical damage on each `on_ranged_hit`, using the current Shadow Blades triggered-damage shape with Ranged Attack Power.
+- **Bursting Shot** copies Blind's 1-turn break-on-damage control, 10-turn cooldown and Bonus Action channel.
+- **Kill Shot** uses the current Shadow Word: Death execute condition (`target_health_percent <= 20`) and spender-sized direct damage, converted to Physical damage and Ranged Attack Power.
 - **Freezing Trap** copies the current Repentance control behavior, cast time, cooldown and action channel, with Hunter name/icon/aura.
 
 ## Beastmaster
@@ -1311,18 +1322,32 @@ RPE_DATASET_ENTRY_V1
     datasetId = "a93f7c12",
     entry = {
         description = "",
-        duration = 1,
-        effects = {
+        duration = 2,
+        effects = {  },
+        events = {
             {
-                baseAmount = 100,
-                operation = "flat",
-                scaleWithRank = false,
-                statRef = "f82db71a:fercjhm5",
-                statScaling = {  },
-                type = "stat",
+                chance = 100,
+                combatEventId = "on_ranged_hit",
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseDamage = 28.1667,
+                        damageSchoolRefs = {
+                            "f82db71a:v1azo4j6",
+                        },
+                        scaleWithRank = true,
+                        statScaling = {
+                            {
+                                coefficient = 0.29575,
+                                statRef = "f82db71a:v2rs9cpy",
+                            },
+                        },
+                        type = "damage",
+                    },
+                },
+                triggerTarget = "event_other",
             },
         },
-        events = {  },
         icon = "interface/icons/ability_hunter_runningshot.blp",
         id = "6phb5os0",
         maxStacks = 1,
@@ -1331,8 +1356,17 @@ RPE_DATASET_ENTRY_V1
         tags = {  },
         tooltipTemplate = true,
         tooltipTemplateData = {
-            bodyText = "Increases Ranged Crit. Chance by 100%.",
-            bodyTokens = {  },
+            bodyText = "When the affected unit hits with a ranged attack, deal {AURA_EVENT_DAMAGE_1} Physical damage to the target.",
+            bodyTokens = {
+                {
+                    applyMode = "damage_amount",
+                    baseField = "baseDamage",
+                    effectIndex = 1,
+                    eventIndex = 1,
+                    key = "AURA_EVENT_DAMAGE_1",
+                    tokenType = "aura_amount",
+                },
+            },
             stackingText = "",
             stackingTokens = {  },
             version = 1,
@@ -1363,7 +1397,7 @@ RPE_DATASET_ENTRY_V1
                 effect = {
                     auraRef = "a93f7c12:6phb5os0",
                     basePower = 0,
-                    duration = 1,
+                    duration = 2,
                     stacks = 1,
                     targetEvents = {  },
                     type = "apply_aura",
@@ -1390,7 +1424,7 @@ RPE_DATASET_ENTRY_V1
         cooldownChannel = 3,
         learnMode = "always_learned",
         learnLevel = 1,
-        usesRanks = false,
+        usesRanks = true,
         rankInterval = 8,
         mountedCombatOnly = false,
         name = "Rapid Fire",
@@ -1413,8 +1447,8 @@ RPE_DATASET_ENTRY_V1
                 {
                     auraRef = "a93f7c12:6phb5os0",
                     datasetId = "a93f7c12",
-                    descriptionText = "Increases Ranged Crit. Chance by 100%.",
-                    duration = 1,
+                    descriptionText = "When you hit with a ranged attack, deal {AURA_EVENT_DAMAGE_1} Physical damage to the target.",
+                    duration = 2,
                     icon = "interface/icons/ability_hunter_runningshot.blp",
                     nameText = "Rapid Fire",
                     powerLevel = 0,
@@ -1426,11 +1460,293 @@ RPE_DATASET_ENTRY_V1
                         reflexive = "yourself",
                         subject = "you",
                     },
+                    tokens = {
+                        {
+                            applyMode = "damage_amount",
+                            baseField = "baseDamage",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_DAMAGE_1",
+                            tokenType = "aura_amount",
+                        },
+                    },
+                },
+            },
+            mainText = "Apply Rapid Fire to yourself for 2 turns.",
+            tokens = {  },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Bursting Shot
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "a93f7c12",
+    entry = {
+        description = "",
+        duration = 1,
+        effects = {
+            {
+                cancelOnDamage = true,
+                forceAutoHitAgainstTarget = true,
+                movementRangeOverride = 0,
+                preventCasting = true,
+                statScaling = {  },
+                type = "control",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/ability_hunter_burstingshot.blp",
+        id = "burstau1",
+        maxStacks = 1,
+        name = "Bursting Shot",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+            bodyTokens = {  },
+            stackingText = "",
+            stackingTokens = {  },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "a93f7c12",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "a93f7c12:burstau1",
+                    basePower = 0,
+                    duration = 1,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "burstcmp",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 10,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/ability_hunter_burstingshot.blp",
+        id = "burst001",
+        cooldownChannel = 2,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Bursting Shot",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Marksmanship",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {
+                {
+                    auraRef = "a93f7c12:burstau1",
+                    datasetId = "a93f7c12",
+                    descriptionText = "Breaks when the affected unit takes damage. Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    duration = 1,
+                    icon = "interface/icons/ability_hunter_burstingshot.blp",
+                    nameText = "Bursting Shot",
+                    powerLevel = 0,
+                    spellDatasetId = "a93f7c12",
+                    stacks = 1,
+                    targetContext = {
+                        object = "the affected enemy",
+                        possessive = "the affected enemy's",
+                        reflexive = "itself",
+                        subject = "the affected enemy",
+                    },
                     tokens = {  },
                 },
             },
-            mainText = "Apply Rapid Fire to yourself for 1 turn.",
+            mainText = "Apply Bursting Shot to an enemy for 1 turn.",
             tokens = {  },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Kill Shot
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "a93f7c12",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {
+            "on_ranged_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseDamage = 225,
+                    damageSchoolRefs = {
+                        "f82db71a:v1azo4j6",
+                    },
+                    damageType = "ranged",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 1.125,
+                            statRef = "f82db71a:v2rs9cpy",
+                        },
+                    },
+                    targetEvents = {
+                        "on_ranged_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 0,
+                    weaponDamageMode = "none",
+                },
+                key = "killdmg1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {
+            {
+                invert = false,
+                showOnTooltip = true,
+                slotKey = "ranged",
+                tooltipTextOverride = "Requires a bow, crossbow, or gun",
+                type = "item_equipped",
+                weaponTypeRefs = {
+                    "f82db71a:l3ce0puc",
+                    "f82db71a:j2gceby4",
+                    "f82db71a:anoo8qfp",
+                },
+            },
+            {
+                invert = false,
+                maximumValue = 20,
+                showOnTooltip = true,
+                tooltipTextOverride = "",
+                type = "target_health_percent",
+            },
+        },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/ability_hunter_assassinate2.blp",
+        id = "killshot1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Kill Shot",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 13.6,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Marksmanship",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {  },
+            mainText = "Deal {DAMAGE_1} Physical damage to an enemy.",
+            tokens = {
+                {
+                    applyMode = "damage_range",
+                    componentIndex = 1,
+                    key = "DAMAGE_1",
+                    tokenType = "spell_damage_range",
+                },
+            },
             version = 1,
         },
         totalTicks = 0,
@@ -1899,6 +2215,390 @@ RPE_DATASET_ENTRY_V1
 ```
 
 ## Survival
+
+### Survival of the Fittest
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "a93f7c12",
+    entry = {
+        description = "",
+        duration = 1,
+        effects = {
+            {
+                baseAmount = 30,
+                operation = "flat",
+                statRef = "f82db71a:pu05li08",
+                statScaling = {  },
+                type = "stat",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_nature_spiritarmor.blp",
+        id = "svfitau1",
+        maxStacks = 1,
+        name = "Survival of the Fittest",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "Increases Damage Reduction by 30%.",
+            bodyTokens = {  },
+            stackingText = "",
+            stackingTokens = {  },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "a93f7c12",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "a93f7c12:svfitau1",
+                    basePower = 0,
+                    duration = 1,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "svfitcmp",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 5,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_nature_spiritarmor.blp",
+        id = "svfit001",
+        cooldownChannel = 5,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Survival of the Fittest",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Survival",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {
+                {
+                    auraRef = "a93f7c12:svfitau1",
+                    datasetId = "a93f7c12",
+                    descriptionText = "Increases Damage Reduction by 30%.",
+                    duration = 1,
+                    icon = "interface/icons/spell_nature_spiritarmor.blp",
+                    nameText = "Survival of the Fittest",
+                    powerLevel = 0,
+                    spellDatasetId = "a93f7c12",
+                    stacks = 1,
+                    targetContext = {
+                        object = "you",
+                        possessive = "your",
+                        reflexive = "yourself",
+                        subject = "you",
+                    },
+                    tokens = {  },
+                },
+            },
+            mainText = "Apply Survival of the Fittest to yourself for 1 turn.",
+            tokens = {  },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Hatchet Toss
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "a93f7c12",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {
+            "on_ranged_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseDamage = 39,
+                    damageSchoolRefs = {
+                        "f82db71a:v1azo4j6",
+                    },
+                    damageType = "ranged",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.182,
+                            statRef = "f82db71a:v2rs9cpy",
+                        },
+                    },
+                    targetEvents = {
+                        "on_ranged_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 2,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 0.52,
+                    weaponDamageMode = "main_hand",
+                },
+                key = "hatdmg01",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {
+            {
+                invert = false,
+                showOnTooltip = true,
+                slotKey = "ranged",
+                tooltipTextOverride = "Requires a thrown weapon",
+                type = "item_equipped",
+                weaponTypeRefs = {
+                    "f82db71a:we5ul4ne",
+                },
+            },
+        },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/ability_hunter_hatchettoss.blp",
+        id = "hattoss1",
+        cooldownChannel = 2,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Hatchet Toss",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 6.3,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Survival",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {  },
+            mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generates a high amount of threat.",
+            tokens = {
+                {
+                    applyMode = "damage_range",
+                    componentIndex = 1,
+                    key = "DAMAGE_1",
+                    tokenType = "spell_damage_range",
+                },
+            },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Carve
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "a93f7c12",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {
+            "on_melee_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseDamage = 75,
+                    damageSchoolRefs = {
+                        "f82db71a:v1azo4j6",
+                    },
+                    damageType = "melee",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.35,
+                            statRef = "f82db71a:u7b49vs9",
+                        },
+                    },
+                    targetEvents = {
+                        "on_melee_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 1,
+                    weaponDamageMode = "main_hand",
+                },
+                key = "carvdmg1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 2,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "raid_marker",
+                },
+            },
+        },
+        conditions = {
+            {
+                invert = false,
+                showOnTooltip = true,
+                slotKey = "mainhand",
+                tooltipTextOverride = "Requires Main Hand",
+                type = "item_equipped",
+                weaponTypeRefs = {  },
+            },
+        },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/ability_hunter_carve.blp",
+        id = "carve001",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Carve",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 10,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Survival",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {  },
+            mainText = "Deal {DAMAGE_1} Physical damage to up to 2 enemies. Targets must share the same raid marker.",
+            tokens = {
+                {
+                    applyMode = "damage_range",
+                    componentIndex = 1,
+                    key = "DAMAGE_1",
+                    tokenType = "spell_damage_range",
+                },
+            },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
 
 ### Raptor Strike
 
