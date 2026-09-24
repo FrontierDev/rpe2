@@ -6,8 +6,28 @@ Import each listed **Aura** before its associated **Spell**. All entries use the
 
 ## Authoring notes
 
-- Hunter currently has no class resource progression, so these entries deliberately use no resource costs. Resource costs can be added after the Hunter resource model is defined.
+- Hunter uses **Mana** (`f82db71a:4c8mfm99`). Every Hunter spell below therefore pays an appropriate **base Mana** cost using `amountMode = "base_percent"`.
 - Main Action = cooldown channel 1; Bonus Action = channel 2; Buff Action = channel 3.
+- Damage/weapon spell Mana costs use the current spell-authoring resource formula. Pure utility/control buffs use the closest current Mana-based analogue; short personal/target utility is generally 5% base Mana, while Trueshot Aura uses the 10% group-stat-buff convention.
+- Mana costs used here:
+
+| Spell | Base Mana |
+|---|---:|
+| Bestial Wrath | 10.0% |
+| Kill Command | 5.0% |
+| Intimidation | 5.0% |
+| Aimed Shot | 6.8% |
+| Trueshot Aura | 10.0% |
+| Hunter's Mark | 5.0% |
+| Serpent Sting | 6.3% |
+| Arcane Shot | 5.0% |
+| Rapid Fire | 5.0% |
+| Explosive Shot | 18.1% |
+| Multi Shot | 18.1% |
+| Volley | 12.3% |
+| Raptor Strike | 5.0% |
+| Mongoose Bite | 13.6% |
+| Freezing Trap | 5.0% |
 - Hunter ranged attacks and damaging ranged auras scale from **Ranged Attack Power** (`f82db71a:v2rs9cpy`). Hunter melee attacks scale from **Melee Attack Power** (`f82db71a:u7b49vs9`).
 - Fixed percentage buffs and control effects do not scale with spell rank. Damage-bearing spells/auras use ranks with the standard 8-level interval.
 - **Hunter's Mark** had no exact current reactive-damage analogue specified. Its proc uses the current Molten Armor reactive-event budget (`28.1667 + 0.4225 × Ranged Attack Power`), changed to Physical damage and `on_ranged_taken`. Its duration is set to 5 turns to match its 5-turn cooldown.
@@ -184,7 +204,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Bestial Wrath",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 10,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Beastmaster",
         tags = {  },
@@ -342,7 +370,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Kill Command",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Beastmaster",
         tags = {  },
@@ -475,7 +511,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Intimidation",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Beastmaster",
         tags = {  },
@@ -606,7 +650,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Aimed Shot",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 6.8,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Marksmanship",
         tags = {  },
@@ -727,7 +779,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Trueshot Aura",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 10,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Marksmanship",
         tags = {  },
@@ -883,7 +943,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Hunter's Mark",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Marksmanship",
         tags = {  },
@@ -1053,7 +1121,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Serpent Sting",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 6.3,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Marksmanship",
         tags = {  },
@@ -1190,7 +1266,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Arcane Shot",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Marksmanship",
         tags = {  },
@@ -1311,7 +1395,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Rapid Fire",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Marksmanship",
         tags = {  },
@@ -1497,7 +1589,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Explosive Shot",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 18.1,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Marksmanship",
         tags = {  },
@@ -1641,7 +1741,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Multi Shot",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 18.1,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Marksmanship",
         tags = {  },
@@ -1758,7 +1866,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Volley",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 12.3,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Marksmanship",
         tags = {  },
@@ -1947,7 +2063,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Raptor Strike",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Survival",
         tags = {  },
@@ -2087,7 +2211,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Mongoose Bite",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 13.6,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Survival",
         tags = {  },
@@ -2208,7 +2340,15 @@ RPE_DATASET_ENTRY_V1
         mountedCombatOnly = false,
         name = "Freezing Trap",
         range = 0,
-        resourceCosts = {  },
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
         seedNPCSpell = false,
         spellbookCategory = "Survival",
         tags = {  },
