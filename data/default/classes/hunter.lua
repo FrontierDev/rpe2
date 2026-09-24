@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 4,
+    version = 5,
     dataset = {
         achievements = {},
         auras = {
@@ -491,9 +491,46 @@ Addon.Data.DefaultDatasets:Register({
                     "f82db71a:gjz2331m",
                     "f82db71a:we5ul4ne",
                 },
-                resourceProgressions = {},
+                resourceProgressions = {
+                    {
+                        initialValue = 26,
+                        perLevelValue = 24.42,
+                        resourceRef = "f82db71a:q2ktkztt"
+                    },
+                    {
+                        initialValue = 63,
+                        perLevelValue = 28.08,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
                 skillBonuses = {},
-                statProgressions = {},
+                statProgressions = {
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.59,
+                        statRef = "f82db71a:zfqm8dxp"
+                    },
+                    {
+                        initialValue = 3,
+                        perLevelValue = 1.73,
+                        statRef = "f82db71a:xqz0daz2"
+                    },
+                    {
+                        initialValue = 1,
+                        perLevelValue = 1.17,
+                        statRef = "f82db71a:ygjno50i"
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.76,
+                        statRef = "f82db71a:75y3a8ib"
+                    },
+                    {
+                        initialValue = 1,
+                        perLevelValue = 0.83,
+                        statRef = "f82db71a:kec9rhli"
+                    }
+                },
                 passiveTraitRefs = {
                     "a93f7c12:monslay1",
                 },
