@@ -705,7 +705,7 @@ RPE_DATASET_ENTRY_V1
                     allowDeadTargets = false,
                     disableSelfCast = false,
                     maxTargets = 0,
-                    minTargets = 0,
+                    minTargets = 1,
                     requiresTarget = true,
                     targetDisposition = "ally",
                     type = "all_allies",
