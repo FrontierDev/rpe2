@@ -54,7 +54,7 @@ If the requested mechanic is explicitly outside this document's balance model, u
 
 The calculator has three balance actions:
 
-| Balance action | Power modifier | Threat modifier | Resource-cost modifier |
+| Balance action | Power modifier | Threat modifier | Mana-cost modifier |
 |---|---:|---:|---:|
 | Action | 1.00 | 1.00 | 1.00 |
 | Bonus Action | 0.65 | 0.75 | 1.25 |
@@ -505,9 +505,18 @@ Bespoke effects such as shields scaling from unusual stats are not forcibly conv
 
 # 8. Resource costs
 
-## 8.1 Power ratio
+Resource handling is deliberately split by resource type.
 
-Resource tiering uses:
+- **Mana** is an RPE-balanced resource and uses the calculator below.
+- **Energy and Rage are not calculator-derived.** For abilities based on a WoW ability with a known Energy/Rage cost, author the actual WoW cost. If the RPE ability is original or materially different and has no authoritative historical cost, use an explicit design value or the closest current same-resource analogue.
+- Do **not** increase or decrease an authentic Energy/Rage cost merely because the generic output formula would place the spell in a different Mana tier.
+- Do **not** back-solve Energy/Rage from target count, cooldown, action type, or role.
+
+Damage/healing output and Energy/Rage cost are therefore separate authoring inputs. When an authentic Energy/Rage cost is unusually cheap or expensive relative to the proposed RPE output, review the output against current same-resource abilities and adjust the output if necessary. Do not apply a universal `actual cost / calculated cost` damage multiplier: the current Warrior/Rogue kits intentionally contain different efficiencies based on mechanics, cooldowns, requirements, target count and role.
+
+## 8.1 Mana power ratio
+
+Mana tiering uses:
 
 ```text
 Power Ratio
@@ -526,7 +535,7 @@ For a standard periodic spell, use:
 - Action = Bonus Action = 0.65;
 - Cooldown = CooldownModifier(Duration).
 
-## 8.2 Resource tiers
+## 8.2 Mana tiers
 
 For damage, weapon attacks, and non-instant healing:
 
@@ -543,65 +552,67 @@ For **instant healing and instant absorption**, there is no Cheap tier:
 | < 1.75 | Standard |
 | >= 1.75 | Expensive |
 
-This rule also applies to an instant HoT spell for mana-cost purposes.
+This rule also applies to an instant HoT spell for Mana-cost purposes.
 
-## 8.3 Base costs
+## 8.3 Base Mana costs
 
-| Tier | Base Mana | Energy | Rage |
-|---|---:|---:|---:|
-| Cheap | 4% | 25 | 12 |
-| Standard | 8% | 40 | 25 |
-| Expensive | 14.5% | 60 | 43 |
+| Tier | Base Mana |
+|---|---:|
+| Cheap | 4% |
+| Standard | 8% |
+| Expensive | 14.5% |
 
 Mana costs use `amountMode = "base_percent"`.
 
-Energy and Rage costs use flat amounts.
-
-## 8.4 Cast/resource modifier
+## 8.4 Mana cast/resource modifier
 
 | Spell type | Modifier |
 |---|---:|
 | Normal instant spell | 1.25 |
 | 1-turn spell | 0.85 |
-| Instant healing/absorption Mana cost | 1.50 |
+| Instant healing/absorption | 1.50 |
 
 For instant healing/absorption Mana, use 1.50 **instead of** the normal instant 1.25.
 
-## 8.5 Action cost modifier
+## 8.5 Mana action-cost modifier
 
-| Balance action | Resource modifier |
+| Balance action | Mana-cost modifier |
 |---|---:|
 | Action | 1.00 |
 | Bonus Action | 1.25 |
 | Spender | 0.75 |
 
-## 8.6 Final resource cost
+## 8.6 Final Mana cost
 
 ```text
-Final Resource Cost
-= Tier Base Cost
+Final Mana Cost
+= Tier Base Mana
 × Cast/Resource Modifier
-× Action Resource Modifier
+× Action Mana-Cost Modifier
 ```
 
-Rounding convention:
+Round Base Mana percentage to the nearest 0.1%.
 
-- Base Mana percentage: round to nearest 0.1%;
-- Energy: round to nearest whole point;
-- Rage: round to nearest whole point.
+Explicit Mana values in the task override calculated Mana cost.
 
-Explicit values in the task always override calculated resource cost.
+## 8.7 Energy and Rage authoring
 
-## 8.7 Existing-spell preservation rules
+For Energy/Rage abilities:
 
-When modifying/rebalancing existing default spells:
+1. Identify the originating WoW ability and verify its actual resource cost from an authoritative reference.
+2. Author that Energy/Rage cost unchanged unless the task explicitly defines an RPE-specific replacement.
+3. Balance damage/healing separately using the normal RPE output model and current same-resource analogues.
+4. If the resulting output is clearly inconsistent with current abilities at a similar cost, adjust the **output**, not the authentic resource cost.
+5. Preserve bespoke mechanics that explain unusual efficiency: cooldowns, target restrictions, combo-point requirements, stealth/form requirements, reaction requirements, conditional availability, threat role, and similar constraints.
+6. Resource-generation abilities and resource-conversion abilities remain outside the direct numerical calculator and require an explicit/current analogue.
 
-- do not automatically replace authored Rogue Energy costs;
-- do not automatically replace authored Warrior Rage costs;
-- Pyroblast retains its intentional **31.8% base Mana** cost;
-- Greater Heal retains its intentional **31.8% base Mana** cost.
+Examples of current same-resource reference points include:
 
-These preservation rules do not prevent using the calculator for a genuinely new Energy/Rage spell when no explicit cost is supplied.
+- Warrior Heroic Strike: 15 Rage;
+- Warrior Cleave: 20 Rage;
+- Warrior Whirlwind: 25 Rage;
+- Warrior Shield Slam: 30 Rage;
+- Rogue/Druid Energy attacks retain their authored WoW Energy costs rather than being converted to generic RPE tiers.
 
 ## 8.8 Example — 5-turn single-target DoT Mana cost
 
@@ -730,13 +741,13 @@ Threat coefficient = 1.00
 Power ratio = 2.25 -> Expensive
 ```
 
-Calculated costs for a new spell:
+Calculated Mana cost for a new spell:
 
 ```text
-Mana   = 14.5% × 1.25 × 0.75 = 13.59375% -> 13.6%
-Energy = 60 × 1.25 × 0.75 = 56.25 -> 56
-Rage   = 43 × 1.25 × 0.75 = 40.3125 -> 40
+Mana = 14.5% × 1.25 × 0.75 = 13.59375% -> 13.6%
 ```
+
+For an Energy/Rage spender, use the ability's authoritative WoW cost or an explicit RPE design value; do not derive Energy/Rage from this Mana tier.
 
 ## 10.5 Three-target instant healer spell with 2-turn cooldown
 
@@ -900,9 +911,10 @@ Before considering a spell task complete, verify all of the following:
 - [ ] Periodic stat coefficient was **not** divided by duration.
 - [ ] Periodic balance uses duration as the cooldown-equivalent.
 - [ ] Absorption was not divided by duration.
-- [ ] Resource power ratio uses total-target, not per-target, modifier.
-- [ ] Instant heal/absorb minimum Standard tier is respected.
-- [ ] Existing Energy/Rage costs were not unintentionally rebalanced.
+- [ ] Mana power ratio uses total-target, not per-target, modifier.
+- [ ] Instant heal/absorb minimum Standard Mana tier is respected.
+- [ ] Energy/Rage costs were verified against the authoritative WoW ability or an explicit RPE design value.
+- [ ] Damage/healing output was reviewed separately against current same-resource analogues rather than back-solving Energy/Rage from the calculator.
 - [ ] Explicit resource-cost exceptions/overrides were preserved.
 - [ ] Group caster buffs use the 10% base-Mana convention where applicable.
 - [ ] No reactive proc was misclassified as a normal DoT/HoT.
