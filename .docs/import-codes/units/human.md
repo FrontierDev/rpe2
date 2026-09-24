@@ -13,7 +13,16 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for the base Human unit in the Cor
 | Spell Power | 0 | 3.389831 | 200 |
 | Healing Power | 0 | 4.237288 | 250 |
 
-The unit is authored as a `normal` Humanoid with no role variants or presets. It retains the Worn Shortsword and the Core Main Hand Attack / Shoot spells.
+The base unit is authored as a `normal` Humanoid. It retains the Worn Shortsword and the Core Main Hand Attack / Shoot spells.
+
+## Militant variant
+
+**Archetype:** Warrior  
+**Challenge level:** Normal  
+**Equipment:** one-handed sword and shield  
+**Spells:** Rage Attack, Multiattack, Rend, Shield Bash
+
+The Human base resource list includes a 100-point Rage pool so Warrior-archetype variants can generate and spend Rage. Rage itself starts at zero according to the Core Rage resource definition.
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -31,13 +40,35 @@ RPE_DATASET_ENTRY_V1
         id = "7i40epa5",
         mainHandWeapon = "f82db71a:stwswd01",
         name = "Human",
-        presets = {  },
+        presets = {
+            {
+                name = "Militant",
+                challengeLevel = "normal",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "f82db71a:npcrage1",
+                    "f82db71a:npcmulti",
+                    "7bbb4cb9:xniv44uu",
+                    "7bbb4cb9:ti2j4umn",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwswd01",
+                    shield = "f82db71a:stshld01",
+                },
+            },
+        },
         resistances = {  },
         resources = {
             {
                 initialValue = 208,
                 perLevelValue = 43.084746,
                 resourceRef = "f82db71a:q2ktkztt",
+            },
+            {
+                initialValue = 100,
+                perLevelValue = 0,
+                resourceRef = "f82db71a:e2tfklq7",
             },
         },
         spells = {
