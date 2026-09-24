@@ -3582,7 +3582,7 @@ Authoring decisions:
 - **Wild Growth** is a 5-target, 3-turn HoT on Bonus Action with a 3-turn cooldown. The standard HoT budget gives **12.675 + 0.22815 Healing Power per target per turn**. Its maximum-target power ratio places it in the Expensive instant-healing tier, for **27.2% base Mana**.
 - **Mark of the Wild** is a single-ally, 10-turn Buff Action utility aura. It grants **+10% Armor**, **+2 Magic Resistance**, and **+20 Nature Resistance**. The resistance values deliberately use current RPE stat scales: +2 Magic Resistance matches Mage Armor's established percentage-point convention, while +20 Nature Resistance reflects the high-rank Classic Mark resistance magnitude. It costs **5% base Mana** and does not use spell ranks.
 - **Tranquility** uses current **Divine Hymn** as the closest all-allies major-healing analogue, but spreads exactly the same total authored healing over the requested 3-turn HoT: **40.2375 + 0.222 Healing Power per turn for 3 turns**. It is a 1-turn Main Action cast, has a **10-turn cooldown**, and costs **12.3% base Mana**.
-- **Revive is blocked by engine support.** The current spell schema has no resurrection effect and cannot legally target a dead ally. Do not represent Revive as a heal fallback. GitHub issue **#414** tracks the required generic resurrection primitive; once implemented, author Revive as a Restoration spell using `spell_nature_revive`.
+- **Revive** uses the existing dead-target support rather than a new effect type: `allowDeadTargets = true` at spell/target level, `target_health_percent <= 0` to require a dead ally, and a normal heal effect. The heal executor already permits Health to rise from 0 for spells flagged this way, which returns the unit to the alive state.
 
 ### Healing Touch
 
@@ -4402,17 +4402,123 @@ RPE_DATASET_ENTRY_V1
 
 ### Revive
 
-Revive is intentionally **not emitted as an import entry yet**.
+Revive can be represented with the existing spell system; no new resurrection primitive is required.
 
-The current engine cannot represent resurrection correctly. Issue #414 adds the required generic resurrection effect and dead-ally targeting. Once that exists, Revive should be authored with:
+The existing `allowDeadTargets` spell/target flag permits selecting and healing a dead unit. The heal executor explicitly allows Health to rise from 0 when the spell has `allowDeadTargets = true`, and unit death is derived from Health being at or below zero. A `target_health_percent` condition with `maximumValue = 0` makes the spell dead-target-only rather than merely dead-target-capable.
 
-- icon: `interface/icons/spell_nature_revive.blp`;
-- category: Restoration;
-- target: one dead ally;
-- 1-turn Main Action cast;
-- no heal fallback;
-- tokenized resurrection output;
-- explicit restored Health/resource values in spell data.
+RPE authoring:
+
+- 1-turn Main Action;
+- one allied target;
+- dead targets allowed at spell and component-target level;
+- requires target Health <= 0%;
+- standard one-turn healer output: **145 base + 0.80 Healing Power**;
+- **6.8% base Mana**;
+- normal rank scaling;
+- tokenized tooltip.
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+        allowDeadTargets = true,
+        canMoveWhileCasting = false,
+        castTime = 1,
+        casterEvents = { "on_heal", "on_critical_heal" },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseHealing = 145,
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.8,
+                            statRef = "f82db71a:hj6d4kvy",
+                        },
+                    },
+                    targetEvents = { "on_heal_taken", "on_critical_heal_taken" },
+                    type = "heal",
+                    usesProjectile = false,
+                },
+                key = "drrevivh",
+                target = {
+                    allowDeadTargets = true,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {
+            {
+                maximumValue = 0,
+                minimumValue = nil,
+                showOnTooltip = true,
+                tooltipTextOverride = "Requires a dead ally",
+                type = "target_health_percent",
+            },
+        },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_nature_revive.blp",
+        id = "drreviv1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 12,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Revive",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 6.8,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Restoration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {  },
+            mainText = "Revive a dead ally with {HEAL_1} health.",
+            tokens = {
+                {
+                    applyMode = "heal_range",
+                    componentIndex = 1,
+                    key = "HEAL_1",
+                    tokenType = "spell_heal_range",
+                },
+            },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
 
 ### Tranquility
 
