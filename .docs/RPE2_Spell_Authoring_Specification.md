@@ -162,7 +162,7 @@ For ordinary direct spells, use the runtime spell cooldown.
 
 Cooldown groups do not create an additional multiplier.
 
-For standard periodic spells, see the separate periodic rule: aura duration is used as the cooldown-equivalent for the periodic budget.
+For standard periodic spells, see the separate periodic rule: aura duration is used as the cooldown-equivalent for the **periodic flat-base budget**. DoT stat coefficients use the separate per-tick/lifetime guidance in section 6 rather than inheriting that modifier mechanically.
 
 ## 3.5 Secondary-effect modifier
 
