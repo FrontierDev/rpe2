@@ -2765,21 +2765,22 @@ These abilities are authored as the Druid's Bear/tank toolkit but, by design, **
 
 | Spell | Rage | RPE implementation |
 |---|---:|---|
-| Maul | 15 | Tank-role Bonus Action weapon attack; moderate threat. |
-| Swipe (Bear) | 20 | Tank-role Main Action, up to 3 enemies on one raid marker; high threat. |
+| Maul | 19 | Tank-role Bonus Action weapon attack; moderate threat. Rage cost is calculated from the authoring specification. |
+| Swipe (Bear) | 54 | Tank-role Main Action, up to 3 enemies on one raid marker; high threat. Rage cost is calculated from the authoring specification. |
 | Growl | 0 | Copy Warrior Taunt: 3-turn taunt, 3-turn cooldown. |
 | Demoralizing Roar | 10 | Copy Demoralizing Shout: -10% Melee Attack Power to up to 5 enemies for 2 turns. |
 | Enrage | 0 | Generates 20 Rage over 5 RPE turns (4/turn) while reducing Armor by 27%; 10-turn cooldown. |
-| Bash | 10 | 1-turn stun/control, Bonus Action, 10-turn cooldown. |
-| Challenging Roar | 15 | Up to 5 same-marker enemies taunted for 2 turns; 10-turn cooldown. |
-| Frenzied Regeneration | 50 | RPE-safe conversion: upfront Rage cost, then heals 5% Max Health/turn for 5 turns; 10-turn cooldown. |
+| Bash | 10 | 1-turn stun/control, Bonus Action, 6-turn cooldown. Uses Hammer of Justice as the current same-mechanic cooldown analogue; 10 Rage is the explicit Classic ability cost. |
+| Challenging Roar | 15 | Bespoke multi-target taunt: up to 5 same-marker enemies for 2 turns, 10-turn cooldown. The numerical calculator does not cover multi-target taunt; 15 Rage is the explicit Classic ability cost. |
 
 Damage/scaling notes:
 
-- **Maul** uses the Tank-role instant Bonus Action weapon budget: **39 base + 0.182 Melee Attack Power + 0.52 main-hand weapon damage**, with **1.5 threat coefficient**. This is the same numerical shape as current Warrior Heroic Strike and matches Maul's high-threat Rage-spender role.
-- **Swipe (Bear)** is not modeled as a weapon strike because Classic Swipe is a direct Physical area attack rather than an empowered weapon swing. The current RPE Tank/Main Action/3-target budget gives **48 base + 0.168 Melee Attack Power per target**, with **2.0 threat coefficient**.
+- **Maul** uses the Tank-role instant Bonus Action weapon budget: **39 base + 0.182 Melee Attack Power + 0.52 main-hand weapon damage**, with **1.5 threat coefficient**. Its Rage cost is calculated from the authoring sheet: Cheap Rage (12) × instant resource modifier (1.25) × Bonus Action resource modifier (1.25) = **18.75 → 19 Rage**.
+- **Swipe (Bear)** is not modeled as a weapon strike because Classic Swipe is a direct Physical area attack rather than an empowered weapon swing. The RPE Tank/Main Action/3-target budget gives **48 base + 0.168 Melee Attack Power per target**, with **2.0 threat coefficient**. Its resource power ratio is 1.80, making it Expensive: 43 Rage × 1.25 instant = **53.75 → 54 Rage**.
 - Fixed control, taunt, stat-debuff, and resource-generation effects do not rank-scale. Maul and Swipe use normal 8-level ranks.
-- **Frenzied Regeneration** is intentionally an RPE adaptation. The current aura runtime can drain Rage each turn, but it cannot condition the heal amount on how much Rage was successfully consumed; implementing the Classic conversion literally would therefore permit free healing after Rage reaches zero. The upfront 50-Rage version avoids that invalid fallback.
+- **Bash** is control-only and therefore outside the numerical calculator. Its 1-turn stun shape and **6-turn cooldown** use current **Hammer of Justice** as the same-mechanic analogue. Its **10 Rage** cost is retained as the explicit Classic ability cost rather than presented as calculator-derived.
+- **Challenging Roar** is also outside the numerical calculator. RPE has no current multi-target taunt analogue, so this entry is explicitly bespoke: **up to 5 enemies sharing one raid marker, 2-turn taunt, 10-turn cooldown, 15 Rage**. These values are design parameters, not calculator outputs.
+- **Frenzied Regeneration is intentionally not included as an import entry.** Classic-style healing based on Rage actually consumed is not representable safely by the current aura/resource runtime. It should be added only after the runtime can condition healing on the amount of Rage successfully consumed; no fallback approximation is authored here.
 
 ### Maul
 
@@ -2863,7 +2864,7 @@ RPE_DATASET_ENTRY_V1
             range = 0,
             resourceCosts = {
                         {
-                                        amount = 15,
+                                        amount = 19,
                                         amountMode = "flat",
                                         castPhase = "on_cast_end",
                                         refundOnInterrupt = 0,
@@ -2975,7 +2976,7 @@ RPE_DATASET_ENTRY_V1
             range = 0,
             resourceCosts = {
                         {
-                                        amount = 20,
+                                        amount = 54,
                                         amountMode = "flat",
                                         castPhase = "on_cast_end",
                                         refundOnInterrupt = 0,
@@ -3454,7 +3455,7 @@ RPE_DATASET_ENTRY_V1
                                     },
                     },
             conditions = {  },
-            cooldown = 10,
+            cooldown = 6,
             cooldownGroup = "stun",
             cooldownScalesWithHaste = false,
             description = "",
@@ -3589,144 +3590,3 @@ RPE_DATASET_ENTRY_V1
         },
 }
 ```
-
-### Frenzied Regeneration
-
-#### Aura
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "auras",
-    datasetId = "6e4d2a91",
-    entry = {
-            description = "",
-            duration = 5,
-            effects = {
-                        {
-                                        amountMode = "max_percent",
-                                        baseHealing = 5,
-                                        scaleWithRank = false,
-                                        statScaling = {  },
-                                        type = "heal",
-                                    },
-                    },
-            events = {  },
-            icon = "interface/icons/ability_bullrush.blp",
-            id = "drfrgau1",
-            maxStacks = 1,
-            name = "Frenzied Regeneration",
-            stackBehavior = "refresh_duration",
-            tags = {  },
-            tooltipTemplate = true,
-            tooltipTemplateData = {
-                        bodyText = "Heals for 5% of Max health each turn.",
-                        bodyTokens = {  },
-                        stackingText = "",
-                        stackingTokens = {  },
-                        version = 1,
-                    },
-        },
-}
-```
-
-#### Spell
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "6e4d2a91",
-    entry = {
-            allowDeadTargets = false,
-            canMoveWhileCasting = false,
-            castTime = 0,
-            casterEvents = {  },
-            charges = 0,
-            components = {
-                        {
-                                        castPhase = "on_cast_end",
-                                        castingGroup = "default",
-                                        effect = {
-                                                            auraRef = "6e4d2a91:drfrgau1",
-                                                            basePower = 0,
-                                                            duration = 5,
-                                                            stacks = 1,
-                                                            targetEvents = {  },
-                                                            type = "apply_aura",
-                                                        },
-                                        key = "fregapp1",
-                                        target = {
-                                                            allowDeadTargets = false,
-                                                            disableSelfCast = false,
-                                                            maxTargets = 0,
-                                                            minTargets = 0,
-                                                            requiresTarget = false,
-                                                            targetDisposition = "ally",
-                                                            type = "caster",
-                                                        },
-                                    },
-                    },
-            conditions = {  },
-            cooldown = 10,
-            cooldownGroup = "",
-            cooldownScalesWithHaste = false,
-            description = "",
-            icon = "interface/icons/ability_bullrush.blp",
-            id = "drfreg01",
-            cooldownChannel = 2,
-            learnMode = "always_learned",
-            learnLevel = 1,
-            usesRanks = false,
-            rankInterval = 8,
-            mountedCombatOnly = false,
-            name = "Frenzied Regeneration",
-            range = 0,
-            resourceCosts = {
-                        {
-                                        amount = 50,
-                                        amountMode = "flat",
-                                        castPhase = "on_cast_end",
-                                        refundOnInterrupt = 0,
-                                        resourceRef = "f82db71a:e2tfklq7",
-                                    },
-                    },
-            seedNPCSpell = false,
-            spellbookCategory = "Feral",
-            tags = {  },
-            tooltipTemplate = true,
-            tooltipTemplateData = {
-                        auraSections = {
-                                        {
-                                                            auraRef = "6e4d2a91:drfrgau1",
-                                                            datasetId = "6e4d2a91",
-                                                            descriptionText = "Heals for 5% of Max health each turn.",
-                                                            duration = 5,
-                                                            icon = "interface/icons/ability_bullrush.blp",
-                                                            nameText = "Frenzied Regeneration",
-                                                            powerLevel = 0,
-                                                            spellDatasetId = "6e4d2a91",
-                                                            stacks = 1,
-                                                            targetContext = {
-                                                                                    object = "you",
-                                                                                    possessive = "your",
-                                                                                    reflexive = "yourself",
-                                                                                    subject = "you",
-                                                                                },
-                                                            tokens = {  },
-                                                        },
-                                    },
-                        mainText = "Apply Frenzied Regeneration to yourself for 5 turns.",
-                        tokens = {  },
-                        version = 1,
-                    },
-            totalTicks = 0,
-            useCooldownCharges = false,
-        },
-}
-```
-
