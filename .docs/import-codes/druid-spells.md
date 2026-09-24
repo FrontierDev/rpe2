@@ -3569,3 +3569,1008 @@ RPE_DATASET_ENTRY_V1
         },
 }
 ```
+
+## Restoration
+
+Restoration entries use Healing Power (`f82db71a:hj6d4kvy`) and Mana (`f82db71a:4c8mfm99`).
+
+Authoring decisions:
+
+- **Healing Touch** is the standard one-turn, single-target Main Action healer budget, matching current Priest **Heal**: **145 base + 0.80 Healing Power**, costing **6.8% base Mana**.
+- **Rejuvenation** directly follows the current **Renew** HoT convention: **20.8 base + 0.624 Healing Power per turn for 5 turns**, Bonus Action, **15% base Mana**.
+- **Regrowth** is a one-turn Main Action hybrid direct heal + HoT. Both numerical components use the 0.85 secondary-output allowance: direct healing is **123.25 + 0.68 Healing Power**; the 5-turn HoT is **17.68 + 0.5304 Healing Power per turn**. It costs **6.8% base Mana**.
+- **Wild Growth** is a 5-target, 3-turn HoT on Bonus Action with a 3-turn cooldown. The standard HoT budget gives **12.675 + 0.22815 Healing Power per target per turn**. Its maximum-target power ratio places it in the Expensive instant-healing tier, for **27.2% base Mana**.
+- **Mark of the Wild** is a single-ally, 10-turn Buff Action utility aura. It grants **+10% Armor**, **+2 Magic Resistance**, and **+20 Nature Resistance**. The resistance values deliberately use current RPE stat scales: +2 Magic Resistance matches Mage Armor's established percentage-point convention, while +20 Nature Resistance reflects the high-rank Classic Mark resistance magnitude. It costs **5% base Mana** and does not use spell ranks.
+- **Tranquility** uses current **Divine Hymn** as the closest all-allies major-healing analogue, but spreads exactly the same total authored healing over the requested 3-turn HoT: **40.2375 + 0.222 Healing Power per turn for 3 turns**. It is a 1-turn Main Action cast, has a **10-turn cooldown**, and costs **12.3% base Mana**.
+- **Revive is blocked by engine support.** The current spell schema has no resurrection effect and cannot legally target a dead ally. Do not represent Revive as a heal fallback. GitHub issue **#414** tracks the required generic resurrection primitive; once implemented, author Revive as a Restoration spell using `spell_nature_revive`.
+
+### Healing Touch
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 1,
+        casterEvents = { "on_heal", "on_critical_heal" },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseHealing = 145,
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.8,
+                            statRef = "f82db71a:hj6d4kvy",
+                        },
+                    },
+                    targetEvents = { "on_heal_taken", "on_critical_heal_taken" },
+                    type = "heal",
+                    usesProjectile = false,
+                },
+                key = "dhtheal1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_nature_healingtouch.blp",
+        id = "drhealt1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Healing Touch",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 6.8,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Restoration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {  },
+            mainText = "Heal an ally for {HEAL_1} health.",
+            tokens = {
+                {
+                    applyMode = "heal_range",
+                    componentIndex = 1,
+                    key = "HEAL_1",
+                    tokenType = "spell_heal_range",
+                },
+            },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Rejuvenation
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseHealing = 20.8,
+                statScaling = {
+                    {
+                        coefficient = 0.624,
+                        statRef = "f82db71a:hj6d4kvy",
+                    },
+                },
+                type = "heal",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_nature_rejuvenation.blp",
+        id = "drrejuv1",
+        maxStacks = 1,
+        name = "Rejuvenation",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "Heals for {AURA_HEAL_1} health each turn.",
+            bodyTokens = {
+                {
+                    applyMode = "heal_amount",
+                    baseField = "baseHealing",
+                    effectIndex = 1,
+                    key = "AURA_HEAL_1",
+                    tokenType = "aura_amount",
+                },
+            },
+            stackingText = "",
+            stackingTokens = {  },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "6e4d2a91:drrejuv1",
+                    basePower = 0,
+                    duration = 5,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "drejuva1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_nature_rejuvenation.blp",
+        id = "drrejus1",
+        cooldownChannel = 2,
+        learnMode = "always_learned",
+        learnLevel = 4,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Rejuvenation",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 15,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Restoration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {
+                {
+                    auraRef = "6e4d2a91:drrejuv1",
+                    datasetId = "6e4d2a91",
+                    descriptionText = "Heals for {AURA_HEAL_1} health each turn.",
+                    duration = 5,
+                    icon = "interface/icons/spell_nature_rejuvenation.blp",
+                    nameText = "Rejuvenation",
+                    powerLevel = 0,
+                    spellDatasetId = "6e4d2a91",
+                    stacks = 1,
+                    targetContext = {
+                        object = "the affected ally",
+                        possessive = "the affected ally's",
+                        reflexive = "itself",
+                        subject = "the affected ally",
+                    },
+                    tokens = {
+                        {
+                            applyMode = "heal_amount",
+                            baseField = "baseHealing",
+                            effectIndex = 1,
+                            key = "AURA_HEAL_1",
+                            tokenType = "aura_amount",
+                        },
+                    },
+                },
+            },
+            mainText = "Apply Rejuvenation to an ally for 5 turns.",
+            tokens = {  },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Regrowth
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseHealing = 17.68,
+                statScaling = {
+                    {
+                        coefficient = 0.5304,
+                        statRef = "f82db71a:hj6d4kvy",
+                    },
+                },
+                type = "heal",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_nature_resistnature.blp",
+        id = "drregra1",
+        maxStacks = 1,
+        name = "Regrowth",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "Heals for {AURA_HEAL_1} health each turn.",
+            bodyTokens = {
+                {
+                    applyMode = "heal_amount",
+                    baseField = "baseHealing",
+                    effectIndex = 1,
+                    key = "AURA_HEAL_1",
+                    tokenType = "aura_amount",
+                },
+            },
+            stackingText = "",
+            stackingTokens = {  },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 1,
+        casterEvents = { "on_heal", "on_critical_heal" },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseHealing = 123.25,
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.68,
+                            statRef = "f82db71a:hj6d4kvy",
+                        },
+                    },
+                    targetEvents = { "on_heal_taken", "on_critical_heal_taken" },
+                    type = "heal",
+                    usesProjectile = false,
+                },
+                key = "drreghl1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "6e4d2a91:drregra1",
+                    basePower = 0,
+                    duration = 5,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "drregap1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_nature_resistnature.blp",
+        id = "drregro1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 12,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Regrowth",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 6.8,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Restoration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {
+                {
+                    auraRef = "6e4d2a91:drregra1",
+                    datasetId = "6e4d2a91",
+                    descriptionText = "Heals for {AURA_HEAL_1} health each turn.",
+                    duration = 5,
+                    icon = "interface/icons/spell_nature_resistnature.blp",
+                    nameText = "Regrowth",
+                    powerLevel = 0,
+                    spellDatasetId = "6e4d2a91",
+                    stacks = 1,
+                    targetContext = {
+                        object = "the affected ally",
+                        possessive = "the affected ally's",
+                        reflexive = "itself",
+                        subject = "the affected ally",
+                    },
+                    tokens = {
+                        {
+                            applyMode = "heal_amount",
+                            baseField = "baseHealing",
+                            effectIndex = 1,
+                            key = "AURA_HEAL_1",
+                            tokenType = "aura_amount",
+                        },
+                    },
+                },
+            },
+            mainText = "Heal an ally for {HEAL_1} health and apply Regrowth for 5 turns.",
+            tokens = {
+                {
+                    applyMode = "heal_range",
+                    componentIndex = 1,
+                    key = "HEAL_1",
+                    tokenType = "spell_heal_range",
+                },
+            },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Wild Growth
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+        description = "",
+        duration = 3,
+        effects = {
+            {
+                amountMode = "flat",
+                baseHealing = 12.675,
+                statScaling = {
+                    {
+                        coefficient = 0.22815,
+                        statRef = "f82db71a:hj6d4kvy",
+                    },
+                },
+                type = "heal",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/ability_druid_flourish.blp",
+        id = "drwgrowa",
+        maxStacks = 1,
+        name = "Wild Growth",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "Heals for {AURA_HEAL_1} health each turn.",
+            bodyTokens = {
+                {
+                    applyMode = "heal_amount",
+                    baseField = "baseHealing",
+                    effectIndex = 1,
+                    key = "AURA_HEAL_1",
+                    tokenType = "aura_amount",
+                },
+            },
+            stackingText = "",
+            stackingTokens = {  },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "6e4d2a91:drwgrowa",
+                    basePower = 0,
+                    duration = 3,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "drwgrowc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 5,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "multi",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 3,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/ability_druid_flourish.blp",
+        id = "drwgrow1",
+        cooldownChannel = 2,
+        learnMode = "always_learned",
+        learnLevel = 40,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Wild Growth",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 27.2,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Restoration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {
+                {
+                    auraRef = "6e4d2a91:drwgrowa",
+                    datasetId = "6e4d2a91",
+                    descriptionText = "Heals for {AURA_HEAL_1} health each turn.",
+                    duration = 3,
+                    icon = "interface/icons/ability_druid_flourish.blp",
+                    nameText = "Wild Growth",
+                    powerLevel = 0,
+                    spellDatasetId = "6e4d2a91",
+                    stacks = 1,
+                    targetContext = {
+                        object = "the affected ally",
+                        possessive = "the affected ally's",
+                        reflexive = "itself",
+                        subject = "the affected ally",
+                    },
+                    tokens = {
+                        {
+                            applyMode = "heal_amount",
+                            baseField = "baseHealing",
+                            effectIndex = 1,
+                            key = "AURA_HEAL_1",
+                            tokenType = "aura_amount",
+                        },
+                    },
+                },
+            },
+            mainText = "Apply Wild Growth to up to 5 allies for 3 turns.",
+            tokens = {  },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Mark of the Wild
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+        description = "",
+        duration = 10,
+        effects = {
+            {
+                baseAmount = 10,
+                operation = "percent",
+                scaleWithRank = false,
+                statRef = "f82db71a:v42albuv",
+                statScaling = {  },
+                type = "stat",
+            },
+            {
+                baseAmount = 2,
+                operation = "flat",
+                scaleWithRank = false,
+                statRef = "f82db71a:zs1nbz13",
+                statScaling = {  },
+                type = "stat",
+            },
+            {
+                baseAmount = 20,
+                operation = "flat",
+                scaleWithRank = false,
+                statRef = "f82db71a:pg0ytacb",
+                statScaling = {  },
+                type = "stat",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_nature_regeneration.blp",
+        id = "drmotwa1",
+        maxStacks = 1,
+        name = "Mark of the Wild",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "Increases Armor by {AURA_STAT_1}%, Magic Resistance by {AURA_STAT_2}% and Nature Resistance by {AURA_STAT_3}.",
+            bodyTokens = {
+                {
+                    applyMode = "stat_amount",
+                    baseField = "baseAmount",
+                    effectIndex = 1,
+                    key = "AURA_STAT_1",
+                    tokenType = "aura_amount",
+                },
+                {
+                    applyMode = "stat_amount",
+                    baseField = "baseAmount",
+                    effectIndex = 2,
+                    key = "AURA_STAT_2",
+                    tokenType = "aura_amount",
+                },
+                {
+                    applyMode = "stat_amount",
+                    baseField = "baseAmount",
+                    effectIndex = 3,
+                    key = "AURA_STAT_3",
+                    tokenType = "aura_amount",
+                },
+            },
+            stackingText = "",
+            stackingTokens = {  },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "6e4d2a91:drmotwa1",
+                    basePower = 0,
+                    duration = 10,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "drmotwap",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_nature_regeneration.blp",
+        id = "drmotw01",
+        cooldownChannel = 3,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Mark of the Wild",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Restoration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {
+                {
+                    auraRef = "6e4d2a91:drmotwa1",
+                    datasetId = "6e4d2a91",
+                    descriptionText = "Increases Armor by {AURA_STAT_1}%, Magic Resistance by {AURA_STAT_2}% and Nature Resistance by {AURA_STAT_3}.",
+                    duration = 10,
+                    icon = "interface/icons/spell_nature_regeneration.blp",
+                    nameText = "Mark of the Wild",
+                    powerLevel = 0,
+                    spellDatasetId = "6e4d2a91",
+                    stacks = 1,
+                    targetContext = {
+                        object = "the affected ally",
+                        possessive = "the affected ally's",
+                        reflexive = "itself",
+                        subject = "the affected ally",
+                    },
+                    tokens = {
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 1,
+                            key = "AURA_STAT_1",
+                            tokenType = "aura_amount",
+                        },
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 2,
+                            key = "AURA_STAT_2",
+                            tokenType = "aura_amount",
+                        },
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 3,
+                            key = "AURA_STAT_3",
+                            tokenType = "aura_amount",
+                        },
+                    },
+                },
+            },
+            mainText = "Apply Mark of the Wild to an ally for 10 turns.",
+            tokens = {  },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Revive
+
+Revive is intentionally **not emitted as an import entry yet**.
+
+The current engine cannot represent resurrection correctly. Issue #414 adds the required generic resurrection effect and dead-ally targeting. Once that exists, Revive should be authored with:
+
+- icon: `interface/icons/spell_nature_revive.blp`;
+- category: Restoration;
+- target: one dead ally;
+- 1-turn Main Action cast;
+- no heal fallback;
+- tokenized resurrection output;
+- explicit restored Health/resource values in spell data.
+
+### Tranquility
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "6e4d2a91",
+    entry = {
+        description = "",
+        duration = 3,
+        effects = {
+            {
+                amountMode = "flat",
+                baseHealing = 40.2375,
+                statScaling = {
+                    {
+                        coefficient = 0.222,
+                        statRef = "f82db71a:hj6d4kvy",
+                    },
+                },
+                type = "heal",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_nature_tranquility.blp",
+        id = "drtranqa",
+        maxStacks = 1,
+        name = "Tranquility",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "Heals for {AURA_HEAL_1} health each turn.",
+            bodyTokens = {
+                {
+                    applyMode = "heal_amount",
+                    baseField = "baseHealing",
+                    effectIndex = 1,
+                    key = "AURA_HEAL_1",
+                    tokenType = "aura_amount",
+                },
+            },
+            stackingText = "",
+            stackingTokens = {  },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "6e4d2a91",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 1,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "6e4d2a91:drtranqa",
+                    basePower = 0,
+                    duration = 3,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "drtranqc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "all_allies",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 10,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_nature_tranquility.blp",
+        id = "drtranq1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 30,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Tranquility",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 12.3,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Restoration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {
+                {
+                    auraRef = "6e4d2a91:drtranqa",
+                    datasetId = "6e4d2a91",
+                    descriptionText = "Heals for {AURA_HEAL_1} health each turn.",
+                    duration = 3,
+                    icon = "interface/icons/spell_nature_tranquility.blp",
+                    nameText = "Tranquility",
+                    powerLevel = 0,
+                    spellDatasetId = "6e4d2a91",
+                    stacks = 1,
+                    targetContext = {
+                        object = "all allies",
+                        possessive = "all allies'",
+                        reflexive = "themselves",
+                        subject = "all allies",
+                    },
+                    tokens = {
+                        {
+                            applyMode = "heal_amount",
+                            baseField = "baseHealing",
+                            effectIndex = 1,
+                            key = "AURA_HEAL_1",
+                            tokenType = "aura_amount",
+                        },
+                    },
+                },
+            },
+            mainText = "Apply Tranquility to all allies for 3 turns.",
+            tokens = {  },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
