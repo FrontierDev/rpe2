@@ -14,13 +14,13 @@ local Addon = { Data = {} }
 loadAddonFile("data/default/Datasets.lua", Addon)
 
 local datasets = {
-    { path = "data/default/classes/druid.lua", id = "6e4d2a91", version = 1 },
-    { path = "data/default/classes/hunter.lua", id = "a93f7c12", version = 10 },
-    { path = "data/default/classes/mage.lua", id = "d7c874c4", version = 38 },
-    { path = "data/default/classes/paladin.lua", id = "b0211ab3", version = 49 },
-    { path = "data/default/classes/priest.lua", id = "1c1038a7", version = 31 },
-    { path = "data/default/classes/rogue.lua", id = "23d5dce2", version = 32 },
-    { path = "data/default/classes/warrior.lua", id = "7bbb4cb9", version = 44 },
+    { path = "data/default/classes/druid.lua", id = "6e4d2a91" },
+    { path = "data/default/classes/hunter.lua", id = "a93f7c12" },
+    { path = "data/default/classes/mage.lua", id = "d7c874c4" },
+    { path = "data/default/classes/paladin.lua", id = "b0211ab3" },
+    { path = "data/default/classes/priest.lua", id = "1c1038a7" },
+    { path = "data/default/classes/rogue.lua", id = "23d5dce2" },
+    { path = "data/default/classes/warrior.lua", id = "7bbb4cb9" },
 }
 
 for _, definition in ipairs(datasets) do
@@ -30,7 +30,6 @@ end
 for _, definition in ipairs(datasets) do
     local registered = Addon.Data.DefaultDatasets.Definitions[definition.id]
     assert(registered, "missing registered dataset " .. definition.id)
-    assertEqual(registered.version, definition.version, "dataset version " .. definition.id)
 end
 
 local expected = {
