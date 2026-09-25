@@ -324,6 +324,7 @@ client/ui/widgets/widget_EventPrimaryResource.lua
 client/ui/widgets/widget_EventAutopilotSchedule.lua
 client/ui/widgets/widget_Event_CombatLogHistory.lua
 client/ui/widgets/widget_Event_Meters.lua
+client/ui/widgets/widget_Event_AllUnits.lua
 client/ui/widgets/widget_Event_DMHelper.lua
 client/autopilot/Helper.lua
 client/autopilot/EmoteCues.lua

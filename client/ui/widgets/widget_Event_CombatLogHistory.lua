@@ -26,6 +26,20 @@ local EVENT_UTILITY_WINDOW_WIDTH = 420
 local EVENT_UTILITY_WINDOW_HEIGHT = 340
 local EVENT_UTILITY_WINDOW_INSET = 8
 local EVENT_UTILITY_HEADER_HEIGHT = 20
+local EVENT_UTILITY_MODES = {
+    ["combat-log"] = {
+        title = "Combat Log",
+        elements = { "combatLogUtilityScroll", "combatLogUtilityEmptyText" },
+    },
+    meters = {
+        title = "Meters",
+        elements = { "metersPanel" },
+    },
+    ["all-units"] = {
+        title = "All Units",
+        elements = { "allUnitsPanel" },
+    },
+}
 
 local function getActiveEventState()
     if type(Client.GetEventState) == "function" then
@@ -46,6 +60,29 @@ end
 local function isFrameShown(element)
     local frame = getFrame(element)
     return frame and type(frame.IsShown) == "function" and frame:IsShown() == true
+end
+
+local function setFrameShown(element, shown)
+    local frame = getFrame(element)
+    if not frame then
+        return
+    end
+
+    if shown then
+        if type(frame.Show) == "function" then
+            frame:Show()
+        end
+    elseif type(frame.Hide) == "function" then
+        frame:Hide()
+    end
+end
+
+local function normalizeEventUtilityMode(mode)
+    local candidate = tostring(mode or "combat-log")
+    if EVENT_UTILITY_MODES[candidate] then
+        return candidate, EVENT_UTILITY_MODES[candidate]
+    end
+    return "combat-log", EVENT_UTILITY_MODES["combat-log"]
 end
 
 local function shallowCopyEntry(entry)
@@ -229,35 +266,29 @@ function EventWidget:HideEventUtilityWindow()
     if frame and type(frame.Hide) == "function" then
         frame:Hide()
     end
+    self.eventUtilityMode = nil
     return true
 end
 
 function EventWidget:ShowEventUtilityWindow(mode)
-    local normalizedMode = tostring(mode or "combat-log") == "meters" and "meters" or "combat-log"
+    local normalizedMode, modeDefinition = normalizeEventUtilityMode(mode)
     local window = self:EnsureEventUtilityWindow()
     if not window then
         return false
     end
 
     self.eventUtilityMode = normalizedMode
-    window:SetTitle(normalizedMode == "meters" and "Meters" or "Combat Log")
+    window:SetTitle(modeDefinition.title)
 
-    local utilityScrollFrame = getFrame(self.combatLogUtilityScroll)
-    local utilityEmptyFrame = getFrame(self.combatLogUtilityEmptyText)
-    local metersFrame = getFrame(self.metersPanel)
-    if normalizedMode == "meters" then
-        if utilityScrollFrame then utilityScrollFrame:Hide() end
-        if utilityEmptyFrame then utilityEmptyFrame:Hide() end
-        if metersFrame then metersFrame:Show() end
-        local historyPanelFrame = getFrame(self.combatLogHistoryPanel)
-        if historyPanelFrame then historyPanelFrame:Hide() end
-    else
-        if metersFrame then metersFrame:Hide() end
-        if utilityScrollFrame then utilityScrollFrame:Show() end
-        if utilityEmptyFrame then utilityEmptyFrame:Show() end
-        local historyPanelFrame = getFrame(self.combatLogHistoryPanel)
-        if historyPanelFrame then historyPanelFrame:Hide() end
+    for _, definition in pairs(EVENT_UTILITY_MODES) do
+        for index = 1, #(definition.elements or {}) do
+            setFrameShown(self[definition.elements[index]], false)
+        end
     end
+    for index = 1, #(modeDefinition.elements or {}) do
+        setFrameShown(self[modeDefinition.elements[index]], true)
+    end
+    setFrameShown(self.combatLogHistoryPanel, false)
 
     local frame = getFrame(window)
     if frame then
@@ -402,13 +433,13 @@ function EventWidget:ShowCombatLogHistoryPanel(mode)
 
     if self.combatLogHistoryMode ~= "dm-helper" then
         self:EnsureEventUtilityWindow()
-        self.eventUtilityMode = "combat-log"
+        local shown = self:ShowEventUtilityWindow("combat-log")
         self:RefreshCombatLogHistoryPanel()
         local historyPanelFrame = getFrame(self.combatLogHistoryPanel)
         if historyPanelFrame then
             historyPanelFrame:Hide()
         end
-        return self:ShowEventUtilityWindow("combat-log")
+        return shown
     end
 
     self.eventUtilityMode = nil

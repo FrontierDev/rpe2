@@ -716,7 +716,6 @@ end
 local originalBuild = EventWidget.Build
 local originalHide = EventWidget.Hide
 local originalRefresh = EventWidget.Refresh
-local originalShowCombatLogHistoryPanel = EventWidget.ShowCombatLogHistoryPanel
 
 function EventWidget:Build(...)
     local result = originalBuild(self, ...)
@@ -741,11 +740,6 @@ function EventWidget:Refresh(...)
         self:HideMetersPanel()
     end
     return result
-end
-
-function EventWidget:ShowCombatLogHistoryPanel(...)
-    self:HideMetersPanel()
-    return originalShowCombatLogHistoryPanel(self, ...)
 end
 
 EventWidget._metersExtensionInstalled = true

@@ -31,6 +31,7 @@ assertEqual(druidDefinition.dataset.groupName, "Core", "Druid dataset group")
 assertEqual(druidDefinition.dataset.dependencies[1], "f82db71a", "Druid dependency")
 
 local dataset = druidDefinition.dataset
+assertEqual(dataset.name, "Druid", "Druid dataset name")
 local class = dataset.classes[1]
 assertEqual(class.name, "Druid", "Druid class name")
 assertEqual(class.icon, "interface/icons/classicon_druid.blp", "Druid class icon")
