@@ -97,7 +97,7 @@ local function findCoreSpell(spellId)
     end
 end
 
-local function assertBasicWeaponAttack(spellId, expectedDamageType, expectedStatRef, label)
+local function assertBasicWeaponAttack(spellId, expectedDamageType, expectedStatRef, expectedStatCoefficient, label)
     local spell = findCoreSpell(spellId)
     assertTrue(type(spell) == "table", label .. " exists in Core")
     assertEqual(spell.cooldownChannel, 4, label .. " remains a Free Action")
@@ -109,12 +109,12 @@ local function assertBasicWeaponAttack(spellId, expectedDamageType, expectedStat
     assertEqual(effect.weaponDamageMode, "main_hand", label .. " includes its equipped ranged-slot weapon")
     assertEqual(effect.weaponDamageCoefficient, 1, label .. " uses full weapon damage")
     assertEqual(effect.statScaling and effect.statScaling[1] and effect.statScaling[1].statRef, expectedStatRef, label .. " uses the correct offensive stat")
-    assertEqual(effect.statScaling and effect.statScaling[1] and effect.statScaling[1].coefficient, 0.5, label .. " uses the basic-attack stat coefficient")
+    assertEqual(effect.statScaling and effect.statScaling[1] and effect.statScaling[1].coefficient, expectedStatCoefficient, label .. " uses the correct basic-attack stat coefficient")
 end
 
-assertBasicWeaponAttack("shoota01", "ranged", "f82db71a:v2rs9cpy", "Shoot")
-assertBasicWeaponAttack("throwa01", "ranged", "f82db71a:v2rs9cpy", "Throw")
-assertBasicWeaponAttack("wandauto", "spell", "f82db71a:7t7xgzcx", "Wand")
+assertBasicWeaponAttack("shoota01", "ranged", "f82db71a:v2rs9cpy", 0.5, "Shoot")
+assertBasicWeaponAttack("throwa01", "ranged", "f82db71a:v2rs9cpy", 0.5, "Throw")
+assertBasicWeaponAttack("wandauto", "spell", "f82db71a:7t7xgzcx", 1.0, "Wand")
 
 local dependencyRecomputations = 0
 local originalRecompute = Dependecies.RecomputeDatasetDependencies
