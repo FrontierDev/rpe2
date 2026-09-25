@@ -36,7 +36,7 @@ assertEqual(class.name, "Druid", "Druid class name")
 assertEqual(class.icon, "interface/icons/classicon_druid.blp", "Druid class icon")
 assertEqual(#class.talentTraitRefs, 5, "Druid talent trait selection")
 for index = 1, #class.talentTraitRefs do
-    assertTrue(class.talentTraitRefs[index]:match("^6e4d2a91:"), "Druid talent trait ownership")
+    assertTrue(class.talentTraitRefs[index]:match("^6e4d2a91:") ~= nil, "Druid talent trait ownership")
 end
 
 local expectedStats = {
