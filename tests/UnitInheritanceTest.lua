@@ -80,7 +80,12 @@ root.datasets = {
                 tags = { "core", "people" },
                 appearances = { { displayId = 1001, cam = 1, rot = 0, z = 0 } },
                 presets = {
-                    { name = "Base Guard", spells = { "base:guard" }, equipment = { mainHandWeapon = "base:shield" } },
+                    {
+                        name = "Base Guard",
+                        spells = { "base:guard" },
+                        equipment = { mainHandWeapon = "base:shield" },
+                        appearances = { { displayId = 3001, fileDataId = 7001, cam = 4, rot = 15, z = 0.4 } },
+                    },
                 },
             }):ToTable(),
         },
@@ -228,31 +233,54 @@ assert(hashBefore ~= hashAfter, "compatibility hash input changes when extendsUn
 root.datasets.campaign.units[2].extendsUnitRef = "base:human"
 
 loadAddonFile("core/classes/EventUnit.lua")
+loadAddonFile("core/classes/EventUnitVariantIdentity.lua")
 local EventUnit = Database.Classes.EventUnit
-local hydratedUnit = EventUnit:New({ registryID = "campaign:campaignHuman" })
+Addon.UI = { UnitPortrait = {} }
+loadAddonFile("core/ui/prefabs/UnitPortraitVariantPresentation.lua")
+local UnitPortrait = Addon.UI.UnitPortrait
+local hydratedUnit = EventUnit:New({
+    registryID = "campaign:campaignHuman",
+    eventID = 17,
+    presetIndex = 1,
+    appearanceIndex = 1,
+})
 assertEqual(hydratedUnit:GetResolvedUnit().id, "campaignHuman", "EventUnit resolves the effective child definition")
 assertEqual(findByRef(hydratedUnit:GetResolvedUnit().resources, "resourceRef", "common:health").initialValue, 150,
     "EventUnit resolution includes inherited resource overlays")
+assertEqual(#hydratedUnit:GetResolvedUnit().presets, 2, "pre-cache EventUnit resolution includes inherited presets")
+local runtimeStep = {
+    turnNumber = 1,
+    tickNumber = 1,
+    units = { hydratedUnit:ToTable() },
+}
+local function resolveRenderedAppearance(unit)
+    local appearance, diagnostic = UnitPortrait.ResolveRuntimeAppearance(unit)
+    assertEqual(diagnostic.status, "resolved",
+        ("runtime appearance resolves at turn %d tick %d"):format(runtimeStep.turnNumber, runtimeStep.tickNumber))
+    return appearance
+end
+
+local initialAppearance = resolveRenderedAppearance(hydratedUnit)
+assertEqual(initialAppearance.displayId, 3001, "pre-cache resolution uses the inherited preset appearance")
+assertEqual(initialAppearance.fileDataId, 7001, "pre-cache resolution preserves inherited appearance file identity")
 
 -- Planner preparation indexes raw authored records. EventUnit must continue to
 -- resolve through Registry so the index cannot bypass Unit inheritance.
 Addon.Internal.ConfigurationRevision = 5
-local preparedUnitIndex = {}
-for index = 1, #root.datasets.campaign.units do
-    local unit = root.datasets.campaign.units[index]
-    preparedUnitIndex[unit.id] = unit
-end
-root.datasets.campaign.__entryCacheByCollection = root.datasets.campaign.__entryCacheByCollection or {}
-root.datasets.campaign.__entryCacheByCollection.units = {
-    revision = 5,
-    entries = root.datasets.campaign.units,
-    byId = preparedUnitIndex,
-}
 Addon.Client = {
     AutopilotPlanner = { Step = function() return true end },
 }
 Addon.Internal.Tasks = {}
 loadAddonFile("client/autopilot/PlannerPreparationPerformance.lua")
+local planner = Addon.Client.AutopilotPlanner
+local preparationState = {
+    phase = "snapshot-auras",
+    eventId = "inheritance-regression",
+    sourceEventState = runtimeStep,
+}
+assertEqual(planner.Step(preparationState, 1000000), false, "planner preparation yields after its cache slice")
+assertEqual(preparationState.performancePreparation.stageA.complete, true,
+    "planner preparation builds the Unit cache")
 local preparedResolved = hydratedUnit:GetResolvedUnit()
 assertEqual(#preparedResolved.presets, 2, "planner-prepared resolution retains inherited presets")
 assertEqual(preparedResolved.presets[1].equipment.mainHandWeapon, "base:shield",
@@ -265,21 +293,24 @@ assertEqual(findByRef(preparedResolved.resources, "resourceRef", "common:health"
     "planner-prepared resolution retains inherited resources")
 assertEqual(preparedResolved.spells[1], "base:racial",
     "planner-prepared resolution retains inherited spells")
+runtimeStep.tickNumber = 2
+local postPreparationAppearance = resolveRenderedAppearance(hydratedUnit)
+assertEqual(postPreparationAppearance.displayId, initialAppearance.displayId,
+    "planner-prepared refresh retains inherited preset display identity")
+assertEqual(postPreparationAppearance.fileDataId, initialAppearance.fileDataId,
+    "planner-prepared refresh retains inherited preset file identity")
 local ordinaryUnit = EventUnit:New({ registryID = "base:human" })
 assertEqual(#ordinaryUnit:GetResolvedUnit().presets, 1, "planner-prepared ordinary Unit resolution is unchanged")
 
--- A revision change must invalidate the prepared raw index before the
--- canonical resolver reads the authored record again.
-root.datasets.campaign.units[2].appearances[#root.datasets.campaign.units[2].appearances + 1] = {
-    displayId = 2003,
-    cam = 3,
-    rot = 0,
-    z = 0,
-}
-Addon.Internal.ConfigurationRevision = 6
-local invalidatedResolved = hydratedUnit:GetResolvedUnit()
-assertEqual(invalidatedResolved.appearances[3].displayId, 2003,
-    "planner-prepared Unit index invalidates on configuration revision")
+-- Simulate the later event-step refresh that originally exposed the raw-child
+-- regression. The same materialized EventUnit must retain its appearance.
+runtimeStep.turnNumber = 2
+runtimeStep.tickNumber = 1
+local refreshedAppearance = resolveRenderedAppearance(hydratedUnit)
+assertEqual(refreshedAppearance.displayId, initialAppearance.displayId,
+    "event-step refresh retains inherited preset display identity")
+assertEqual(refreshedAppearance.fileDataId, initialAppearance.fileDataId,
+    "event-step refresh retains inherited preset file identity")
 
 Addon.Internal.Ruleset = { Rules = {} }
 Addon.Server = {
