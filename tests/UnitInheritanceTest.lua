@@ -233,6 +233,54 @@ local hydratedUnit = EventUnit:New({ registryID = "campaign:campaignHuman" })
 assertEqual(hydratedUnit:GetResolvedUnit().id, "campaignHuman", "EventUnit resolves the effective child definition")
 assertEqual(findByRef(hydratedUnit:GetResolvedUnit().resources, "resourceRef", "common:health").initialValue, 150,
     "EventUnit resolution includes inherited resource overlays")
+
+-- Planner preparation indexes raw authored records. EventUnit must continue to
+-- resolve through Registry so the index cannot bypass Unit inheritance.
+Addon.Internal.ConfigurationRevision = 5
+local preparedUnitIndex = {}
+for index = 1, #root.datasets.campaign.units do
+    local unit = root.datasets.campaign.units[index]
+    preparedUnitIndex[unit.id] = unit
+end
+root.datasets.campaign.__entryCacheByCollection = root.datasets.campaign.__entryCacheByCollection or {}
+root.datasets.campaign.__entryCacheByCollection.units = {
+    revision = 5,
+    entries = root.datasets.campaign.units,
+    byId = preparedUnitIndex,
+}
+Addon.Client = {
+    AutopilotPlanner = { Step = function() return true end },
+}
+Addon.Internal.Tasks = {}
+loadAddonFile("client/autopilot/PlannerPreparationPerformance.lua")
+local preparedResolved = hydratedUnit:GetResolvedUnit()
+assertEqual(#preparedResolved.presets, 2, "planner-prepared resolution retains inherited presets")
+assertEqual(preparedResolved.presets[1].equipment.mainHandWeapon, "base:shield",
+    "planner-prepared resolution retains inherited equipment")
+assertEqual(preparedResolved.appearances[1].displayId, 1001,
+    "planner-prepared resolution retains inherited appearances")
+assertEqual(findByRef(preparedResolved.stats, "statRef", "common:armor").initialValue, 3,
+    "planner-prepared resolution retains inherited stats")
+assertEqual(findByRef(preparedResolved.resources, "resourceRef", "common:health").initialValue, 150,
+    "planner-prepared resolution retains inherited resources")
+assertEqual(preparedResolved.spells[1], "base:racial",
+    "planner-prepared resolution retains inherited spells")
+local ordinaryUnit = EventUnit:New({ registryID = "base:human" })
+assertEqual(#ordinaryUnit:GetResolvedUnit().presets, 1, "planner-prepared ordinary Unit resolution is unchanged")
+
+-- A revision change must invalidate the prepared raw index before the
+-- canonical resolver reads the authored record again.
+root.datasets.campaign.units[2].appearances[#root.datasets.campaign.units[2].appearances + 1] = {
+    displayId = 2003,
+    cam = 3,
+    rot = 0,
+    z = 0,
+}
+Addon.Internal.ConfigurationRevision = 6
+local invalidatedResolved = hydratedUnit:GetResolvedUnit()
+assertEqual(invalidatedResolved.appearances[3].displayId, 2003,
+    "planner-prepared Unit index invalidates on configuration revision")
+
 Addon.Internal.Ruleset = { Rules = {} }
 Addon.Server = {
     SummonEventPetUnit = function(self, _, registryId, options)

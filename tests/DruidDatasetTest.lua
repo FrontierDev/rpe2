@@ -86,6 +86,41 @@ for _, name in ipairs({ "Maul", "Swipe (Bear)", "Growl", "Demoralizing Roar", "E
     assertEqual(findByName(dataset.spells, name).spellbookCategory, "Guardian", name .. " category")
 end
 
+local thorns = findByName(dataset.spells, "Thorns")
+local thornsTokens = thorns.tooltipTemplateData.auraSections[1].tokens
+assertEqual(#thornsTokens, 4, "Thorns spell tooltip token count")
+local thornsTokenKeys = {}
+for _, token in ipairs(thornsTokens) do
+    assertTrue(type(token) == "table", "Thorns spell tooltip token is a table")
+    assertTrue(type(token.key) == "string", "Thorns spell tooltip token has a key")
+    assertTrue(thornsTokenKeys[token.key] == nil, "Thorns spell tooltip token keys are siblings")
+    thornsTokenKeys[token.key] = true
+end
+for _, key in ipairs({ "AURA_STAT_1", "AURA_EVENT_DAMAGE_1", "AURA_EVENT_DAMAGE_2", "AURA_EVENT_DAMAGE_3" }) do
+    assertTrue(thornsTokenKeys[key] == true, "Thorns spell tooltip includes " .. key)
+end
+
+local sunfireAura = findByName(dataset.auras, "Sunfire")
+local sunfireSpell = findByName(dataset.spells, "Sunfire")
+assertEqual(sunfireAura.effects[1].damageSchoolRefs[1], "f82db71a:qtr10qyj", "Sunfire periodic damage school")
+assertEqual(sunfireSpell.components[1].effect.damageSchoolRefs[1], "f82db71a:qtr10qyj", "Sunfire direct damage school")
+assertEqual(findByName(dataset.spells, "Prowl").icon, "interface/icons/ability_druid_prowl.blp", "Prowl icon")
+
+local swipe = findByName(dataset.spells, "Swipe")
+local swipeResource = swipe.components[2].effect
+assertEqual(swipeResource.type, "resource", "Swipe combo-point component type")
+assertEqual(swipeResource.resourceRef, "f82db71a:1h7yfxff", "Swipe combo-point resource")
+assertEqual(swipeResource.amount, 1, "Swipe combo-point amount")
+
+local rootsBody = findByName(dataset.auras, "Entangling Roots").tooltipTemplateData.bodyText
+assertTrue(rootsBody:find("movement range", 1, true) == nil, "Entangling Roots omits movement-range wording")
+assertTrue(rootsBody:find("preventing movement", 1, true) ~= nil, "Entangling Roots explains movement prevention")
+assertTrue(rootsBody:find("automatically hit", 1, true) ~= nil, "Entangling Roots explains automatic hits")
+assertTrue(rootsBody:find("Breaks when it takes damage", 1, true) ~= nil, "Entangling Roots explains its damage break")
+assertEqual(findByName(dataset.auras, "Bash").tooltipTemplateData.bodyText, "Stuns the affected unit for 1 turn.", "Bash tooltip")
+assertEqual(findByName(dataset.auras, "Pounce").tooltipTemplateData.bodyText, "Stuns the affected unit for 1 turn.", "Pounce tooltip")
+assertEqual(findByName(dataset.auras, "Solar Beam").tooltipTemplateData.bodyText, "Silences the affected unit for 1 turn.", "Solar Beam tooltip")
+
 local knownRefs = {}
 local collections = { "achievements", "auras", "classes", "currencies", "damageSchools", "itemSlots", "items", "loot", "mounts", "pets", "races", "recipes", "resources", "skills", "spells", "stats", "traits", "units", "weaponTypes" }
 for _, definition in pairs(definitions) do

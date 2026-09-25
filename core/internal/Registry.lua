@@ -57,6 +57,7 @@ local function ensureDatasetEntryCache(dataset, collectionKey)
 
     local revision = getConfigurationRevision()
     local entries = dataset[collectionKey]
+    local entryCount = #(entries or {})
     local cacheByCollection = type(dataset.__entryCacheByCollection) == "table" and dataset.__entryCacheByCollection or {}
     dataset.__entryCacheByCollection = cacheByCollection
 
@@ -64,6 +65,7 @@ local function ensureDatasetEntryCache(dataset, collectionKey)
     if type(cached) == "table"
         and cached.revision == revision
         and cached.entries == entries
+        and cached.entryCount == entryCount
     then
         return cached.byId
     end
@@ -80,6 +82,7 @@ local function ensureDatasetEntryCache(dataset, collectionKey)
     cacheByCollection[collectionKey] = {
         revision = revision,
         entries = entries,
+        entryCount = entryCount,
         byId = byId,
     }
     return byId
@@ -423,13 +426,8 @@ local function findUnitRecord(unitRef, includeInactive)
     for datasetIndex = 1, #datasets do
         local dataset = datasets[datasetIndex]
         if dataset and tostring(dataset.id or "") == datasetId then
-            for unitIndex = 1, #(dataset.units or {}) do
-                local unit = dataset.units[unitIndex]
-                if unit and tostring(unit.id or "") == unitId then
-                    return dataset, unit
-                end
-            end
-            return dataset, nil
+            local byId = ensureDatasetEntryCache(dataset, "units")
+            return dataset, byId and byId[unitId] or nil
         end
     end
 

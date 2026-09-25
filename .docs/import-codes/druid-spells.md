@@ -9,14 +9,14 @@ Import each listed **Aura** before its associated **Spell**. These entries use t
 - Balance Druid uses **Mana** (`f82db71a:4c8mfm99`); the Feral abilities in this document use **Energy** (`f82db71a:c3gaf7dd`) where applicable.
 - Main Action = cooldown channel 1; Bonus Action = channel 2; Buff Action = channel 3.
 - Balance damage scales from **Spell Power** (`f82db71a:7t7xgzcx`).
-- Damage schools used here are Nature (`f82db71a:qtr10qyj`), Arcane (`f82db71a:dtxhglqg`) and Fire (`f82db71a:esjguw6d`).
+- Damage schools used here are Nature (`f82db71a:qtr10qyj`) and Arcane (`f82db71a:dtxhglqg`).
 - **Wrath** intentionally copies the current Priest **Smite** low-threat budget: 70 base damage, 0.70 Spell Power, 0.50 threat coefficient and 5% base Mana, converted from Holy to Nature.
 - **Starfire** is the standard one-turn, single-target Main Action DPS budget: 135 base damage + 1.40 Spell Power, 6.8% base Mana.
 - **Starsurge** is the standard instant single-target Bonus Action DPS budget: 65 base damage + 0.65 Spell Power, 0.75 threat coefficient, 6.3% base Mana.
 - **Moonfire** and **Sunfire** have two independently useful numerical outputs. Their direct component remains the secondary-output Bonus Action budget at 55.25 + 0.5525 Spell Power. Their 5-turn periodic component remains 17.68 base damage per turn, but its authored per-tick coefficient follows the corrected hybrid-DoT convention and current Fireball DoT reference: **0.22 Spell Power per turn** (1.10 Spell Power over five ticks). Each costs 6.3% base Mana.
 - **Thorns** is reactive and therefore is not forced through the direct/periodic calculator. Its reactive damage copies the current **Molten Armor** event budget (28.1667 + 0.845 Spell Power), converted to Nature. The fixed +8% Threat Generated effect does not rank-scale; reactive damage does. Use `on_melee_taken`, `on_ranged_taken` and `on_spell_taken`. Do **not** also register `on_auto_attack_taken`: current combat-event filtering treats a melee auto attack as both `hitType = "auto"` and `attackType = "melee"`, so registering both would retaliate twice against the same melee auto attack.
 - **Thorns** uses the current 5% base-Mana utility/reactive-buff convention, lasts 10 turns, uses Buff Action and has the requested 1-turn personal cooldown.
-- **Entangling Roots** copies the current Polymorph/Freezing-Trap control shape but does **not** prevent spellcasting: it breaks on damage, sets movement range to 0 and causes attacks against the target to automatically hit. It costs 5% base Mana.
+- **Entangling Roots** roots the target, preventing movement, causes attacks against it to automatically hit, and breaks when the target takes damage. It does **not** prevent spellcasting and costs 5% base Mana.
 - **Solar Beam** uses the implemented `raid_marker` targeter with `maxTargets = 5`. Control-only mechanics are outside the numerical output calculator; its 18.1% base-Mana cost follows the current multi-target control analogue (Psychic Scream), while keeping the requested Bonus Action channel, 1-turn duration and 10-turn cooldown.
 - Damage-bearing spells and damaging auras use the standard 8-level rank interval. Pure control effects do not use ranks.
 
@@ -572,7 +572,7 @@ RPE_DATASET_ENTRY_V1
                                         amountMode = "flat",
                                         baseDamage = 17.68,
                                         damageSchoolRefs = {
-                                                            "f82db71a:esjguw6d",
+                                                            "f82db71a:qtr10qyj",
                                                         },
                                         statScaling = {
                                                             {
@@ -592,7 +592,7 @@ RPE_DATASET_ENTRY_V1
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
-                        bodyText = "Deals {AURA_DAMAGE_1} Fire damage each turn.",
+                        bodyText = "Deals {AURA_DAMAGE_1} Nature damage each turn.",
                         bodyTokens = {
                                         {
                                                             applyMode = "damage_amount",
@@ -640,7 +640,7 @@ RPE_DATASET_ENTRY_V1
                                                             auraStacks = 1,
                                                             baseDamage = 55.25,
                                                             damageSchoolRefs = {
-                                                                                    "f82db71a:esjguw6d",
+                                                                                    "f82db71a:qtr10qyj",
                                                                                 },
                                                             damageType = "spell",
                                                             hitType = "ability",
@@ -707,7 +707,7 @@ RPE_DATASET_ENTRY_V1
                                         {
                                                             auraRef = "6e4d2a91:drsnaur1",
                                                             datasetId = "6e4d2a91",
-                                                            descriptionText = "Deals {AURA_DAMAGE_1} Fire damage each turn.",
+                                                            descriptionText = "Deals {AURA_DAMAGE_1} Nature damage each turn.",
                                                             duration = 5,
                                                             icon = "interface/icons/ability_mage_firestarter.blp",
                                                             nameText = "Sunfire",
@@ -731,7 +731,7 @@ RPE_DATASET_ENTRY_V1
                                                                                 },
                                                         },
                                     },
-                        mainText = "Deal {DAMAGE_1} Fire damage to an enemy and apply Sunfire for 5 turns.",
+                        mainText = "Deal {DAMAGE_1} Nature damage to an enemy and apply Sunfire for 5 turns.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -979,7 +979,16 @@ RPE_DATASET_ENTRY_V1
                                                                                                                 effectIndex = 1,
                                                                                                                 key = "AURA_STAT_1",
                                                                                                                 tokenType = "aura_amount",
-                                                                                                                {
+                                                                                                            },
+                                                                                    {
+                                                                                                                applyMode = "damage_amount",
+                                                                                                                baseField = "baseDamage",
+                                                                                                                effectIndex = 1,
+                                                                                                                eventIndex = 1,
+                                                                                                                key = "AURA_EVENT_DAMAGE_1",
+                                                                                                                tokenType = "aura_amount",
+                                                                                                            },
+                                                                                    {
                                                                                                                 applyMode = "damage_amount",
                                                                                                                 baseField = "baseDamage",
                                                                                                                 effectIndex = 1,
@@ -993,15 +1002,6 @@ RPE_DATASET_ENTRY_V1
                                                                                                                 effectIndex = 1,
                                                                                                                 eventIndex = 3,
                                                                                                                 key = "AURA_EVENT_DAMAGE_3",
-                                                                                                                tokenType = "aura_amount",
-                                                                                                            },
-                                                                                },
-                                                                                    {
-                                                                                                                applyMode = "damage_amount",
-                                                                                                                baseField = "baseDamage",
-                                                                                                                effectIndex = 1,
-                                                                                                                eventIndex = 1,
-                                                                                                                key = "AURA_EVENT_DAMAGE_1",
                                                                                                                 tokenType = "aura_amount",
                                                                                                             },
                                                                                 },
@@ -1050,7 +1050,7 @@ RPE_DATASET_ENTRY_V1
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
-                        bodyText = "Breaks when the affected unit takes damage. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                        bodyText = "Roots the affected unit, preventing movement. Causes attacks against it to automatically hit. Breaks when it takes damage.",
                         bodyTokens = {  },
                         stackingText = "",
                         stackingTokens = {  },
@@ -1132,7 +1132,7 @@ RPE_DATASET_ENTRY_V1
                                         {
                                                             auraRef = "6e4d2a91:dreroot1",
                                                             datasetId = "6e4d2a91",
-                                                            descriptionText = "Breaks when the affected unit takes damage. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                                                            descriptionText = "Roots the affected unit, preventing movement. Causes attacks against it to automatically hit. Breaks when it takes damage.",
                                                             duration = 1,
                                                             icon = "interface/icons/spell_nature_stranglevines.blp",
                                                             nameText = "Entangling Roots",
@@ -1190,7 +1190,7 @@ RPE_DATASET_ENTRY_V1
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
-                        bodyText = "Prevents the affected unit from casting spells.",
+                        bodyText = "Silences the affected unit for 1 turn.",
                         bodyTokens = {  },
                         stackingText = "",
                         stackingTokens = {  },
@@ -1272,7 +1272,7 @@ RPE_DATASET_ENTRY_V1
                                         {
                                                             auraRef = "6e4d2a91:drsolaru",
                                                             datasetId = "6e4d2a91",
-                                                            descriptionText = "Prevents the affected unit from casting spells.",
+                                                            descriptionText = "Silences the affected unit for 1 turn.",
                                                             duration = 1,
                                                             icon = "interface/icons/ability_vehicle_sonicshockwave.blp",
                                                             nameText = "Solar Beam",
@@ -1315,7 +1315,7 @@ The Feral abilities below use the requested WoW Classic Energy costs rather than
 | Rip | 30 | Copy current Rogue Rupture; consumes 5 Combo Points. |
 | Tiger's Fury | 30 | Fixed +30% Melee Attack Power for 1 turn; Buff Action. |
 | Ravage | 60 | Copy current Rogue Ambush; requires Prowl and generates 2 Combo Points. |
-| Swipe | 50 | Copy current Warrior Cleave; Cat-form Energy cost uses the WoW Classic Season of Discovery Cat Swipe because original vanilla Cat Form had no Energy-based Swipe. |
+| Swipe | 50 | Copy current Warrior Cleave; Cat-form Energy cost uses the WoW Classic Season of Discovery Cat Swipe because original vanilla Cat Form had no Energy-based Swipe. Generates 1 Combo Point. |
 
 Authoring details:
 
@@ -1323,7 +1323,7 @@ Authoring details:
 - Prowl copies the current Rogue Stealth runtime shape exactly: self-hide, Buff Action, 10-turn RPE cooldown, and no resource cost.
 - Pounce uses the current hidden-caster condition used by Ambush. Its direct weapon-attack output uses the Bonus Action budget with the 0.85 secondary-effect modifier: 41.4375 flat + 0.1934 Melee Attack Power + 0.5525 main-hand weapon damage. The stun is 1 turn and the spell generates the requested 2 Combo Points.
 - Rake has no separate upfront damage component: it applies a Rend-like 5-turn bleed and generates 1 Combo Point. The flat periodic base remains the 0.85 secondary-output version of Rend at 17.68 per turn. Under the corrected per-tick DoT convention, current Rend is 0.15 Melee Attack Power per turn; applying the same 0.85 secondary-output allowance gives Rake **0.1275 Melee Attack Power per turn** (0.6375 over five ticks).
-- Shred, Ferocious Bite, Claw, Rip, Ravage and Swipe intentionally copy the current RPE analogue's numerical damage/effect shape. In particular, **Rip now follows the current Rupture periodic coefficient of 0.20 Melee Attack Power per turn**, not the superseded 0.364 value. Only the icon/name/category, explicit Druid mechanics, and requested Classic Energy costs are changed.
+- Shred, Ferocious Bite, Claw, Rip, Ravage and Swipe intentionally copy the current RPE analogue's numerical damage/effect shape. In particular, **Rip now follows the current Rupture periodic coefficient of 0.20 Melee Attack Power per turn**, not the superseded 0.364 value. Swipe additionally generates 1 Combo Point to match its Season of Discovery source. Only the icon/name/category, explicit Druid mechanics, and requested Classic Energy costs are changed.
 - Shred and Ravage generate 2 Combo Points in this RPE design. This is deliberate and follows the requested design/current RPE analogue rather than original Classic's combo-point award.
 - Ferocious Bite and Rip follow the current RPE finisher convention and consume 5 Combo Points.
 - Tiger's Fury is a fixed percentage buff and therefore does not scale with spell rank.
@@ -1372,7 +1372,7 @@ RPE_DATASET_ENTRY_V1
             cooldownScalesWithHaste = false,
             description = "",
             doesNotRevealCaster = true,
-            icon = "interface/icons/ability_ambush.blp",
+            icon = "interface/icons/ability_druid_prowl.blp",
             id = "drprowl1",
             cooldownChannel = 3,
             learnMode = "always_learned",
@@ -1432,7 +1432,7 @@ RPE_DATASET_ENTRY_V1
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
-                        bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                        bodyText = "Stuns the affected unit for 1 turn.",
                         bodyTokens = {  },
                         stackingText = "",
                         stackingTokens = {  },
@@ -1570,7 +1570,7 @@ RPE_DATASET_ENTRY_V1
                                         {
                                                             auraRef = "6e4d2a91:drpncau1",
                                                             datasetId = "6e4d2a91",
-                                                            descriptionText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                                                            descriptionText = "Stuns the affected unit for 1 turn.",
                                                             duration = 1,
                                                             icon = "interface/icons/ability_druid_supriseattack.blp",
                                                             nameText = "Pounce",
@@ -1586,7 +1586,7 @@ RPE_DATASET_ENTRY_V1
                                                             tokens = {  },
                                                         },
                                     },
-                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy, stun it for 1 turn, and restore {RESOURCE_AMOUNT_1} to yourself.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy, stun it for 1 turn, and generate {RESOURCE_AMOUNT_1} Combo Points.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -1789,7 +1789,7 @@ RPE_DATASET_ENTRY_V1
                                                                                 },
                                                         },
                                     },
-                        mainText = "Apply Rake to an enemy for 5 turns and restore {RESOURCE_AMOUNT_1} to yourself.",
+                        mainText = "Apply Rake to an enemy for 5 turns and generate {RESOURCE_AMOUNT_1} Combo Points.",
                         tokens = {
                                         {
                                                             applyMode = "resource_gain_amount",
@@ -1922,7 +1922,7 @@ RPE_DATASET_ENTRY_V1
             tooltipTemplate = true,
             tooltipTemplateData = {
                         auraSections = {  },
-                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generate {RESOURCE_AMOUNT_1} Combo Points.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -2180,7 +2180,7 @@ RPE_DATASET_ENTRY_V1
             tooltipTemplate = true,
             tooltipTemplateData = {
                         auraSections = {  },
-                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generate {RESOURCE_AMOUNT_1} Combo Points.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -2661,7 +2661,7 @@ RPE_DATASET_ENTRY_V1
             tooltipTemplate = true,
             tooltipTemplateData = {
                         auraSections = {  },
-                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Restore {RESOURCE_AMOUNT_1} to yourself.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generate {RESOURCE_AMOUNT_1} Combo Points.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -2750,6 +2750,27 @@ RPE_DATASET_ENTRY_V1
                                                             type = "raid_marker",
                                                         },
                                     },
+                        {
+                                        castPhase = "on_cast_end",
+                                        castingGroup = "default",
+                                        effect = {
+                                                            amount = 1,
+                                                            amountMode = "flat",
+                                                            resourceRef = "f82db71a:1h7yfxff",
+                                                            targetEvents = {  },
+                                                            type = "resource",
+                                                        },
+                                        key = "swipecp1",
+                                        target = {
+                                                            allowDeadTargets = false,
+                                                            disableSelfCast = false,
+                                                            maxTargets = 0,
+                                                            minTargets = 0,
+                                                            requiresTarget = false,
+                                                            targetDisposition = "ally",
+                                                            type = "caster",
+                                                        },
+                                    },
                     },
             conditions = {  },
             cooldown = 0,
@@ -2781,13 +2802,19 @@ RPE_DATASET_ENTRY_V1
             tooltipTemplate = true,
             tooltipTemplateData = {
                         auraSections = {  },
-                        mainText = "Deal {DAMAGE_1} Physical damage to up to 2 enemies. Targets must share the same raid marker.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to up to 2 enemies. Generate {RESOURCE_AMOUNT_1} Combo Points. Targets must share the same raid marker.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
                                                             componentIndex = 1,
                                                             key = "DAMAGE_1",
                                                             tokenType = "spell_damage_range",
+                                                        },
+                                        {
+                                                            applyMode = "resource_gain_amount",
+                                                            componentIndex = 2,
+                                                            key = "RESOURCE_AMOUNT_1",
+                                                            tokenType = "spell_resource_amount",
                                                         },
                                     },
                         version = 1,
@@ -2798,9 +2825,9 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
-## Feral — Bear Abilities
+## Guardian — Bear Abilities
 
-These abilities are authored as the Druid's Bear/tank toolkit but, by design, **do not require Bear Form**. They remain in the `Feral` spellbook category and use Rage where appropriate.
+These abilities are authored as the Druid's Bear/tank toolkit but, by design, **do not require Bear Form**. They use the `Guardian` spellbook category and Rage where appropriate.
 
 ### Bear authoring notes
 
@@ -2913,7 +2940,7 @@ RPE_DATASET_ENTRY_V1
                                     },
                     },
             seedNPCSpell = false,
-            spellbookCategory = "Feral",
+            spellbookCategory = "Guardian",
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
@@ -3025,7 +3052,7 @@ RPE_DATASET_ENTRY_V1
                                     },
                     },
             seedNPCSpell = false,
-            spellbookCategory = "Feral",
+            spellbookCategory = "Guardian",
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
@@ -3102,7 +3129,7 @@ RPE_DATASET_ENTRY_V1
             range = 0,
             resourceCosts = {  },
             seedNPCSpell = false,
-            spellbookCategory = "Feral",
+            spellbookCategory = "Guardian",
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
@@ -3232,7 +3259,7 @@ RPE_DATASET_ENTRY_V1
                                     },
                     },
             seedNPCSpell = false,
-            spellbookCategory = "Feral",
+            spellbookCategory = "Guardian",
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
@@ -3395,7 +3422,7 @@ RPE_DATASET_ENTRY_V1
             range = 0,
             resourceCosts = {  },
             seedNPCSpell = false,
-            spellbookCategory = "Feral",
+            spellbookCategory = "Guardian",
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
@@ -3476,7 +3503,7 @@ RPE_DATASET_ENTRY_V1
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
-                        bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                        bodyText = "Stuns the affected unit for 1 turn.",
                         bodyTokens = {  },
                         stackingText = "",
                         stackingTokens = {  },
@@ -3550,7 +3577,7 @@ RPE_DATASET_ENTRY_V1
                                     },
                     },
             seedNPCSpell = false,
-            spellbookCategory = "Feral",
+            spellbookCategory = "Guardian",
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {
@@ -3558,7 +3585,7 @@ RPE_DATASET_ENTRY_V1
                                         {
                                                             auraRef = "6e4d2a91:drbashau",
                                                             datasetId = "6e4d2a91",
-                                                            descriptionText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                                                            descriptionText = "Stuns the affected unit for 1 turn.",
                                                             duration = 1,
                                                             icon = "interface/icons/ability_druid_bash.blp",
                                                             nameText = "Bash",
@@ -3647,7 +3674,7 @@ RPE_DATASET_ENTRY_V1
                                     },
                     },
             seedNPCSpell = false,
-            spellbookCategory = "Feral",
+            spellbookCategory = "Guardian",
             tags = {  },
             tooltipTemplate = true,
             tooltipTemplateData = {

@@ -1410,9 +1410,11 @@ local function resolveAuraTemplateToken(auraDefinition, token, options)
                 and math.abs(tonumber(effect[token.baseField or "baseAmount"]) or 0)
                 or numericAmount
         )
-        if applyMode == "stat_amount" and (tostring(effect.operation or "flat") == "percent" or isPercentDisplayStat(effect.statRef)) then
-            amountText = amountText .. "%"
-        end
+        -- Percentage-valued stat tokens are rendered as the numeric value only.
+        -- Authored tooltip templates own their punctuation (for example, the
+        -- common `{AURA_STAT_1}%` form), while generated sentences append the
+        -- suffix themselves. Keeping the token value punctuation-free avoids
+        -- duplicated percent signs when a template includes the suffix.
         return amountText
     end
 
