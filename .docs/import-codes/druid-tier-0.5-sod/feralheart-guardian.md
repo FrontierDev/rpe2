@@ -12,7 +12,7 @@ Guardian translation follows the existing RPE Druid tank convention:
 - source Dodge is mapped to **Dodge Chance**;
 - the shared item-set key is `t05_druid_feralheart`.
 
-This document currently contains the six Guardian pieces whose SoD stats were verified for import. Feralheart Faceguard and Feralheart Legguards are intentionally not included here until their SoD tooltip values are verified.
+This document contains all eight Guardian / Feral Tank Feralheart pieces with their Season of Discovery tooltip stats verified for import.
 
 ## Feralheart Armor
 
@@ -622,6 +622,208 @@ RPE_DATASET_ENTRY_V1
         uniqueFlag = "none",
         validSlotRefs = {
             "f82db71a:crezt6ix",
+        },
+        yellowSockets = 0,
+    },
+}
+```
+
+## Feralheart Faceguard
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "items",
+    datasetId = "6e4d2a91",
+    entry = {
+        allowWowConversion = false,
+        armorWeight = "leather",
+        bindingFlag = "bind_on_pickup",
+        blueSockets = 0,
+        canDisenchant = true,
+        canSell = true,
+        canStack = false,
+        canTrade = true,
+        cogSockets = 0,
+        conditions = {
+            {
+                invert = false,
+                minimumValue = 60,
+                showOnTooltip = true,
+                tooltipTextOverride = "",
+                type = "level",
+            },
+            {
+                classRefs = {
+                    "6e4d2a91:drdcls01",
+                },
+                invert = false,
+                showOnTooltip = true,
+                tooltipTextOverride = "Classes: Druid",
+                type = "class",
+            },
+        },
+        consumableElixirType = "",
+        consumableType = "",
+        damageMode = "fixed",
+        damagePerTurn = 0,
+        description = "",
+        gemColor = "none",
+        genericModificationKey = "",
+        greenSockets = 0,
+        icon = "interface/icons/inv_helmet_27.blp",
+        id = "d05tface",
+        isTwoHanded = false,
+        itemLevel = 60,
+        itemSetKey = "t05_druid_feralheart",
+        itemType = "armor",
+        maxDamagePerTurn = 0,
+        maxGenericModificationCounts = {
+            mod = 1,
+        },
+        maxModificationCounts = {
+            mod = 1,
+        },
+        maxStackSize = 1,
+        metaSockets = 0,
+        minDamagePerTurn = 0,
+        modificationKind = "generic",
+        name = "Feralheart Faceguard",
+        prismaticSockets = 0,
+        quality = "epic",
+        redSockets = 0,
+        sellPrice = 0,
+        skillBonuses = {  },
+        socketTypes = {  },
+        sockets = {  },
+        stats = {
+            {
+                sourceStatRef = "f82db71a:v42albuv",
+                value = 270,
+            },
+            {
+                sourceStatRef = "f82db71a:xqz0daz2",
+                value = 15,
+            },
+            {
+                sourceStatRef = "f82db71a:ygjno50i",
+                value = 30,
+            },
+            {
+                sourceStatRef = "f82db71a:0wyp78x9",
+                value = 11,
+            },
+        },
+        tags = {  },
+        targetArmorWeight = "none",
+        targetSlotRefs = {  },
+        targetTwoHandedOnly = false,
+        uniqueFlag = "none",
+        validSlotRefs = {
+            "f82db71a:bgvs1zx6",
+        },
+        yellowSockets = 0,
+    },
+}
+```
+
+## Feralheart Legguards
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "items",
+    datasetId = "6e4d2a91",
+    entry = {
+        allowWowConversion = false,
+        armorWeight = "leather",
+        bindingFlag = "bind_on_pickup",
+        blueSockets = 0,
+        canDisenchant = true,
+        canSell = true,
+        canStack = false,
+        canTrade = true,
+        cogSockets = 0,
+        conditions = {
+            {
+                invert = false,
+                minimumValue = 60,
+                showOnTooltip = true,
+                tooltipTextOverride = "",
+                type = "level",
+            },
+            {
+                classRefs = {
+                    "6e4d2a91:drdcls01",
+                },
+                invert = false,
+                showOnTooltip = true,
+                tooltipTextOverride = "Classes: Druid",
+                type = "class",
+            },
+        },
+        consumableElixirType = "",
+        consumableType = "",
+        damageMode = "fixed",
+        damagePerTurn = 0,
+        description = "",
+        gemColor = "none",
+        genericModificationKey = "",
+        greenSockets = 0,
+        icon = "interface/icons/inv_pants_08.blp",
+        id = "d05tlegs",
+        isTwoHanded = false,
+        itemLevel = 60,
+        itemSetKey = "t05_druid_feralheart",
+        itemType = "armor",
+        maxDamagePerTurn = 0,
+        maxGenericModificationCounts = {
+            mod = 1,
+        },
+        maxModificationCounts = {
+            mod = 1,
+        },
+        maxStackSize = 1,
+        metaSockets = 0,
+        minDamagePerTurn = 0,
+        modificationKind = "generic",
+        name = "Feralheart Legguards",
+        prismaticSockets = 0,
+        quality = "rare",
+        redSockets = 0,
+        sellPrice = 0,
+        skillBonuses = {  },
+        socketTypes = {  },
+        sockets = {  },
+        stats = {
+            {
+                sourceStatRef = "f82db71a:v42albuv",
+                value = 160,
+            },
+            {
+                sourceStatRef = "f82db71a:xqz0daz2",
+                value = 13,
+            },
+            {
+                sourceStatRef = "f82db71a:ygjno50i",
+                value = 25,
+            },
+            {
+                sourceStatRef = "f82db71a:0wyp78x9",
+                value = 9,
+            },
+        },
+        tags = {  },
+        targetArmorWeight = "none",
+        targetSlotRefs = {  },
+        targetTwoHandedOnly = false,
+        uniqueFlag = "none",
+        validSlotRefs = {
+            "f82db71a:obmt4ntq",
         },
         yellowSockets = 0,
     },
