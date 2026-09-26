@@ -4,7 +4,7 @@ This folder contains the **Balance DPS**, **Feral DPS**, and **Guardian / Feral 
 
 - **Balance / Astral rewards** — 8 pieces.
 - **Feral DPS / Feline rewards** — 8 pieces.
-- **Guardian / Feral Tank rewards** — 6 verified import codes currently documented; Faceguard and Legguards remain pending source-stat verification.
+- **Guardian / Feral Tank rewards** — 8 pieces.
 
 The codes target the Druid dataset `6e4d2a91`, use the current `RPE_DATASET_ENTRY_V1` format, require level 60 and Druid class ref `6e4d2a91:drdcls01`, and use the existing Core stat and equipment-slot references.
 
