@@ -1,9 +1,10 @@
 # Season of Discovery Druid Tier 0.5 — Feralheart RPE Import Codes
 
-This folder currently contains the **Balance DPS** and **Feral DPS** variants of the Druid Dungeon Set 2 / Tier 0.5 **Feralheart Raiment** from Season of Discovery.
+This folder contains the **Balance DPS**, **Feral DPS**, and **Guardian / Feral Tank** variants of the Druid Dungeon Set 2 / Tier 0.5 **Feralheart Raiment** from Season of Discovery.
 
 - **Balance / Astral rewards** — 8 pieces.
 - **Feral DPS / Feline rewards** — 8 pieces.
+- **Guardian / Feral Tank rewards** — 6 verified import codes currently documented; Faceguard and Legguards remain pending source-stat verification.
 
 The codes target the Druid dataset `6e4d2a91`, use the current `RPE_DATASET_ENTRY_V1` format, require level 60 and Druid class ref `6e4d2a91:drdcls01`, and use the existing Core stat and equipment-slot references.
 
@@ -17,6 +18,7 @@ The codes target the Druid dataset `6e4d2a91`, use the current `RPE_DATASET_ENTR
 - SoD effects that improve hit or critical chance for **all spells and attacks** are specialized by intended RPE role, matching the existing Druid Tier 2 convention:
   - Balance maps them to **Spell Hit Chance** / **Spell Crit. Chance**.
   - Feral DPS maps them to **Melee Hit Chance** / **Melee Crit. Chance**.
+  - Guardian maps generic hit to **Melee Hit Chance**, source Defense to **Defense Rating**, and source Dodge to **Dodge Chance**.
 - Source damage-and-healing bonuses are represented as **Spell Power** for the Balance set.
 - The original Feralheart slot icon family is used.
 
@@ -33,6 +35,7 @@ The Season of Discovery Feralheart variants share these set bonuses. They are do
 
 - `feralheart-balance.md`
 - `feralheart-feral-dps.md`
+- `feralheart-guardian.md`
 
 ## Reference sources
 
@@ -40,3 +43,4 @@ The Season of Discovery Feralheart variants share these set bonuses. They are do
 - Wowhead — Dungeon Set 2 / Tier 0.5 in Season of Discovery Phase 4: https://www.wowhead.com/classic/news/how-to-acquire-dungeon-set-2-tier-0-5-in-season-of-discovery-phase-4-345224
 - Wowhead — SoD Balance Feralheart item IDs 226772–226779.
 - Wowhead / Warcraft Wiki — SoD Feral DPS Feralheart item IDs 226788–226795.
+- Wowhead / Warcraft Wiki — SoD Guardian Feralheart pieces, including item IDs 226796–226804.
