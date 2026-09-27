@@ -4,6 +4,17 @@ local function assertEqual(actual, expected, message)
     end
 end
 
+local function assertTrue(value, message)
+    if value ~= true then error(message, 2) end
+end
+
+local function contains(values, expected)
+    for index = 1, #values do
+        if values[index] == expected then return true end
+    end
+    return false
+end
+
 local function loadAddonFile(path, addon)
     local chunk, loadError = loadfile(path)
     assert(chunk, loadError)
@@ -35,6 +46,11 @@ local imported, importError = Database.ImportRuleset(DefaultRuleset.export)
 assert(imported, importError)
 assertEqual(imported.id, CORE_RULESET_ID, "packaged Core import ID")
 assertEqual(imported.name, "Core", "packaged Core import name")
+assertEqual(DefaultRuleset.packageVersion, 10, "packaged Core ruleset version")
+assertTrue(contains(imported.rules.setup.allowed_class_refs, "c4a91e7d:shaman01"), "packaged Core allows Shaman setup")
+assertTrue(contains(imported.rules.setup.allowed_class_refs, "e8f3b2c6:warlock1"), "packaged Core allows Warlock setup")
+assertTrue(contains(imported.rules.setup.forced_dataset_ids, "c4a91e7d"), "packaged Core forces the Shaman dataset")
+assertTrue(contains(imported.rules.setup.forced_dataset_ids, "e8f3b2c6"), "packaged Core forces the Warlock dataset")
 
 -- Clean startup installs and activates Core for the current character.
 resetRulesets()

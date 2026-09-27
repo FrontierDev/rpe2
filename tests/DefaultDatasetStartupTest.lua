@@ -47,6 +47,8 @@ local packagedDataFiles = {
     "data/default/classes/paladin.lua",
     "data/default/classes/priest.lua",
     "data/default/classes/rogue.lua",
+    "data/default/classes/shaman.lua",
+    "data/default/classes/warlock.lua",
     "data/default/classes/warrior.lua",
     "data/default/professions/fishing.lua",
     "data/default/professions/alchemy.lua",
