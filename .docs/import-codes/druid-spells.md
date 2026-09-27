@@ -1389,7 +1389,7 @@ RPE_DATASET_ENTRY_V1
             tooltipTemplate = true,
             tooltipTemplateData = {
                         auraSections = {  },
-                        mainText = "Hide yourself.",
+                        mainText = "Cause yourself to become hidden.",
                         tokens = {  },
                         version = 1,
                     },
@@ -1586,7 +1586,7 @@ RPE_DATASET_ENTRY_V1
                                                             tokens = {  },
                                                         },
                                     },
-                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy, stun it for 1 turn, and generate {RESOURCE_AMOUNT_1} Combo Points.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy and apply Pounce for 1 turn. Generate {RESOURCE_AMOUNT_1}.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -1789,7 +1789,7 @@ RPE_DATASET_ENTRY_V1
                                                                                 },
                                                         },
                                     },
-                        mainText = "Apply Rake to an enemy for 5 turns and generate {RESOURCE_AMOUNT_1} Combo Points.",
+                        mainText = "Apply Rake to an enemy for 5 turns. Generate {RESOURCE_AMOUNT_1}.",
                         tokens = {
                                         {
                                                             applyMode = "resource_gain_amount",
@@ -1922,7 +1922,7 @@ RPE_DATASET_ENTRY_V1
             tooltipTemplate = true,
             tooltipTemplateData = {
                         auraSections = {  },
-                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generate {RESOURCE_AMOUNT_1} Combo Points.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generate {RESOURCE_AMOUNT_1}.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -2180,7 +2180,7 @@ RPE_DATASET_ENTRY_V1
             tooltipTemplate = true,
             tooltipTemplateData = {
                         auraSections = {  },
-                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generate {RESOURCE_AMOUNT_1} Combo Points.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generate {RESOURCE_AMOUNT_1}.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -2661,7 +2661,7 @@ RPE_DATASET_ENTRY_V1
             tooltipTemplate = true,
             tooltipTemplateData = {
                         auraSections = {  },
-                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generate {RESOURCE_AMOUNT_1} Combo Points.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to an enemy. Generate {RESOURCE_AMOUNT_1}.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -2802,7 +2802,7 @@ RPE_DATASET_ENTRY_V1
             tooltipTemplate = true,
             tooltipTemplateData = {
                         auraSections = {  },
-                        mainText = "Deal {DAMAGE_1} Physical damage to up to 2 enemies. Generate {RESOURCE_AMOUNT_1} Combo Points. Targets must share the same raid marker.",
+                        mainText = "Deal {DAMAGE_1} Physical damage to up to 2 enemies. Generate {RESOURCE_AMOUNT_1}. Targets must share the same raid marker.",
                         tokens = {
                                         {
                                                             applyMode = "damage_range",
@@ -4622,7 +4622,7 @@ RPE_DATASET_ENTRY_V1
         tooltipTemplate = true,
         tooltipTemplateData = {
             auraSections = {  },
-            mainText = "Revive a dead ally with {HEAL_1} health.",
+            mainText = "Heal an ally for {HEAL_1} health.",
             tokens = {
                 {
                     applyMode = "heal_range",

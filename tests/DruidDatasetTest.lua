@@ -35,7 +35,10 @@ assertEqual(dataset.name, "Druid", "Druid dataset name")
 local class = dataset.classes[1]
 assertEqual(class.name, "Druid", "Druid class name")
 assertEqual(class.icon, "interface/icons/classicon_druid.blp", "Druid class icon")
-assertEqual(#class.talentTraitRefs, 5, "Druid talent trait selection")
+assertEqual(#class.passiveTraitRefs, 2, "Druid passive trait selection")
+assertEqual(class.passiveTraitRefs[1], "6e4d2a91:drfornat", "Druid passive trait ownership")
+assertEqual(class.passiveTraitRefs[2], "6e4d2a91:drnatres", "Druid nature resistance passive ownership")
+assertEqual(#class.talentTraitRefs, 13, "Druid talent trait selection")
 for index = 1, #class.talentTraitRefs do
     assertTrue(class.talentTraitRefs[index]:match("^6e4d2a91:") ~= nil, "Druid talent trait ownership")
 end
@@ -83,6 +86,12 @@ assertTrue(findByName(dataset.spells, "Bear Form") == nil, "Bear Form spell is n
 assertTrue(findByName(dataset.spells, "Cat Form") == nil, "Cat Form spell is not packaged")
 assertTrue(findByName(dataset.auras, "Bear Form") == nil, "Bear Form aura is not packaged")
 assertTrue(findByName(dataset.auras, "Cat Form") == nil, "Cat Form aura is not packaged")
+local bearFormTrait = findByName(dataset.traits, "Bear Form")
+assertEqual(#bearFormTrait.events, 2, "Bear Form trait event count")
+assertEqual(bearFormTrait.events[1].combatEventId, "on_auto_attack_hit", "Bear Form hit event")
+assertEqual(bearFormTrait.events[1].effects[1].amount, 10, "Bear Form hit resource")
+assertEqual(bearFormTrait.events[2].combatEventId, "on_auto_attack_taken", "Bear Form taken event")
+assertEqual(bearFormTrait.events[2].effects[1].amount, 2, "Bear Form taken resource")
 for _, name in ipairs({ "Maul", "Swipe (Bear)", "Growl", "Demoralizing Roar", "Enrage", "Bash", "Challenging Roar" }) do
     assertEqual(findByName(dataset.spells, name).spellbookCategory, "Guardian", name .. " category")
 end

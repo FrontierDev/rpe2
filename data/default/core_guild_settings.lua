@@ -11,8 +11,8 @@ if not definition or not definition.dataset then
     error("Core default dataset must be registered before core_guild_settings.lua", 2)
 end
 
-if definition.version < 37 then
-    definition.version = 37
+if definition.version < 39 then
+    definition.version = 39
 end
 
 local dataset = definition.dataset
@@ -43,6 +43,8 @@ local guildSettingDependencyIds = {
     "538a54a0", -- Leatherworking
     "072d4851", -- Inscription
     "7259f1d3", -- Tailoring
+    "6e4d2a91", -- Druid
+    "a93f7c12", -- Hunter
 }
 for _, requiredDependencyId in ipairs(guildSettingDependencyIds) do
     local hasDependency = false
@@ -345,6 +347,18 @@ local armourStockGroups = {
             "23d5dce2:r05dbrac",
             "23d5dce2:r05twais",
             "23d5dce2:r05twris",
+            "a93f7c12:bm05mwst",
+            "a93f7c12:bm05mbrc",
+            "a93f7c12:bm05rblt",
+            "a93f7c12:bm05rbnd",
+            "6e4d2a91:d05bsash",
+            "6e4d2a91:d05bwrap",
+            "6e4d2a91:d05fgird",
+            "6e4d2a91:d05fband",
+            "6e4d2a91:d05twais",
+            "6e4d2a91:d05twris",
+            "6e4d2a91:d05rcord",
+            "6e4d2a91:d05rbind",
         },
     },
     {
@@ -372,6 +386,18 @@ local armourStockGroups = {
             "23d5dce2:r05dfoot",
             "23d5dce2:r05thand",
             "23d5dce2:r05ttrea",
+            "a93f7c12:bm05mgrv",
+            "a93f7c12:bm05mfst",
+            "a93f7c12:bm05rtrd",
+            "a93f7c12:bm05rgan",
+            "6e4d2a91:d05bgalo",
+            "6e4d2a91:d05bhand",
+            "6e4d2a91:d05fwalk",
+            "6e4d2a91:d05ffist",
+            "6e4d2a91:d05ttred",
+            "6e4d2a91:d05tgrip",
+            "6e4d2a91:d05rsand",
+            "6e4d2a91:d05rgaun",
         },
     },
     {
@@ -421,6 +447,30 @@ local armourStockGroups = {
             "23d5dce2:r05tpaul",
             "23d5dce2:r05tarmo",
             "23d5dce2:r05tlegs",
+            "a93f7c12:bm05mchn",
+            "a93f7c12:bm05mcof",
+            "a93f7c12:bm05mlgg",
+            "a93f7c12:bm05mpld",
+            "a93f7c12:bm05rtun",
+            "a93f7c12:bm05rcap",
+            "a93f7c12:bm05rpnt",
+            "a93f7c12:bm05rmnt",
+            "6e4d2a91:d05bvest",
+            "6e4d2a91:d05bcowl",
+            "6e4d2a91:d05bkilt",
+            "6e4d2a91:d05bspau",
+            "6e4d2a91:d05ftuni",
+            "6e4d2a91:d05fcap",
+            "6e4d2a91:d05ftrou",
+            "6e4d2a91:d05fepau",
+            "6e4d2a91:d05tarmo",
+            "6e4d2a91:d05tface",
+            "6e4d2a91:d05tlegs",
+            "6e4d2a91:d05tpaul",
+            "6e4d2a91:d05rembr",
+            "6e4d2a91:d05rhead",
+            "6e4d2a91:d05rpant",
+            "6e4d2a91:d05rmant",
         },
     },
 }
