@@ -40,6 +40,7 @@ local function loadAddonFile(path)
     chunk(nil, Addon)
 end
 
+loadAddonFile("client/combat/Normalization.lua")
 loadAddonFile("client/combat/Reaction.lua")
 
 local Client = Addon.Client
