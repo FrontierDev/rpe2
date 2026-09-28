@@ -73,8 +73,8 @@ Spells:
 
 Models:
 
-- FileDataID `1711518`, DisplayID `79677`
-- FileDataID `1711518`, DisplayID `79678`
+- FileDataID `1711518`, DisplayID `79677` — camera distance `0.45`, rotation `0.01`, vertical offset `-0.35`
+- FileDataID `1711518`, DisplayID `79678` — camera distance `0.45`, rotation `0.01`, vertical offset `-0.35`
 
 ### Destroyer
 
@@ -101,7 +101,7 @@ Spells:
 
 Models:
 
-- FileDataID `1100490`
+- FileDataID `1100490` — camera distance `0.45`, rotation `0.01`, vertical offset `-0.35`
 - Multiple DisplayIDs are valid for this model family; `64802` must not be used.
 - The import intentionally uses the FileDataID-only appearance until the allowed DisplayID set is explicitly enumerated.
 
@@ -132,11 +132,11 @@ Spells:
 
 Models:
 
-- FileDataID `1279257`, DisplayID `64753`
-- FileDataID `1279257`, DisplayID `64754`
-- FileDataID `1279257`, DisplayID `64755`
-- FileDataID `1279257`, DisplayID `65792`
-- FileDataID `1279257`, DisplayID `73411`
+- FileDataID `1279257`, DisplayID `64753` — camera distance `0.25`, rotation `0.01`, vertical offset `-1.30`
+- FileDataID `1279257`, DisplayID `64754` — camera distance `0.25`, rotation `0.01`, vertical offset `-1.30`
+- FileDataID `1279257`, DisplayID `64755` — camera distance `0.25`, rotation `0.01`, vertical offset `-1.30`
+- FileDataID `1279257`, DisplayID `65792` — camera distance `0.25`, rotation `0.01`, vertical offset `-1.30`
+- FileDataID `1279257`, DisplayID `73411` — camera distance `0.25`, rotation `0.01`, vertical offset `-1.30`
 
 At Level 60 the Lieutenant resolves to 10,500 authored Health, 3,987.5 Armor and 750 Melee Attack Power. With the current five-player scaling for Elite units, that is approximately 15,750 runtime Health before event difficulty modifiers.
 
@@ -176,10 +176,16 @@ RPE_DATASET_ENTRY_V1
                     {
                         displayId = 79677,
                         fileDataId = 1711518,
+                        cam = 0.45,
+                        rot = 0.01,
+                        z = -0.35,
                     },
                     {
                         displayId = 79678,
                         fileDataId = 1711518,
+                        cam = 0.45,
+                        rot = 0.01,
+                        z = -0.35,
                     },
                 },
                 resourceModifiers = {
@@ -233,6 +239,9 @@ RPE_DATASET_ENTRY_V1
                 appearances = {
                     {
                         fileDataId = 1100490,
+                        cam = 0.45,
+                        rot = 0.01,
+                        z = -0.35,
                     },
                 },
                 resourceModifiers = {
@@ -281,22 +290,37 @@ RPE_DATASET_ENTRY_V1
                     {
                         displayId = 64753,
                         fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
                     },
                     {
                         displayId = 64754,
                         fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
                     },
                     {
                         displayId = 64755,
                         fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
                     },
                     {
                         displayId = 65792,
                         fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
                     },
                     {
                         displayId = 73411,
                         fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
                     },
                 },
                 resourceModifiers = {
