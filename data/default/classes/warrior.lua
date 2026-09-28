@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-        version = 44,
+    version = 45,
     dataset = {
         achievements = {},
         auras = {
@@ -538,7 +538,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 events = {},
-                icon = "interface/icons/ability_warrior_battleshout.blp",
+                icon = "interface/icons/ability_warrior_warcry.blp",
                 id = "demshaur",
                 maxStacks = 1,
                 name = "Demoralizing Shout",
@@ -7023,7 +7023,7 @@ Addon.Data.DefaultDatasets:Register({
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
-                icon = "interface/icons/ability_warrior_battleshout.blp",
+                icon = "interface/icons/ability_warrior_warcry.blp",
                 id = "demoshot",
                 cooldownChannel = 1,
                 learnMode = "always_learned",

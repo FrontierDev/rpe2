@@ -152,6 +152,44 @@ assertEqual(actionsByRef.reaction.actionClass, "action", "Reaction keeps its act
 assertEqual(actionsByRef.reaction.cooldownChannelTriggersGCD, true, "Reaction remains GCD-triggering")
 assertEqual(actionsByRef.reaction.cooldownChannelCanUseOffTurn, true, "Reaction remains off-turn legal")
 
+local function copySnapshot(snapshot)
+    local copied = {}
+    for key, value in pairs(snapshot) do
+        copied[key] = value
+    end
+    return copied
+end
+
+local optionalMetadataSnapshot = copySnapshot(snapshots.free)
+optionalMetadataSnapshot.cooldownChannelName = nil
+optionalMetadataSnapshot.cooldownChannelConfigured = nil
+optionalMetadataSnapshot.cooldownChannelCanUseOffTurn = nil
+optionalMetadataSnapshot.cooldownChannelReason = nil
+local optionalMetadataSequence = Addon.Client.AutopilotSequencePlanning.BuildSequence({
+    {
+        spellRef = "free",
+        totalUtility = 1,
+        activationSnapshot = optionalMetadataSnapshot,
+    },
+}, caster)
+assertEqual(#optionalMetadataSequence.actions, 1, "optional channel metadata does not reject a legal activation")
+
+local malformedSnapshot = copySnapshot(snapshots.free)
+malformedSnapshot.cooldownChannelId = nil
+local malformedSequence = Addon.Client.AutopilotSequencePlanning.BuildSequence({
+    {
+        spellRef = "free",
+        totalUtility = 1,
+        activationSnapshot = malformedSnapshot,
+    },
+}, caster)
+assertEqual(#malformedSequence.actions, 0, "legal activation without channel ID is not planned")
+assertEqual(
+    malformedSequence.rejected[1].reason,
+    "activation-action-economy-metadata-missing",
+    "missing action-economy metadata has an internal invariant reason"
+)
+
 local invalidSequence = Addon.Client.AutopilotSequencePlanning.BuildSequence({ candidate("invalid") }, caster)
 assertEqual(#invalidSequence.actions, 0, "canonical invalid snapshot is not planned")
 assertEqual(#invalidSequence.rejected, 1, "canonical invalid snapshot is rejected")

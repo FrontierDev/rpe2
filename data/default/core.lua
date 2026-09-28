@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 40,
+    version = 42,
     dataset = {
         achievements = {},
         auras = {},
@@ -5295,6 +5295,22 @@ units = {
             {
                 name = "Legionnaire",
                 challengeLevel = "normal",
+                appearances = {
+                    {
+                        displayId = 79677,
+                        fileDataId = 1711518,
+                        cam = 0.45,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                    {
+                        displayId = 79678,
+                        fileDataId = 1711518,
+                        cam = 0.45,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                },
                 resourceModifiers = {
                     {
                         resourceRef = "f82db71a:q2ktkztt",
@@ -5343,6 +5359,15 @@ units = {
             {
                 name = "Destroyer",
                 challengeLevel = "normal",
+                appearances = {
+                    {
+                        displayId = 18193,
+                        fileDataId = 1100490,
+                        cam = 0.45,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                },
                 resourceModifiers = {
                     {
                         resourceRef = "f82db71a:q2ktkztt",
@@ -5385,6 +5410,43 @@ units = {
             {
                 name = "Lieutenant",
                 challengeLevel = "elite",
+                appearances = {
+                    {
+                        displayId = 64753,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                    {
+                        displayId = 64754,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                    {
+                        displayId = 64755,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                    {
+                        displayId = 65792,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                    {
+                        displayId = 73411,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                },
                 resourceModifiers = {
                     {
                         resourceRef = "f82db71a:q2ktkztt",

@@ -624,7 +624,7 @@ local PLANNER_REJECTION_TEXT = {
     ["insufficient-resources"] = "spell resources are insufficient",
     ["conditions"] = "authored spell conditions are not satisfied",
     ["basic-attack-type"] = "another basic-attack damage type was already used this turn",
-    ["activation-channel-metadata-missing"] = "internal activation channel metadata is missing",
+    ["activation-action-economy-metadata-missing"] = "internal action-economy channel metadata is missing",
     ["illegal-activation"] = "spell activation is currently illegal",
     ["not-useful"] = "projected effect has zero utility",
 }

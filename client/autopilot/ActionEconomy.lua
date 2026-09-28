@@ -153,14 +153,8 @@ function ActionEconomy.CreateInput(candidate, activationMetadata)
     local cooldownChannelReason = tostring(activationSnapshot.cooldownChannelReason or "")
     local canCast = activationSnapshot.canCast == true
 
-    if canCast and (
-        cooldownChannelConfigured ~= true
-        or cooldownChannelId == nil
-        or cooldownChannelName == nil
-        or type(cooldownChannelTriggersGCD) ~= "boolean"
-        or type(cooldownChannelCanUseOffTurn) ~= "boolean"
-    ) then
-        return nil, "activation-channel-metadata-missing"
+    if canCast and (cooldownChannelId == nil or type(cooldownChannelTriggersGCD) ~= "boolean") then
+        return nil, "activation-action-economy-metadata-missing"
     end
 
     return {
@@ -171,8 +165,8 @@ function ActionEconomy.CreateInput(candidate, activationMetadata)
         cooldownChannelId = cooldownChannelId,
         cooldownChannelName = cooldownChannelName,
         cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
-        cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn == true,
-        cooldownChannelConfigured = cooldownChannelConfigured == true,
+        cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
+        cooldownChannelConfigured = cooldownChannelConfigured,
         cooldownChannelReason = cooldownChannelReason,
         cooldownGroup = normalizeCooldownGroup(metadata.cooldownGroup),
         resourceCommitments = copyResourceMap(metadata.resourceCommitments),
@@ -187,19 +181,13 @@ function ActionEconomy.ClassifyInput(entry)
     if normalizeRef(entry.spellRef) == nil then
         return nil, "spell-ref-unavailable"
     end
-    if entry.cooldownChannelConfigured ~= true
-        or normalizeCooldownChannelId(entry.cooldownChannelId) == nil
-        or normalizeCooldownChannelName(entry.cooldownChannelName) == nil
-        or type(entry.cooldownChannelTriggersGCD) ~= "boolean"
-        or type(entry.cooldownChannelCanUseOffTurn) ~= "boolean"
-    then
-        if entry.canCast == true then
-            return nil, "activation-channel-metadata-missing"
-        end
-        return nil, entry.cooldownChannelReason ~= "" and entry.cooldownChannelReason or "illegal-activation"
-    end
     if entry.canCast ~= true then
         return nil, "illegal-activation"
+    end
+    if normalizeCooldownChannelId(entry.cooldownChannelId) == nil
+        or type(entry.cooldownChannelTriggersGCD) ~= "boolean"
+    then
+        return nil, "activation-action-economy-metadata-missing"
     end
     if not isUsefulCandidate(getComparable(entry)) then
         return nil, "not-useful"
@@ -369,13 +357,9 @@ function ActionEconomy.BuildSequence(inputs, options)
                 persistentCastTurns = normalizePositiveTurnCount(source.persistentCastTurns),
                 cooldownChannelId = normalizeCooldownChannelId(source.cooldownChannelId),
                 cooldownChannelName = normalizeCooldownChannelName(source.cooldownChannelName),
-                cooldownChannelTriggersGCD = type(source.cooldownChannelTriggersGCD) == "boolean"
-                    and source.cooldownChannelTriggersGCD
-                    or nil,
-                cooldownChannelCanUseOffTurn = type(source.cooldownChannelCanUseOffTurn) == "boolean"
-                    and source.cooldownChannelCanUseOffTurn
-                    or nil,
-                cooldownChannelConfigured = source.cooldownChannelConfigured == true,
+                cooldownChannelTriggersGCD = source.cooldownChannelTriggersGCD,
+                cooldownChannelCanUseOffTurn = source.cooldownChannelCanUseOffTurn,
+                cooldownChannelConfigured = source.cooldownChannelConfigured,
                 cooldownChannelReason = tostring(source.cooldownChannelReason or ""),
                 cooldownGroup = normalizeCooldownGroup(source.cooldownGroup),
                 resourceCommitments = copyResourceMap(source.resourceCommitments),

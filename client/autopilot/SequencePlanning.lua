@@ -289,11 +289,7 @@ local function buildActionEconomyInput(candidate)
 
     local persistentCastTurns = Spellcasting.ResolvePersistentCastTurns(spell)
     local cooldownChannelId = activation.cooldownChannelId
-    local cooldownChannelName = activation.cooldownChannelName
     local cooldownChannelTriggersGCD = activation.cooldownChannelTriggersGCD
-    local cooldownChannelCanUseOffTurn = activation.cooldownChannelCanUseOffTurn
-    local cooldownChannelConfigured = activation.cooldownChannelConfigured
-    local cooldownChannelReason = activation.cooldownChannelReason
     local cooldownTurns = type(Spellcasting.GetEffectivePersonalCooldownTurns) == "function"
         and Spellcasting.GetEffectivePersonalCooldownTurns(spell)
         or Spellcasting.NormalizeTurnCount(spell.cooldown)
@@ -309,11 +305,7 @@ local function buildActionEconomyInput(candidate)
         canCast = activation.canCast == true,
         persistentCastTurns = persistentCastTurns,
         cooldownChannelId = cooldownChannelId,
-        cooldownChannelName = cooldownChannelName,
         cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
-        cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
-        cooldownChannelConfigured = cooldownChannelConfigured,
-        cooldownChannelReason = tostring(cooldownChannelReason or ""),
         cooldownGroup = cooldownGroup,
         resourceCommitments = buildResourceCommitments(
             candidate,
