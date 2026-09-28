@@ -31,6 +31,53 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for a base Felguard unit in the Co
 | Resource Regeneration | 0 | 0 | 0 |
 | Movement Speed | 30 | 0 | 30 |
 
+## Variants
+
+| Variant | Challenge | Level-60 Health | Level-60 Armor | Level-60 MAP | Role |
+|---|---|---:|---:|---:|---|
+| Legionnaire | Normal | 3,850 | 2,887.5 | 650 | Durable disciplined frontliner |
+| Destroyer | Normal | 2,975 | 2,062.5 | 650 | Aggressive melee attacker with higher crit |
+| Lieutenant | Elite | 10,500 | 3,987.5 | 750 | Elite command/frontline unit |
+
+### Legionnaire
+
+A tougher standard Felguard intended to hold the line without leaving the Normal challenge band.
+
+Modifiers:
+
+- Health: +10%
+- Armor: +5%
+- Melee Attack Power: +4%
+- Melee Hit Chance: +3
+- Parry Chance: +2
+
+### Destroyer
+
+A more aggressive Normal Felguard that trades survivability for offensive reliability.
+
+Modifiers:
+
+- Health: -15%
+- Armor: -25%
+- Melee Attack Power: +4%
+- Melee Hit Chance: +3
+- Melee Crit Chance: +5
+
+### Lieutenant
+
+An Elite Felguard commander. The preset changes the effective challenge level to `elite` and raises its actual resolved durability into the current Elite authoring bands rather than relying on the challenge label alone.
+
+Modifiers:
+
+- Health: +200%
+- Armor: +45%
+- Melee Attack Power: +20%
+- Melee Hit Chance: +5
+- Melee Crit Chance: +2
+- Parry Chance: +5
+
+At Level 60 this resolves to 10,500 authored Health, 3,987.5 Armor and 750 Melee Attack Power. With the current five-player scaling for Elite units, that is approximately 15,750 runtime Health before event difficulty modifiers.
+
 ## Authoring notes
 
 - Creature type: `demon`
@@ -59,7 +106,115 @@ RPE_DATASET_ENTRY_V1
         creatureType = "demon",
         id = "felgrd01",
         name = "Felguard",
-        presets = {  },
+        presets = {
+            {
+                name = "Legionnaire",
+                challengeLevel = "normal",
+                resourceModifiers = {
+                    {
+                        resourceRef = "f82db71a:q2ktkztt",
+                        percentBonus = 10,
+                        flatBonus = 0,
+                    },
+                },
+                statModifiers = {
+                    {
+                        statRef = "f82db71a:v42albuv",
+                        percentBonus = 5,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:u7b49vs9",
+                        percentBonus = 4,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:wbj4zuf3",
+                        percentBonus = 0,
+                        flatBonus = 3,
+                    },
+                    {
+                        statRef = "f82db71a:tcn0s8kx",
+                        percentBonus = 0,
+                        flatBonus = 2,
+                    },
+                },
+                spells = {  },
+            },
+            {
+                name = "Destroyer",
+                challengeLevel = "normal",
+                resourceModifiers = {
+                    {
+                        resourceRef = "f82db71a:q2ktkztt",
+                        percentBonus = -15,
+                        flatBonus = 0,
+                    },
+                },
+                statModifiers = {
+                    {
+                        statRef = "f82db71a:v42albuv",
+                        percentBonus = -25,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:u7b49vs9",
+                        percentBonus = 4,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:wbj4zuf3",
+                        percentBonus = 0,
+                        flatBonus = 3,
+                    },
+                    {
+                        statRef = "f82db71a:jslmczbi",
+                        percentBonus = 0,
+                        flatBonus = 5,
+                    },
+                },
+                spells = {  },
+            },
+            {
+                name = "Lieutenant",
+                challengeLevel = "elite",
+                resourceModifiers = {
+                    {
+                        resourceRef = "f82db71a:q2ktkztt",
+                        percentBonus = 200,
+                        flatBonus = 0,
+                    },
+                },
+                statModifiers = {
+                    {
+                        statRef = "f82db71a:v42albuv",
+                        percentBonus = 45,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:u7b49vs9",
+                        percentBonus = 20,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:wbj4zuf3",
+                        percentBonus = 0,
+                        flatBonus = 5,
+                    },
+                    {
+                        statRef = "f82db71a:jslmczbi",
+                        percentBonus = 0,
+                        flatBonus = 2,
+                    },
+                    {
+                        statRef = "f82db71a:tcn0s8kx",
+                        percentBonus = 0,
+                        flatBonus = 5,
+                    },
+                },
+                spells = {  },
+            },
+        },
         resistances = {  },
         resources = {
             {
