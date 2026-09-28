@@ -146,7 +146,7 @@ end
 
 local function validateRefs(value, path)
     if type(value) == "string" then
-        local datasetId, entryId = value:match("^([^:]+):([^:]+)$")
+        local datasetId, entryId = value:match("^([^:%s]+):([^:%s]+)$")
         if datasetId and entryId then
             assertTrue(knownRefs[value] == true, "Druid reference resolves at " .. path .. ": " .. value)
         end
