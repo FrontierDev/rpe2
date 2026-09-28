@@ -33,15 +33,22 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for a base Felguard unit in the Co
 
 ## Variants
 
-| Variant | Challenge | Level-60 Health | Level-60 Armor | Level-60 MAP | Role |
-|---|---|---:|---:|---:|---|
-| Legionnaire | Normal | 3,850 | 2,887.5 | 650 | Durable disciplined frontliner |
-| Destroyer | Normal | 2,975 | 2,062.5 | 650 | Aggressive melee attacker with higher crit |
-| Lieutenant | Elite | 10,500 | 3,987.5 | 750 | Elite command/frontline unit |
+All Felguard variants use the Core **Rage** resource (`f82db71a:e2tfklq7`) and share:
+
+- **Main Hand Attack** — `f82db71a:z36xzk0w`
+- **Rage Attack** — `f82db71a:npcrage1`
+
+Rage Attack is the standard NPC basic attack that also generates Rage, allowing the variant-specific Warrior abilities below to be paid for during combat.
+
+| Variant | Challenge | L60 Health | L60 Armor | L60 MAP | Melee Hit | Melee Crit | Parry | Block | Equipment |
+|---|---|---:|---:|---:|---:|---:|---:|---:|---|
+| Legionnaire | Normal | 3,850 | 2,887.5 | 650 | +3 | 5 | 0 | 10 | Worn Shortsword + Worn Shield |
+| Destroyer | Normal | 2,975 | 2,062.5 | 650 | +3 | 10 | 3 | 0 | Worn Two-Handed Sword |
+| Lieutenant | Elite | 10,500 | 3,987.5 | 750 | +5 | 7 | 8 | 0 | Worn Two-Handed Sword |
 
 ### Legionnaire
 
-A tougher standard Felguard intended to hold the line without leaving the Normal challenge band.
+A defensive frontline Felguard built around shield use.
 
 Modifiers:
 
@@ -49,11 +56,24 @@ Modifiers:
 - Armor: +5%
 - Melee Attack Power: +4%
 - Melee Hit Chance: +3
-- Parry Chance: +2
+- Parry Chance: reduced to 0
+- Block Chance: +10
+
+Equipment:
+
+- Worn Shortsword — `f82db71a:stwswd01`
+- Worn Shield — `f82db71a:stshld01`
+
+Spells:
+
+- Main Hand Attack — `f82db71a:z36xzk0w`
+- Rage Attack — `f82db71a:npcrage1`
+- Shield Block — `7bbb4cb9:g36ujwt9`
+- Shield Bash — `7bbb4cb9:ti2j4umn`
 
 ### Destroyer
 
-A more aggressive Normal Felguard that trades survivability for offensive reliability.
+An aggressive Normal Felguard that trades durability for offensive pressure.
 
 Modifiers:
 
@@ -63,9 +83,20 @@ Modifiers:
 - Melee Hit Chance: +3
 - Melee Crit Chance: +5
 
+Equipment:
+
+- Worn Two-Handed Sword — `f82db71a:stw2sw01`
+
+Spells:
+
+- Main Hand Attack — `f82db71a:z36xzk0w`
+- Rage Attack — `f82db71a:npcrage1`
+- Cleave — `7bbb4cb9:e0mooybr`
+- Demoralizing Shout — `7bbb4cb9:demoshot`
+
 ### Lieutenant
 
-An Elite Felguard commander. The preset changes the effective challenge level to `elite` and raises its actual resolved durability into the current Elite authoring bands rather than relying on the challenge label alone.
+An Elite Felguard commander with substantially greater durability, reliable melee pressure and group-support capability.
 
 Modifiers:
 
@@ -76,7 +107,19 @@ Modifiers:
 - Melee Crit Chance: +2
 - Parry Chance: +5
 
-At Level 60 this resolves to 10,500 authored Health, 3,987.5 Armor and 750 Melee Attack Power. With the current five-player scaling for Elite units, that is approximately 15,750 runtime Health before event difficulty modifiers.
+Equipment:
+
+- Worn Two-Handed Sword — `f82db71a:stw2sw01`
+
+Spells:
+
+- Main Hand Attack — `f82db71a:z36xzk0w`
+- Rage Attack — `f82db71a:npcrage1`
+- Battle Shout — `7bbb4cb9:9gh28pe5`
+- Mortal Strike — `7bbb4cb9:0jiq0uoc`
+- Multiattack — `f82db71a:npcmulti`
+
+At Level 60 the Lieutenant resolves to 10,500 authored Health, 3,987.5 Armor and 750 Melee Attack Power. With the current five-player scaling for Elite units, that is approximately 15,750 runtime Health before event difficulty modifiers.
 
 ## Authoring notes
 
@@ -89,7 +132,7 @@ At Level 60 this resolves to 10,500 authored Health, 3,987.5 Armor and 750 Melee
 - No broad elemental or magical resistance is granted solely for being a Demon. Resistances should be added by a specific variant or encounter mechanic where required.
 - Damage Done and Damage Reduction are not baseline seeded NPC stats and are not authored here.
 - The Level-60 values are the balance target. The low-level curve is provisional because the current NPC survivability guide does not yet define authoritative low-level calibration.
-- This base import intentionally defines no role preset, equipment package, or bespoke combat abilities. Those should be layered separately so the base creature remains reusable.
+- The base Felguard remains reusable, while the three authored presets define their own combat role, weapon package and spell list.
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -135,11 +178,25 @@ RPE_DATASET_ENTRY_V1
                     },
                     {
                         statRef = "f82db71a:tcn0s8kx",
+                        percentBonus = -100,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:p8syz5ba",
                         percentBonus = 0,
-                        flatBonus = 2,
+                        flatBonus = 10,
                     },
                 },
-                spells = {  },
+                spells = {
+                    "f82db71a:z36xzk0w",
+                    "f82db71a:npcrage1",
+                    "7bbb4cb9:g36ujwt9",
+                    "7bbb4cb9:ti2j4umn",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwswd01",
+                    shield = "f82db71a:stshld01",
+                },
             },
             {
                 name = "Destroyer",
@@ -173,7 +230,15 @@ RPE_DATASET_ENTRY_V1
                         flatBonus = 5,
                     },
                 },
-                spells = {  },
+                spells = {
+                    "f82db71a:z36xzk0w",
+                    "f82db71a:npcrage1",
+                    "7bbb4cb9:e0mooybr",
+                    "7bbb4cb9:demoshot",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stw2sw01",
+                },
             },
             {
                 name = "Lieutenant",
@@ -212,7 +277,16 @@ RPE_DATASET_ENTRY_V1
                         flatBonus = 5,
                     },
                 },
-                spells = {  },
+                spells = {
+                    "f82db71a:z36xzk0w",
+                    "f82db71a:npcrage1",
+                    "7bbb4cb9:9gh28pe5",
+                    "7bbb4cb9:0jiq0uoc",
+                    "f82db71a:npcmulti",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stw2sw01",
+                },
             },
         },
         resistances = {  },
@@ -221,6 +295,11 @@ RPE_DATASET_ENTRY_V1
                 initialValue = 208,
                 perLevelValue = 55.796610,
                 resourceRef = "f82db71a:q2ktkztt",
+            },
+            {
+                initialValue = 100,
+                perLevelValue = 0,
+                resourceRef = "f82db71a:e2tfklq7",
             },
         },
         spells = {  },
