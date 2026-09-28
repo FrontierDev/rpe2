@@ -1290,6 +1290,19 @@ function Server:BroadcastEventDeltaBatch(entries, includeState)
     return broadcastEventDeltaBatch(self, self.EventState, entries, includeState)
 end
 
+function Server:AdvanceLiveUnitRevision(reason)
+    local eventState = self.EventState
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return nil
+    end
+    eventState.liveUnitRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) + 1
+    if type(Debug) == "table" and type(Debug.Internal) == "function" then
+        Debug.Internal("Live EventUnit revision advanced: eventId=%s revision=%d reason=%s.",
+            tostring(eventState.id or ""), eventState.liveUnitRevision, tostring(reason or "mutation"))
+    end
+    return eventState.liveUnitRevision
+end
+
 function Server:CopyLiveEventToDraftState()
     return copyLiveEventToDraft(self, self.EventState)
 end
@@ -2522,6 +2535,14 @@ function Server:_AdvanceEventStepAfterCommit(commit, completed)
     end
 
     if channelId then
+        -- The step boundary is the normal convergence point for resource-only
+        -- commits, which do not otherwise have an EventUnit delta packet.
+        Comms:SendToChannel(
+            channelId,
+            EVENT_UNITS_OPCODE,
+            buildEventUnitsArguments(eventState),
+            buildSendMetadata(EVENT_UNITS_OPCODE)
+        )
         Comms:SendToChannel(
             channelId,
             EVENT_STATE_OPCODE,

@@ -144,6 +144,35 @@ assertTrue(not Server:HandleResourceDeltaBatch(corruptedArguments, "PlayerA"), "
 assertEqual(Server.EventState.units[2].threatTable[3], nil, "server did not accept local-only threat")
 assertTrue(#warnings > 0, "malformed threat transport is diagnosable")
 
+-- Ordinary resource commits must participate in the same authoritative
+-- revision stream as EventUnit deltas, otherwise a missed HP update cannot be
+-- repaired at the next event-state boundary.
+local resourceTarget = { eventID = 3, isPlayer = true, ownerID = "PlayerA", resources = { health = { currentValue = 10, maxValue = 10 } } }
+local resourceDraftTarget = { eventID = 3, isPlayer = true, ownerID = "PlayerA", resources = { health = { currentValue = 10, maxValue = 10 } } }
+Addon.Internal.Comms.ResourceSync.CoalesceResourceDeltas = function()
+    return { { resourceRef = "health", delta = -4 } }
+end
+Addon.Internal.Comms.ResourceSync.NormalizeResourceDeltas = function()
+    return { { resourceRef = "health", delta = -4 } }
+end
+Addon.Internal.Comms.ResourceSync.ApplyResourceDeltasToEventUnitByEventID = function(units, eventId, deltas)
+    local unit = units and units[1] or nil
+    if not unit or tonumber(unit.eventID) ~= tonumber(eventId) then return false end
+    unit.resources.health.currentValue = unit.resources.health.currentValue + (tonumber(deltas[1].delta) or 0)
+    return true, unit
+end
+Addon.Internal.Comms.ResourceSync.CloneResources = function(resources) return resources end
+Server.State = { active = true, channelName = "channel", clientsByName = {}, clientOrder = {} }
+Server.EventState = { active = true, units = { resourceTarget }, liveUnitRevision = 7 }
+Server.EventDraftState = { units = { resourceDraftTarget } }
+Server.AdvanceLiveUnitRevision = function(self)
+    self.EventState.liveUnitRevision = self.EventState.liveUnitRevision + 1
+    return self.EventState.liveUnitRevision
+end
+assertTrue(Server:HandleResourceDelta({ "channel", "PlayerA", "resource", 3 }, "PlayerA"), "server accepts resource delta")
+assertEqual(resourceTarget.resources.health.currentValue, 6, "authoritative event HP is committed")
+assertEqual(Server.EventState.liveUnitRevision, 8, "authoritative resource commit advances live-unit revision")
+
 -- Exercise the real Event Unit delta codec and client application path with a
 -- separate remote client runtime. The remote meter must only see the table
 -- materialized from the authoritative network delta.

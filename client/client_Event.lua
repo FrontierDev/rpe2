@@ -16,6 +16,16 @@ local EventUnit = Addon.Internal.Database.Classes.EventUnit
 local Runtime = Addon.Internal.Runtime or {}
 local Operations = Comms.Operations or {}
 local LIVE_UNIT_REVISION_MARKER = "rpe-live-unit-revision"
+local SNAPSHOT_REPAIR_RETRY_MS = 1500
+local MAX_SNAPSHOT_REPAIR_ATTEMPTS = 3
+local scheduleSnapshotRepair
+
+local function getSnapshotRepairNowMilliseconds()
+    if type(GetTimePreciseSec) == "function" then
+        return GetTimePreciseSec() * 1000
+    end
+    return (GetTime and GetTime() or 0) * 1000
+end
 
 local function getLiveUnitRevisionFromStateArguments(arguments)
     local argumentCount = type(arguments) == "table" and #arguments or 0
@@ -25,12 +35,19 @@ local function getLiveUnitRevisionFromStateArguments(arguments)
     return 0, nil
 end
 
-local function requestAuthoritativeEventSnapshot(client, eventState, expectedRevision, reason)
+local function requestAuthoritativeEventSnapshot(client, eventState, expectedRevision, reason, nowOverride)
     if type(client) ~= "table" or type(eventState) ~= "table" then
         return false
     end
     local revision = math.max(0, math.floor(tonumber(expectedRevision) or 0))
-    if tonumber(client.EventSnapshotRepairRequestedRevision) == revision then
+    local now = tonumber(nowOverride) or getSnapshotRepairNowMilliseconds()
+    local repair = type(client.EventSnapshotRepair) == "table" and client.EventSnapshotRepair or nil
+    if repair and (tostring(repair.eventId or "") ~= tostring(eventState.id or "") or tonumber(repair.revision) ~= revision) then
+        repair = nil
+        client.EventSnapshotRepair = nil
+        client.EventSnapshotRepairRequestedRevision = nil
+    end
+    if repair and now < (tonumber(repair.nextRetryAtMs) or 0) then
         return false
     end
     local opcode = Operations.GetOpcode and Operations:GetOpcode("EVENT_SNAPSHOT_REQUEST") or nil
@@ -38,13 +55,47 @@ local function requestAuthoritativeEventSnapshot(client, eventState, expectedRev
     if not opcode or hostName == "" then
         return false
     end
+    repair = repair or {
+        eventId = eventState.id,
+        revision = revision,
+        attempts = 0,
+        createdAtMs = now,
+    }
+    if (tonumber(repair.attempts) or 0) >= MAX_SNAPSHOT_REPAIR_ATTEMPTS then
+        client.EventSnapshotRepair = nil
+        client.EventSnapshotRepairRequestedRevision = nil
+        if type(Debug) == "table" and type(Debug.Internal) == "function" then
+            Debug.Internal("Authoritative event snapshot repair expired: eventId=%s revision=%s.", tostring(eventState.id or ""), tostring(revision))
+        end
+        return false
+    end
+    repair.attempts = (tonumber(repair.attempts) or 0) + 1
+    repair.lastAttemptAtMs = now
+    repair.nextRetryAtMs = now + SNAPSHOT_REPAIR_RETRY_MS
+    repair.reason = tostring(reason or repair.reason or "revision-mismatch")
+    client.EventSnapshotRepair = repair
     client.EventSnapshotRepairRequestedRevision = revision
-    client.EventSnapshotRepairReason = tostring(reason or "revision-mismatch")
+    client.EventSnapshotRepairReason = repair.reason
     local sent = Comms:SendMessage("WHISPER", opcode, {
         eventState.channelName,
         eventState.id,
         revision,
     }, hostName, { opcode = opcode, scope = "client" }) == true
+    repair.lastSendSucceeded = sent
+    local diagnostics = Comms.Diagnostics
+    local store = type(diagnostics) == "table" and type(diagnostics.GetTransportDiagnosticsStore) == "function"
+        and diagnostics:GetTransportDiagnosticsStore() or nil
+    if type(store) == "table" then
+        store.lastSnapshotRepair = {
+            eventId = eventState.id,
+            revision = revision,
+            attempts = repair.attempts,
+            reason = repair.reason,
+            sent = sent,
+            nextRetryAtMs = repair.nextRetryAtMs,
+        }
+    end
+    scheduleSnapshotRepair(client)
     if type(Debug) == "table" and type(Debug.Internal) == "function" then
         Debug.Internal(
             "Authoritative event snapshot repair %s: eventId=%s localRevision=%s expectedRevision=%s.",
@@ -53,6 +104,39 @@ local function requestAuthoritativeEventSnapshot(client, eventState, expectedRev
         )
     end
     return sent
+end
+
+function Client:RequestAuthoritativeEventSnapshot(eventState, expectedRevision, reason, nowMs)
+    return requestAuthoritativeEventSnapshot(self, eventState, expectedRevision, reason, nowMs)
+end
+
+function Client:ProcessEventSnapshotRepair(nowMs)
+    local repair = self.EventSnapshotRepair
+    local eventState = self.GetEventState and self:GetEventState() or nil
+    if type(repair) ~= "table" or type(eventState) ~= "table" or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(repair.eventId or "")
+    then
+        return false
+    end
+    return requestAuthoritativeEventSnapshot(self, eventState, repair.revision, repair.reason, nowMs)
+end
+
+scheduleSnapshotRepair = function(client)
+    if type(client) ~= "table" or client.EventSnapshotRepairTimerActive == true or not (C_Timer and C_Timer.After) then
+        return false
+    end
+    client.EventSnapshotRepairTimerActive = true
+    C_Timer.After(SNAPSHOT_REPAIR_RETRY_MS / 1000, function()
+        client.EventSnapshotRepairTimerActive = nil
+        local repair = client.EventSnapshotRepair
+        local eventState = client.GetEventState and client:GetEventState() or nil
+        if type(repair) == "table" and type(eventState) == "table"
+            and eventState.active == true and tostring(eventState.id or "") == tostring(repair.eventId or "")
+        then
+            client:ProcessEventSnapshotRepair()
+        end
+    end)
+    return true
 end
 
 local function getTimings()
@@ -3232,6 +3316,7 @@ function Client:HandleEventUnits(arguments)
     if self.EventSnapshotRepairRequestedRevision then
         self.EventSnapshotRepairRequestedRevision = nil
         self.EventSnapshotRepairReason = nil
+        self.EventSnapshotRepair = nil
         if type(self.ClearCombatReactionRuntime) == "function" then
             self:ClearCombatReactionRuntime(eventState.id, "authoritative-resync")
         end
@@ -3376,6 +3461,9 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     if type(auraManager) == "table" and type(auraManager.RecheckAuraOwnerOccurrences) == "function" then
         auraManager:RecheckAuraOwnerOccurrences(self)
     end
+    if type(self.PruneCombatReactionTransactions) == "function" then
+        self:PruneCombatReactionTransactions("event-unit-delta")
+    end
     return true
 end
 
@@ -3480,6 +3568,9 @@ function Client:HandleEventState(arguments)
     if startupRuntime then
         startupRuntime.startupStateReceived = true
         refreshEventStartupPhase(eventState, startupRuntime)
+    end
+    if type(self.PruneCombatReactionTransactions) == "function" then
+        self:PruneCombatReactionTransactions("event-state")
     end
 
     if previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)

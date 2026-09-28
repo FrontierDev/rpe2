@@ -264,6 +264,10 @@ local function applyClientResourceDeltasToServerState(server, state, clientName,
         end
     end
 
+    if eventUpdated and type(server.AdvanceLiveUnitRevision) == "function" then
+        server:AdvanceLiveUnitRevision("resource-delta")
+    end
+
     return true
 end
 

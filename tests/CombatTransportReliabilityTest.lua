@@ -85,6 +85,18 @@ Combat:ProcessPendingCombatTransactions(Client, 1501)
 assertTrue(#sent > firstRequestCount, "unacknowledged request is retried after its deadline")
 assertTrue(Combat:HandleDamageHitCheckAck(Client, { "check-retry", "event" }, "Defender"), "matching ACK stops request retry")
 
+local earlyOutcome = {
+    checkId = "out-of-order", eventId = "event", attackerEventId = 10, defenderEventId = 20,
+    eventState = eventState, defenderUnit = eventState.units[2], attackerUnit = eventState.units[1],
+    turnNumber = 1, tickNumber = 0, defenceSystem = "simple",
+}
+Client:SetPendingCombatHitCheck(earlyOutcome)
+assertTrue(Combat:HandleCombatDamageResolved(Client, { "out-of-order", "event", "physical", "-4", "1" }, "Defender"), "early outcome is buffered")
+assertTrue(type(earlyOutcome.pendingDamageOutcome) == "table", "early outcome is retained until hit response")
+assertTrue(Combat:HandleDamageHitCheckResponse(Client, { "out-of-order", "event", "pass", "", "" }, "Defender"), "later hit response consumes buffered outcome")
+assertEqual(Client:GetPendingCombatHitCheck("out-of-order"), nil, "buffered outcome completes exactly one hit transaction")
+assertEqual(sent[#sent].opcode, opcodes.COMBAT_DAMAGE_RESOLVED_ACK, "outcome is ACKed only after completion")
+
 Client.PendingCombatDamageOutcomes = {
     ["damage-1"] = {
         checkId = "damage-1", eventId = "event", attackerEventId = 10, defenderEventId = 20,
