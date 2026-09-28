@@ -12,14 +12,13 @@ local Profile = Addon.Internal.Profile or {}
 local Ruleset = Addon.Internal.Ruleset or {}
 local Operations = Comms.Operations or {}
 local ResourceSync = Comms.ResourceSync or {}
+local ThreatUpdates = Comms.ThreatUpdates or {}
 
 local RESOURCE_OPCODE = Operations:GetOpcode("RESOURCE")
 local RESOURCE_DELTA_OPCODE = Operations:GetOpcode("RESOURCE_DELTA")
 local RESOURCE_DELTA_BATCH_OPCODE = Operations:GetOpcode("RESOURCE_DELTA_BATCH")
 local NativeJoinChannel = Comms and Comms.JoinChannel or nil
 local NativeResolveChannelId = Comms and Comms.ResolveChannelId or nil
-local THREAT_UPDATE_RECORD_SEPARATOR = string.char(30)
-local THREAT_UPDATE_FIELD_SEPARATOR = string.char(31)
 
 Client.ResourceSyncQueued = Client.ResourceSyncQueued or false
 Client.LastResourceSyncSignature = Client.LastResourceSyncSignature or nil
@@ -252,48 +251,31 @@ local function coalesceThreatUpdates(threatUpdates, additionalThreatUpdates)
 end
 
 local function serializeThreatUpdates(threatUpdates)
-    local records = {}
-    local normalized = normalizeThreatUpdates(threatUpdates)
-    for index = 1, #normalized do
-        local entry = normalized[index]
-        records[#records + 1] = table.concat({
-            tostring(entry.targetEventId),
-            tostring(entry.sourceEventId),
-            tostring(entry.amount),
-            tostring(entry.turnNumber or 0),
-        }, THREAT_UPDATE_FIELD_SEPARATOR)
+    if type(ThreatUpdates.Serialize) ~= "function" then
+        if Debug and type(Debug.Warn) == "function" then
+            Debug.Warn("Threat update transport unavailable: shared codec is missing.")
+        end
+        return ""
     end
-    return table.concat(records, THREAT_UPDATE_RECORD_SEPARATOR)
+    local payload, reason = ThreatUpdates:Serialize(threatUpdates)
+    if not payload and Debug and type(Debug.Warn) == "function" then
+        Debug.Warn("Threat update transport encode rejected: %s.", tostring(reason or "unknown error"))
+    end
+    return payload or ""
 end
 
 local function deserializeThreatUpdates(payload)
-    local normalized = {}
-    if type(payload) ~= "string" or payload == "" then return normalized end
-    local records = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(payload, THREAT_UPDATE_RECORD_SEPARATOR) or {}
-    for index = 1, #records do
-        local values = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(records[index], THREAT_UPDATE_FIELD_SEPARATOR) or {}
-        local targetEventId = math.floor(tonumber(values[1]) or 0)
-        local sourceEventId = math.floor(tonumber(values[2]) or 0)
-        local amount = math.max(0, tonumber(values[3]) or 0)
-        local turnNumber = math.floor(tonumber(values[4]) or 0)
-        if targetEventId > 0 and sourceEventId > 0 and amount > 0 then
-            normalized[#normalized + 1] = {
-                targetEventId = targetEventId,
-                sourceEventId = sourceEventId,
-                amount = amount,
-                turnNumber = turnNumber > 0 and turnNumber or nil,
-            }
+    if type(ThreatUpdates.Deserialize) ~= "function" then
+        if Debug and type(Debug.Warn) == "function" then
+            Debug.Warn("Threat update transport unavailable: shared codec is missing.")
         end
+        return {}
     end
-    return normalized
-end
-
-local function recordThreatUpdates(client, eventState, threatUpdates)
-    local meters = type(client) == "table" and client.EventMeters or nil
-    if type(meters) ~= "table" or type(meters.RecordThreatUpdate) ~= "function" then return end
-    for index = 1, #(threatUpdates or {}) do
-        meters:RecordThreatUpdate(eventState, threatUpdates[index])
+    local updates, reason = ThreatUpdates:Deserialize(payload)
+    if not updates and Debug and type(Debug.Warn) == "function" then
+        Debug.Warn("Threat update transport decode rejected: %s.", tostring(reason or "unknown error"))
     end
+    return updates or {}
 end
 
 local function refreshThreatMeterWidget(client)
@@ -1843,7 +1825,6 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
         eventState
     )
     if allowLocalEchoApply and #threatUpdates > 0 then
-        recordThreatUpdates(self, eventState, threatUpdates)
         refreshThreatMeterWidget(self)
     end
     self.PendingResourceDeltaBatches = self.PendingResourceDeltaBatches or {}
@@ -2086,7 +2067,10 @@ function Client:SendClientResourceDeltas(state, reason, playerNameOverride, reso
         arguments[#arguments + 1] = targetEventId
     end
     if #threatUpdates > 0 then
-        arguments[#arguments + 1] = serializeThreatUpdates(threatUpdates)
+        -- Keep the nested payload in argument five even when a resource update is
+        -- not tied to a unit, so the server sees a stable message shape.
+        arguments[4] = arguments[4] or ""
+        arguments[5] = serializeThreatUpdates(threatUpdates)
     end
 
     local sent = sendToChannelForState(state, channelId, RESOURCE_DELTA_OPCODE, arguments, {
@@ -2433,12 +2417,9 @@ function Client:HandleResourceDelta(arguments, sender)
     end
 
     local eventState = self:GetEventState()
-    local threatUpdates = filterThreatUpdatesForEvent(
-        deserializeThreatUpdates(arguments and arguments[5] or ""),
-        eventState
-    )
-    recordThreatUpdates(self, eventState, threatUpdates)
-    if #threatUpdates > 0 then refreshThreatMeterWidget(self) end
+    -- The server distributes the resulting authoritative threat table through an
+    -- Event Unit delta. Decode here only to surface malformed transport data.
+    deserializeThreatUpdates(arguments and arguments[5] or "")
     local result = applyInboundResourceDeltasForTarget(self, state, eventState, playerName, sender, targetEventId, resourceDeltas)
     grantBossKillValor(self, eventState, result)
     if transportActionOwner then
@@ -2550,12 +2531,8 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
     end
 
     local eventState = self:GetEventState()
-    local threatUpdates = filterThreatUpdatesForEvent(
-        deserializeThreatUpdates(arguments and arguments[4] or ""),
-        eventState
-    )
-    recordThreatUpdates(self, eventState, threatUpdates)
-    if #threatUpdates > 0 then refreshThreatMeterWidget(self) end
+    -- Threat state itself is applied from the authoritative Event Unit delta.
+    deserializeThreatUpdates(arguments and arguments[4] or "")
     local changed = false
     local anyEventUpdated = false
     local anyCompanionBarRelevantTarget = false

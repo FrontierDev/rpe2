@@ -11,6 +11,7 @@ local Comms = Addon.Internal.Comms
 local Operations = Comms.Operations
 local Registry = Addon.Internal.Registry or {}
 local ResourceSync = Comms.ResourceSync or {}
+local ThreatUpdates = Comms.ThreatUpdates or {}
 local Debug = Addon.Debug or {}
 
 local function getTasks()
@@ -24,8 +25,6 @@ local RESOURCE_DELTA_OPCODE = Operations:GetOpcode("RESOURCE_DELTA")
 local SKILL_ROLL_RESULT_OPCODE = Operations:GetOpcode("SKILL_ROLL_RESULT")
 local MAX_START_ATTEMPTS = 5
 local START_RETRY_DELAY = 1.5
-local THREAT_UPDATE_RECORD_SEPARATOR = string.char(30)
-local THREAT_UPDATE_FIELD_SEPARATOR = string.char(31)
 
 local function buildChannelName()
     local now = tonumber(Common.GetNow()) or 0
@@ -91,30 +90,18 @@ local function findEventUnitById(units, eventId)
     return nil
 end
 
-local function normalizeThreatUpdates(text)
-    local normalized = {}
-    if type(text) ~= "string" or text == "" then
-        return normalized
-    end
-
-    local records = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(text, THREAT_UPDATE_RECORD_SEPARATOR) or {}
-    for index = 1, #records do
-        local values = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(records[index], THREAT_UPDATE_FIELD_SEPARATOR) or {}
-        local targetEventId = math.floor(tonumber(values[1]) or 0)
-        local sourceEventId = math.floor(tonumber(values[2]) or 0)
-        local amount = math.max(0, tonumber(values[3]) or 0)
-        local turnNumber = math.floor(tonumber(values[4]) or 0)
-        if targetEventId > 0 and sourceEventId > 0 and amount > 0 then
-            normalized[#normalized + 1] = {
-                targetEventId = targetEventId,
-                sourceEventId = sourceEventId,
-                amount = amount,
-                turnNumber = turnNumber > 0 and turnNumber or nil,
-            }
+local function deserializeThreatUpdates(payload, operation, sender)
+    if type(ThreatUpdates.Deserialize) ~= "function" then
+        if type(Debug.Warn) == "function" then
+            Debug.Warn("%s rejected threat update from %s: shared codec is missing.", tostring(operation), tostring(sender))
         end
+        return nil
     end
-
-    return normalized
+    local updates, reason = ThreatUpdates:Deserialize(payload)
+    if not updates and type(Debug.Warn) == "function" then
+        Debug.Warn("%s rejected malformed threat update from %s: %s.", tostring(operation), tostring(sender), tostring(reason or "unknown error"))
+    end
+    return updates
 end
 
 local function applyThreatUpdatesToUnits(units, threatUpdates, changedByEventId, validSourceUnits)
@@ -640,14 +627,13 @@ function Server:HandleResourceDelta(arguments, sender)
     local targetEventId = tonumber(arguments and arguments[4]) or 0
 
     local resourceDeltas = ResourceSync.NormalizeResourceDeltas and ResourceSync.NormalizeResourceDeltas(arguments and arguments[3] or "") or {}
-    if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
-        return false
+    local handled = false
+    if type(resourceDeltas) == "table" and #resourceDeltas > 0 then
+        handled = applyClientResourceDeltasToServerState(self, state, clientName, targetEventId, resourceDeltas)
     end
-
-    local handled = applyClientResourceDeltasToServerState(self, state, clientName, targetEventId, resourceDeltas)
-    local threatUpdates = normalizeThreatUpdates(arguments and arguments[5] or "")
-    if #threatUpdates > 0 then
-        applyThreatUpdatesToServerState(self, threatUpdates)
+    local threatUpdates = deserializeThreatUpdates(arguments and arguments[5] or "", "RESOURCE_DELTA", sender)
+    if type(threatUpdates) == "table" and #threatUpdates > 0 then
+        handled = applyThreatUpdatesToServerState(self, threatUpdates) or handled
     end
     return handled
 end
@@ -673,8 +659,8 @@ function Server:HandleResourceDeltaBatch(arguments, sender)
     local targetedResourceDeltas = ResourceSync.CoalesceTargetedResourceDeltas
         and ResourceSync.CoalesceTargetedResourceDeltas(arguments and arguments[3] or "")
         or {}
-    if type(targetedResourceDeltas) ~= "table" or #targetedResourceDeltas == 0 then
-        return false
+    if type(targetedResourceDeltas) ~= "table" then
+        targetedResourceDeltas = {}
     end
     local deltaOrder = {}
     local deltasByTargetEventId = {}
@@ -697,10 +683,6 @@ function Server:HandleResourceDeltaBatch(arguments, sender)
         end
     end
 
-    if #deltaOrder == 0 then
-        return false
-    end
-
     local handled = false
     for index = 1, #deltaOrder do
         handled = applyClientResourceDeltasToServerState(
@@ -712,9 +694,9 @@ function Server:HandleResourceDeltaBatch(arguments, sender)
         ) or handled
     end
 
-    local threatUpdates = normalizeThreatUpdates(arguments and arguments[4] or "")
-    if #threatUpdates > 0 then
-        applyThreatUpdatesToServerState(self, threatUpdates)
+    local threatUpdates = deserializeThreatUpdates(arguments and arguments[4] or "", "RESOURCE_DELTA_BATCH", sender)
+    if type(threatUpdates) == "table" and #threatUpdates > 0 then
+        handled = applyThreatUpdatesToServerState(self, threatUpdates) or handled
     end
 
     return handled

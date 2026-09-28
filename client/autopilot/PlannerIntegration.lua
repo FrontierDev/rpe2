@@ -2388,6 +2388,8 @@ function Planner.IsFrozenSnapshotStale(state)
         local liveUnit = liveByEventId[eventId]
         local liveTauntState = getHostLocalTauntState(liveEventState, eventId)
         if type(liveUnit) ~= "table"
+            or buildThreatSignature(frozenUnit and frozenUnit.threatTable)
+                ~= buildThreatSignature(liveUnit and liveUnit.threatTable)
             or buildTauntSignature(frozenUnit and frozenUnit.tauntState)
                 ~= buildTauntSignature(liveTauntState)
         then
