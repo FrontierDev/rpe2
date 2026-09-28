@@ -2,7 +2,7 @@
 
 Standalone `RPE_DATASET_ENTRY_V1` import code for a base Felguard unit in the Core dataset (`f82db71a`).
 
-## Level-60 calibration
+## Level-60 calibrations
 
 | Stat | Initial | Per level | Level 60 |
 |---|---:|---:|---:|
