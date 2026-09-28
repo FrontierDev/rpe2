@@ -608,11 +608,30 @@ local PLANNER_REJECTION_TEXT = {
     ["zero-utility"] = "projected effect has zero utility",
     ["melee-position-unreachable"] = "melee target is outside the reachable marker position",
     ["invalid-cooldown-channel"] = "cooldown channel is not configured",
+    ["channel-cooldown"] = "cooldown channel is on cooldown",
+    ["cooldown"] = "spell is on personal cooldown",
+    ["not-your-turn"] = "it is not this caster's turn",
+    ["no-charges"] = "spell has no charges available",
+    ["insufficient-resources"] = "spell resources are insufficient",
+    ["conditions"] = "authored spell conditions are not satisfied",
+    ["basic-attack-type"] = "another basic-attack damage type was already used this turn",
     ["illegal-activation"] = "spell activation is currently illegal",
     ["not-useful"] = "projected effect has zero utility",
 }
 
-local function recordPlannerRejection(state, eventId, spellRef, reason)
+local function buildPlannerRejectionDetail(code, activation)
+    local detail = PLANNER_REJECTION_TEXT[code] or code:gsub("%-", " ")
+    if code == "conditions" and type(activation) == "table" then
+        local conditionState = activation.conditionState
+        local failureText = type(conditionState) == "table" and tostring(conditionState.failureText or "") or ""
+        if failureText ~= "" then
+            detail = detail .. ": " .. failureText
+        end
+    end
+    return detail
+end
+
+local function recordPlannerRejection(state, eventId, spellRef, reason, activation)
     local normalizedEventId = normalizeEventId(eventId)
     if normalizedEventId <= 0 then return end
     local code = tostring(reason or "candidate-rejected")
@@ -621,12 +640,14 @@ local function recordPlannerRejection(state, eventId, spellRef, reason)
     state.scratch.plannerRejectionsByEventId[normalizedEventId] = entries
     local definition = state.scratch.spellDefinitionByRef and state.scratch.spellDefinitionByRef[tostring(spellRef or "")] or nil
     local spellLabel = tostring(type(definition) == "table" and definition.name or spellRef or "Spell")
-    local detail = spellLabel .. ": " .. (PLANNER_REJECTION_TEXT[code] or code:gsub("%-", " "))
+    local detail = spellLabel .. ": " .. buildPlannerRejectionDetail(code, activation)
     for index = 1, #entries do
         if entries[index] == detail then return end
     end
     entries[#entries + 1] = detail
 end
+
+Planner.RecordPlannerRejection = recordPlannerRejection
 
 local function buildNoActionDiagnostic(state, unit, sequence)
     local eventId = normalizeEventId(unit and unit.eventID)
@@ -637,6 +658,8 @@ local function buildNoActionDiagnostic(state, unit, sequence)
     local entries = state.scratch.plannerRejectionsByEventId and state.scratch.plannerRejectionsByEventId[eventId] or {}
     return #entries > 0 and table.concat(entries, "; ") or nil
 end
+
+Planner.BuildNoActionDiagnostic = buildNoActionDiagnostic
 
 local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId, actionEconomyEntry)
     local eventId = normalizeEventId(unit and unit.eventID)
@@ -1407,7 +1430,13 @@ local function phaseActivation(state, deadlineMs)
                     or nil
                 state.scratch.profileByKey[cacheKey] = profile or false
                 if activation.canCast ~= true then
-                    recordPlannerRejection(state, eventId, spellRef, activation.reason or "illegal-activation")
+                    recordPlannerRejection(
+                        state,
+                        eventId,
+                        spellRef,
+                        activation.reason or "illegal-activation",
+                        activation
+                    )
                 elseif type(profile) ~= "table" then
                     recordPlannerRejection(state, eventId, spellRef, "profile-unavailable")
                 end

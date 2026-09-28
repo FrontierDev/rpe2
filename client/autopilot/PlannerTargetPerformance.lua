@@ -276,6 +276,17 @@ local function phaseTargetsBounded(state, deadlineMs)
             local activation = state.scratch.activationByKey[cacheKey]
             local profile = state.scratch.profileByKey[cacheKey]
             if type(activation) ~= "table" or activation.canCast ~= true or type(profile) ~= "table" then
+                if type(activation) == "table" and activation.canCast ~= true
+                    and type(Planner.RecordPlannerRejection) == "function"
+                then
+                    Planner.RecordPlannerRejection(
+                        state,
+                        eventId,
+                        spellRef,
+                        activation.reason or "illegal-activation",
+                        activation
+                    )
+                end
                 state.cursors.spell = state.cursors.spell + 1
                 state.cursors.intent = 1
             else

@@ -166,12 +166,20 @@ function ActionEconomy.CreateInput(candidate, activationMetadata)
     end
     local cooldownChannelConfigured = metadata.cooldownChannelConfigured
     if cooldownChannelConfigured == nil and type(activationSnapshot) == "table" then
+        cooldownChannelConfigured = activationSnapshot.cooldownChannelConfigured
+    end
+    if cooldownChannelConfigured == nil and type(activationSnapshot) == "table" then
         cooldownChannelConfigured = activationSnapshot.cooldownChannelId ~= nil
             and type(activationSnapshot.cooldownChannelTriggersGCD) == "boolean"
             and normalizeCooldownChannelName(activationSnapshot.cooldownChannelName) ~= nil
     end
     if type(cooldownChannelConfigured) ~= "boolean" then
         cooldownChannelConfigured = cooldownChannelId ~= nil and cooldownChannelTriggersGCD ~= nil
+    end
+
+    local cooldownChannelReason = tostring(metadata.cooldownChannelReason or "")
+    if cooldownChannelReason == "" and type(activationSnapshot) == "table" then
+        cooldownChannelReason = tostring(activationSnapshot.cooldownChannelReason or "")
     end
 
     return {
@@ -187,7 +195,7 @@ function ActionEconomy.CreateInput(candidate, activationMetadata)
         cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
         cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
         cooldownChannelConfigured = cooldownChannelConfigured == true,
-        cooldownChannelReason = tostring(metadata.cooldownChannelReason or ""),
+        cooldownChannelReason = cooldownChannelReason,
         cooldownGroup = normalizeCooldownGroup(metadata.cooldownGroup),
         resourceCommitments = copyResourceMap(metadata.resourceCommitments),
         inputIndex = 0,

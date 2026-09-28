@@ -473,7 +473,37 @@ function Conditions:FindEquippedItemRows(scope)
     return type(Equipment.ListEquippedSlots) == "function" and Equipment.ListEquippedSlots() or {}
 end
 
+local EVENT_UNIT_EQUIPMENT_SLOTS = {
+    { slotKey = "mainhand", field = "mainHandWeapon" },
+    { slotKey = "offhand", field = "offHandWeapon" },
+    { slotKey = "ranged", field = "rangedWeapon" },
+    { slotKey = "offhand", field = "shield" },
+}
+
+local function resolveEventUnitEquippedItemRows(unit)
+    local rows = {}
+    for index = 1, #EVENT_UNIT_EQUIPMENT_SLOTS do
+        local definition = EVENT_UNIT_EQUIPMENT_SLOTS[index]
+        local itemRef = ensureString(unit and unit[definition.field])
+        if itemRef ~= "" then
+            rows[#rows + 1] = {
+                slotKey = definition.slotKey,
+                entry = { itemRef = itemRef },
+                item = type(Equipment.ResolveItemDefinition) == "function"
+                    and select(1, Equipment.ResolveItemDefinition(itemRef))
+                    or nil,
+            }
+        end
+    end
+    return rows
+end
+
 function Conditions:ResolveEquippedItemRows(context)
+    local casterUnit = type(context) == "table" and context.casterUnit or nil
+    if type(casterUnit) == "table" and casterUnit.isPlayer ~= true then
+        return resolveEventUnitEquippedItemRows(casterUnit)
+    end
+
     local scope = type(context) == "table" and context.equipmentScope or nil
     return self:FindEquippedItemRows(scope)
 end

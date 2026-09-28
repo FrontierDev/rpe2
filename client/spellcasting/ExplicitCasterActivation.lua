@@ -305,9 +305,6 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
     local snapshot = buildActivationSnapshot(self, spellRef, options)
 
     snapshot = applyBasicAttackTypeRestriction(self, snapshot)
-    if self ~= Client and type(snapshot) == "table" and snapshot.canCast ~= true then
-        return nil
-    end
     return snapshot
 end
 

@@ -237,7 +237,16 @@ function Spellcasting.ResolveSpellRankContext(spell, options)
     end
     gainPercent = math.max(0, gainPercent or 5)
 
-    local resolved = spellClass.ResolveRankForLevel(spell, casterLevel)
+    local isNpcEventUnit = type(casterUnit) == "table" and casterUnit.isPlayer ~= true
+    local rankResolutionLevel = casterLevel
+    if isNpcEventUnit then
+        -- NPC spell lists are authored explicitly on their EventUnit or preset.
+        -- Learn level remains a player-spellbook restriction, while an NPC below
+        -- that level uses the spell's lowest valid rank/scaling instead.
+        rankResolutionLevel = math.max(casterLevel, spellClass.ResolveLearnLevel(spell))
+    end
+
+    local resolved = spellClass.ResolveRankForLevel(spell, rankResolutionLevel)
     local spellUsesRanks = true
     if type(spellClass.ResolveUsesRanks) == "function" then
         spellUsesRanks = spellClass.ResolveUsesRanks(spell) ~= false
@@ -262,6 +271,8 @@ function Spellcasting.ResolveSpellRankContext(spell, options)
         rank = rank,
         multiplier = multiplier,
         casterLevel = casterLevel,
+        rankResolutionLevel = rankResolutionLevel,
+        isNpcEventUnit = isNpcEventUnit,
         learnLevel = resolved and resolved.learnLevel or spellClass.ResolveLearnLevel(spell),
         rankInterval = resolved and resolved.rankInterval or spellClass.ResolveRankInterval(spell),
         nextRankLevel = resolved and resolved.nextRankLevel or nil,

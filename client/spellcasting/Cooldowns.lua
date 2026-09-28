@@ -1700,6 +1700,8 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         cooldownChannelName = cooldownChannelName,
         cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
         cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
+        cooldownChannelConfigured = cooldownChannelConfigured,
+        cooldownChannelReason = cooldownChannelConfigured and "" or "invalid-cooldown-channel",
         channelCooldownRemaining = channelCooldownRemaining,
         currentCharges = currentCharges,
         maxCharges = maxCharges,

@@ -117,7 +117,7 @@ local function appendWarning(state, warning)
     end
 end
 
-local function appendNoAction(state, actorKey, unit, reason)
+local function appendNoAction(state, actorKey, unit, reason, diagnostic)
     local eventId = normalizeEventId(unit and unit.eventID)
     if eventId <= 0 then return end
     state.output.noActions[#state.output.noActions + 1] = {
@@ -127,8 +127,16 @@ local function appendNoAction(state, actorKey, unit, reason)
         actorKey = tostring(actorKey or ""),
         casterEventId = eventId,
         reason = tostring(reason or "no-useful-action"),
+        diagnostic = tostring(diagnostic or ""),
         status = "ready",
     }
+end
+
+local function buildNoActionDiagnostic(state, unit, sequence)
+    if type(Planner.BuildNoActionDiagnostic) == "function" then
+        return Planner.BuildNoActionDiagnostic(state, unit, sequence)
+    end
+    return nil
 end
 
 local function copyTargetSelectionMap(targetUnits, targetGroupKey)
@@ -210,7 +218,14 @@ end
 local function emitSequenceActions(state, actor, unit, sequence, movementActionId, noActionReason)
     local entries = type(sequence) == "table" and sequence.actions or {}
     if #entries == 0 then
-        appendNoAction(state, actor.key, unit, noActionReason or "no-useful-action")
+        local diagnostic = buildNoActionDiagnostic(state, unit, sequence)
+        appendNoAction(
+            state,
+            actor.key,
+            unit,
+            diagnostic and "autopilot-rejected" or noActionReason or "no-useful-action",
+            diagnostic
+        )
         return false
     end
     local previousActionId = nil
@@ -229,7 +244,14 @@ local function emitSequenceActions(state, actor, unit, sequence, movementActionI
         end
     end
     if previousActionId == nil then
-        appendNoAction(state, actor.key, unit, noActionReason or "no-useful-action")
+        local diagnostic = buildNoActionDiagnostic(state, unit, sequence)
+        appendNoAction(
+            state,
+            actor.key,
+            unit,
+            diagnostic and "autopilot-rejected" or noActionReason or "no-useful-action",
+            diagnostic
+        )
         return false
     end
     return true

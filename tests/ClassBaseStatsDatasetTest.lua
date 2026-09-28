@@ -43,10 +43,10 @@ local function assertProgressions(class, fieldName, expected, label)
     assertTrue(next(remaining) == nil, label .. " includes every expected stat")
 end
 
-local function assertClass(datasetId, classId, name, expectedStats, expectedResources)
+local function assertClass(datasetId, expectedVersion, classId, name, expectedStats, expectedResources)
     local definition = definitions[datasetId]
     assertTrue(type(definition) == "table", name .. " definition is registered")
-    assertEqual(definition.version, 1, name .. " dataset version")
+    assertEqual(definition.version, expectedVersion, name .. " dataset version")
 
     local dataset = definition.dataset
     assertEqual(dataset.datasetType, "class", name .. " dataset type")
@@ -76,7 +76,7 @@ local function assertClass(datasetId, classId, name, expectedStats, expectedReso
     assertTrue(next(remainingResources) == nil, name .. " includes Health and Mana")
 end
 
-assertClass("c4a91e7d", "shaman01", "Shaman", {
+assertClass("c4a91e7d", 1, "shaman01", "Shaman", {
     ["f82db71a:zfqm8dxp"] = { 1, 1.08 },
     ["f82db71a:xqz0daz2"] = { 0, 0.59 },
     ["f82db71a:ygjno50i"] = { 1, 1.25 },
@@ -87,7 +87,7 @@ assertClass("c4a91e7d", "shaman01", "Shaman", {
     ["f82db71a:4c8mfm99"] = { 53, 24.86 },
 })
 
-assertClass("e8f3b2c6", "warlock1", "Warlock", {
+assertClass("e8f3b2c6", 3, "warlock1", "Warlock", {
     ["f82db71a:zfqm8dxp"] = { 0, 0.42 },
     ["f82db71a:xqz0daz2"] = { 0, 0.51 },
     ["f82db71a:ygjno50i"] = { 1, 0.75 },
@@ -97,6 +97,57 @@ assertClass("e8f3b2c6", "warlock1", "Warlock", {
     ["f82db71a:q2ktkztt"] = { 23, 23.58 },
     ["f82db71a:4c8mfm99"] = { 59, 22.27 },
 })
+
+local warlockDataset = definitions["e8f3b2c6"].dataset
+assertEqual(#warlockDataset.auras, 12, "Warlock aura count")
+assertEqual(#warlockDataset.spells, 23, "Warlock spell count")
+
+local function findByName(collection, name)
+    for index = 1, #collection do
+        if collection[index].name == name then return collection[index] end
+    end
+end
+
+for _, name in ipairs({
+    "Shadow Bolt", "Immolate", "Searing Pain", "Rain of Fire", "Hellfire", "Soul Fire",
+    "Corruption", "Life Tap", "Curse of Agony", "Curse of Weakness", "Fear", "Drain Soul",
+    "Drain Life", "Drain Mana", "Chaos Bolt", "Curse of Tongues", "Curse of Elements",
+    "Curse of Shadows", "Death Coil", "Howl of Terror", "Demon Skin", "Banish", "Shadow Ward",
+}) do
+    assertTrue(findByName(warlockDataset.spells, name) ~= nil, "Warlock includes " .. name)
+end
+for _, name in ipairs({
+    "Immolate", "Corruption", "Curse of Agony", "Curse of Weakness", "Fear",
+    "Curse of Tongues", "Curse of Elements", "Curse of Shadows", "Howl of Terror",
+    "Demon Skin", "Banish", "Shadow Ward",
+}) do
+    local aura = findByName(warlockDataset.auras, name)
+    assertTrue(aura ~= nil, "Warlock includes " .. name .. " aura")
+    assertEqual(aura.description, "", name .. " aura keeps its description generator-owned")
+    assertTrue(type(aura.tooltipTemplateData) == "table", name .. " aura has generated tooltip data")
+end
+
+for index = 1, #warlockDataset.spells do
+    local spell = warlockDataset.spells[index]
+    assertEqual(spell.description, "", spell.name .. " keeps its description generator-owned")
+    assertTrue(type(spell.tooltipTemplateData) == "table", spell.name .. " has generated tooltip data")
+    assertTrue(spell.tooltipTemplateData.mainText ~= "", spell.name .. " has generated tooltip text")
+end
+
+local knownAuraRefs = {}
+for index = 1, #warlockDataset.auras do
+    local aura = warlockDataset.auras[index]
+    knownAuraRefs["e8f3b2c6:" .. aura.id] = true
+end
+for index = 1, #warlockDataset.spells do
+    local spell = warlockDataset.spells[index]
+    for componentIndex = 1, #spell.components do
+        local effect = spell.components[componentIndex].effect
+        if effect.type == "apply_aura" then
+            assertTrue(knownAuraRefs[effect.auraRef] == true, spell.name .. " references a packaged Warlock aura")
+        end
+    end
+end
 
 local toc = assert(io.open("RPEngine2.toc", "r"))
 local tocText = toc:read("*a")

@@ -282,22 +282,18 @@ local function buildActionEconomyInput(candidate)
     end
 
     if type(Spellcasting.ResolvePersistentCastTurns) ~= "function"
-        or type(Spellcasting.ResolveSpellCooldownChannel) ~= "function"
         or type(Spellcasting.NormalizeTurnCount) ~= "function"
     then
         return nil
     end
 
     local persistentCastTurns = Spellcasting.ResolvePersistentCastTurns(spell)
-    local cooldownChannelId, cooldownChannel, _, cooldownChannelReason = Spellcasting.ResolveSpellCooldownChannel(spell)
-    local cooldownChannelConfigured = type(cooldownChannel) == "table" and cooldownChannel.enabled == true
-    local cooldownChannelTriggersGCD = type(cooldownChannel) == "table"
-        and cooldownChannel.triggersGCD == true
-        or false
-    local cooldownChannelCanUseOffTurn = type(cooldownChannel) == "table"
-        and cooldownChannel.enabled == true
-        and cooldownChannel.canUseOffTurn == true
-        or false
+    local cooldownChannelId = activation.cooldownChannelId
+    local cooldownChannelName = activation.cooldownChannelName
+    local cooldownChannelTriggersGCD = activation.cooldownChannelTriggersGCD
+    local cooldownChannelCanUseOffTurn = activation.cooldownChannelCanUseOffTurn
+    local cooldownChannelConfigured = activation.cooldownChannelConfigured
+    local cooldownChannelReason = activation.cooldownChannelReason
     local cooldownTurns = type(Spellcasting.GetEffectivePersonalCooldownTurns) == "function"
         and Spellcasting.GetEffectivePersonalCooldownTurns(spell)
         or Spellcasting.NormalizeTurnCount(spell.cooldown)
@@ -313,13 +309,11 @@ local function buildActionEconomyInput(candidate)
         canCast = activation.canCast == true,
         persistentCastTurns = persistentCastTurns,
         cooldownChannelId = cooldownChannelId,
-        cooldownChannelName = type(cooldownChannel) == "table" and cooldownChannel.name or nil,
+        cooldownChannelName = cooldownChannelName,
         cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
         cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
         cooldownChannelConfigured = cooldownChannelConfigured,
-        cooldownChannelReason = cooldownChannelConfigured
-            and ""
-            or tostring(cooldownChannelReason or "invalid-cooldown-channel"),
+        cooldownChannelReason = tostring(cooldownChannelReason or ""),
         cooldownGroup = cooldownGroup,
         resourceCommitments = buildResourceCommitments(
             candidate,
