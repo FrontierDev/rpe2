@@ -945,18 +945,23 @@ local EVENT_END_OPCODE = Operations:GetOpcode("EVENT_END")
 local EVENT_UNITS_OPCODE = Operations:GetOpcode("EVENT_UNITS")
 local EVENT_STATE_OPCODE = Operations:GetOpcode("EVENT_STATE")
 local EVENT_UNIT_DELTA_BATCH_OPCODE = Operations:GetOpcode("EVENT_UNIT_DELTA_BATCH")
+local LIVE_UNIT_REVISION_MARKER = "rpe-live-unit-revision"
 
 local function buildEventUnitsArguments(eventState)
     return {
         eventState and eventState.channelName or "",
         eventState and eventState.id or nil,
         eventState and eventState.SerializeUnitsForNetwork and eventState:SerializeUnitsForNetwork() or "",
+        math.max(0, math.floor(tonumber(eventState and eventState.liveUnitRevision) or 0)),
     }
 end
 
 local function buildEventStateArguments(eventState)
     if eventState and eventState.ToStateArguments then
-        return eventState:ToStateArguments()
+        local arguments = eventState:ToStateArguments()
+        arguments[#arguments + 1] = LIVE_UNIT_REVISION_MARKER
+        arguments[#arguments + 1] = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
+        return arguments
     end
 
     return {
@@ -965,6 +970,8 @@ local function buildEventStateArguments(eventState)
         eventState and eventState.turnNumber or 0,
         eventState and eventState.tickNumber or 0,
         eventState and eventState.totalTicks or 0,
+        LIVE_UNIT_REVISION_MARKER,
+        math.max(0, math.floor(tonumber(eventState and eventState.liveUnitRevision) or 0)),
     }
 end
 
@@ -1186,6 +1193,7 @@ local function buildEventUnitDeltaBatchArguments(eventState, entries)
         eventState and eventState.channelName or "",
         eventState and eventState.id or nil,
         Event and Event.SerializeUnitDeltaBatchForNetwork and Event.SerializeUnitDeltaBatchForNetwork(entries, options) or "",
+        math.max(0, math.floor(tonumber(eventState and eventState.liveUnitRevision) or 0)),
     }
 end
 
@@ -1239,6 +1247,7 @@ local function broadcastEventDeltaBatch(server, eventState, entries, includeStat
         return false
     end
 
+    eventState.liveUnitRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) + 1
     local arguments = buildEventUnitDeltaBatchArguments(eventState, entries)
     if type(arguments[3]) ~= "string" or arguments[3] == "" then
         return false
@@ -1258,6 +1267,14 @@ local function broadcastEventDeltaBatch(server, eventState, entries, includeStat
     ) and true or false
 
     if includeState then
+        -- A complete authoritative snapshot at the step boundary repairs any
+        -- missed delta without relying on clients retaining every packet.
+        Comms:SendToChannel(
+            channelId,
+            EVENT_UNITS_OPCODE,
+            buildEventUnitsArguments(eventState),
+            buildSendMetadata(EVENT_UNITS_OPCODE)
+        )
         Comms:SendToChannel(
             channelId,
             EVENT_STATE_OPCODE,
@@ -1327,6 +1344,20 @@ local function sendEventSnapshotToClient(eventState, clientName, snapshot)
 
     local resolvedSnapshot = snapshot or buildEventSnapshot(eventState)
     return sendBuiltEventSnapshot("WHISPER", normalizedClientName, resolvedSnapshot)
+end
+
+function Server:HandleEventSnapshotRequest(arguments, sender)
+    local eventState = self.EventState
+    local channelName = arguments and arguments[1] or nil
+    local eventId = arguments and arguments[2] or nil
+    local requester = Common.NormalizeName(sender)
+    if type(eventState) ~= "table" or eventState.active ~= true
+        or requester == "" or tostring(eventState.channelName or "") ~= tostring(channelName or "")
+        or tostring(eventState.id or "") ~= tostring(eventId or "")
+    then
+        return false
+    end
+    return sendEventSnapshotToClient(eventState, requester)
 end
 
 local function sendInitialEventSnapshot(server, sessionState, eventState)

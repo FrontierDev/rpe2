@@ -1944,7 +1944,7 @@ function Combat:BeginHitCheck(context, effect, component)
 
     local defenderName = Combat.ResolveSenderForUnit and Combat:ResolveSenderForUnit(entry.eventState, entry.defenderUnit) or ""
     local sendStartTime = timingEnabled and getNowMilliseconds() or nil
-    if defenderName == "" or not Combat.SendCombatWhisper or not Combat:SendCombatWhisper(defenderName, HIT_CHECK_REQUEST_OPCODE, {
+    local requestArguments = {
         entry.checkId,
         entry.eventId,
         entry.attackerEventId,
@@ -1954,7 +1954,10 @@ function Combat:BeginHitCheck(context, effect, component)
         entry.attackerTotal,
         entry.rawDamage,
         entry.resultType,
-    }) then
+    }
+    if defenderName == "" or type(Client.SendPendingCombatHitCheckRequest) ~= "function"
+        or not Client:SendPendingCombatHitCheckRequest(entry, defenderName, requestArguments)
+    then
         if Client.ClearPendingCombatHitCheck then
             Client:ClearPendingCombatHitCheck(entry.checkId)
         end

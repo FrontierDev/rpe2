@@ -14,6 +14,46 @@ local Event = Addon.Internal.Database.Classes.Event
 local ResourceSync = Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local EventUnit = Addon.Internal.Database.Classes.EventUnit
 local Runtime = Addon.Internal.Runtime or {}
+local Operations = Comms.Operations or {}
+local LIVE_UNIT_REVISION_MARKER = "rpe-live-unit-revision"
+
+local function getLiveUnitRevisionFromStateArguments(arguments)
+    local argumentCount = type(arguments) == "table" and #arguments or 0
+    if argumentCount >= 2 and arguments[argumentCount - 1] == LIVE_UNIT_REVISION_MARKER then
+        return math.max(0, math.floor(tonumber(arguments[argumentCount]) or 0)), argumentCount - 2
+    end
+    return 0, nil
+end
+
+local function requestAuthoritativeEventSnapshot(client, eventState, expectedRevision, reason)
+    if type(client) ~= "table" or type(eventState) ~= "table" then
+        return false
+    end
+    local revision = math.max(0, math.floor(tonumber(expectedRevision) or 0))
+    if tonumber(client.EventSnapshotRepairRequestedRevision) == revision then
+        return false
+    end
+    local opcode = Operations.GetOpcode and Operations:GetOpcode("EVENT_SNAPSHOT_REQUEST") or nil
+    local hostName = Common and Common.NormalizeName and Common.NormalizeName(eventState.hostName) or tostring(eventState.hostName or "")
+    if not opcode or hostName == "" then
+        return false
+    end
+    client.EventSnapshotRepairRequestedRevision = revision
+    client.EventSnapshotRepairReason = tostring(reason or "revision-mismatch")
+    local sent = Comms:SendMessage("WHISPER", opcode, {
+        eventState.channelName,
+        eventState.id,
+        revision,
+    }, hostName, { opcode = opcode, scope = "client" }) == true
+    if type(Debug) == "table" and type(Debug.Internal) == "function" then
+        Debug.Internal(
+            "Authoritative event snapshot repair %s: eventId=%s localRevision=%s expectedRevision=%s.",
+            sent and "requested" or "failed", tostring(eventState.id or ""),
+            tostring(eventState.liveUnitRevision or 0), tostring(revision)
+        )
+    end
+    return sent
+end
 
 local function getTimings()
     return Addon.Debug and Addon.Debug.Timings or nil
@@ -2518,6 +2558,9 @@ local function clearEventStateNow(client, state, reason, options)
     if type(combat) == "table" and type(combat.ClearPendingDamageOutcomes) == "function" then
         combat:ClearPendingDamageOutcomes(eventId)
     end
+    if type(client.ClearCombatReactionRuntime) == "function" then
+        client:ClearCombatReactionRuntime(eventId, reason or "event-reset")
+    end
     if type(client.CancelPendingTurnCommit) == "function" then
         client:CancelPendingTurnCommit(options.cancelReason or "event-reset", eventId)
     end
@@ -3166,6 +3209,7 @@ function Client:HandleEventUnits(arguments)
     local startupRuntime = getEventStartupRuntime(self, eventState.id, true)
     local deserializeStartTime = timingParts and getTimingNowMilliseconds() or nil
     local serializedUnits = arguments and arguments[3] or ""
+    local receivedRevision = math.max(0, math.floor(tonumber(arguments and arguments[4]) or 0))
     local units = Event.DeserializeUnitsFromNetwork(serializedUnits, {
         level = eventState.level,
         difficulty = eventState.difficulty,
@@ -3182,6 +3226,16 @@ function Client:HandleEventUnits(arguments)
 
     local readinessStartTime = timingParts and getTimingNowMilliseconds() or nil
     eventState.units = units
+    if receivedRevision > 0 then
+        eventState.liveUnitRevision = receivedRevision
+    end
+    if self.EventSnapshotRepairRequestedRevision then
+        self.EventSnapshotRepairRequestedRevision = nil
+        self.EventSnapshotRepairReason = nil
+        if type(self.ClearCombatReactionRuntime) == "function" then
+            self:ClearCombatReactionRuntime(eventState.id, "authoritative-resync")
+        end
+    end
     eventState.rosterReady = true
     eventState.unitsChunkReceived = eventState.unitsChunkExpected or eventState.unitsChunkReceived or 0
     if ResourceSync.UpdateEventReadiness then
@@ -3253,6 +3307,16 @@ function Client:HandleEventUnitDeltaBatch(arguments)
         return false
     end
 
+    local receivedRevision = math.max(0, math.floor(tonumber(arguments and arguments[4]) or 0))
+    local localRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
+    if receivedRevision > 0 and receivedRevision <= localRevision then
+        return true
+    end
+    if receivedRevision > 0 and localRevision > 0 and receivedRevision ~= localRevision + 1 then
+        requestAuthoritativeEventSnapshot(self, eventState, receivedRevision, "delta-revision-mismatch")
+        return false
+    end
+
     local hydrationOptions = {
         level = eventState.level,
         difficulty = eventState.difficulty,
@@ -3278,7 +3342,13 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     end
 
     if not changed then
+        if receivedRevision > 0 then
+            eventState.liveUnitRevision = receivedRevision
+        end
         return false
+    end
+    if receivedRevision > 0 then
+        eventState.liveUnitRevision = receivedRevision
     end
 
     if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
@@ -3378,6 +3448,11 @@ function Client:HandleEventState(arguments)
         return false
     end
 
+    local expectedRevision, stateArgumentCount = getLiveUnitRevisionFromStateArguments(arguments)
+    if expectedRevision > math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) then
+        requestAuthoritativeEventSnapshot(self, eventState, expectedRevision, "state-revision-mismatch")
+    end
+
     local timer = startTiming("Event-state immediate handler", 8, eventState.id or "event-state")
 
     local previousTurnNumber = tonumber(eventState.turnNumber) or 0
@@ -3388,7 +3463,14 @@ function Client:HandleEventState(arguments)
 
     local stateApplyStartTime = timingParts and getTimingNowMilliseconds() or nil
     if Event and Event.ApplyStateArguments then
-        Event.ApplyStateArguments(eventState, arguments)
+        local stateArguments = arguments
+        if stateArgumentCount then
+            stateArguments = {}
+            for index = 1, stateArgumentCount do
+                stateArguments[index] = arguments[index]
+            end
+        end
+        Event.ApplyStateArguments(eventState, stateArguments)
     else
         eventState.turnNumber = tonumber(arguments and arguments[3]) or eventState.turnNumber or 0
         eventState.tickNumber = tonumber(arguments and arguments[4]) or eventState.tickNumber or 0
