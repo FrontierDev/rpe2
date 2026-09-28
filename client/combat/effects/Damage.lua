@@ -374,10 +374,11 @@ local function applyThreatToUnit(targetUnit, sourceEventId, threatAmount)
         return false, numericThreatAmount, 0
     end
 
-    targetUnit.threatTable = type(targetUnit.threatTable) == "table" and targetUnit.threatTable or {}
-    local previousThreat = tonumber(targetUnit.threatTable[numericSourceEventId]) or 0
-    targetUnit.threatTable[numericSourceEventId] = previousThreat + numericThreatAmount
-    return true, numericThreatAmount, targetUnit.threatTable[numericSourceEventId]
+    -- Threat is host-authoritative. Do not mutate the local EventUnit here: the
+    -- server applies this update and returns the synchronized table in an Event
+    -- Unit delta consumed by both the meter and Autopilot.
+    local previousThreat = tonumber(type(targetUnit.threatTable) == "table" and targetUnit.threatTable[numericSourceEventId]) or 0
+    return true, numericThreatAmount, previousThreat + numericThreatAmount
 end
 
 local function getThreatForUnit(targetUnit, sourceEventId)

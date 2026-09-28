@@ -72,9 +72,6 @@ local function buildPeriodicThreatUpdate(Combat, context, effect, targetUnit, ap
         return nil
     end
 
-    targetUnit.threatTable = type(targetUnit.threatTable) == "table" and targetUnit.threatTable or {}
-    targetUnit.threatTable[sourceEventId] = (tonumber(targetUnit.threatTable[sourceEventId]) or 0) + threatAmount
-
     return {
         targetEventId = targetEventId,
         sourceEventId = sourceEventId,

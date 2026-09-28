@@ -72,13 +72,11 @@ loadAddonFile("core/internal/comms/Serialization.lua")
 loadAddonFile("core/internal/comms/ThreatUpdates.lua")
 loadAddonFile("server/server_Session.lua")
 loadAddonFile("client/autopilot/TargetSelector.lua")
-loadAddonFile("client/client_EventMeters.lua")
 
 local Serialization = Addon.Internal.Comms.Serialization
 local ThreatUpdates = Addon.Internal.Comms.ThreatUpdates
 local Server = Addon.Server
 local Selector = Addon.Client.AutopilotTargetSelector
-local EventMeters = Addon.Client.EventMeters
 
 local first = { targetEventId = 12, sourceEventId = 3, amount = 40, turnNumber = 2 }
 local second = { targetEventId = 12, sourceEventId = 4, amount = 250, turnNumber = 2 }
@@ -121,11 +119,6 @@ assertEqual(draftNpc.threatTable[3], 40, "draft stores player A threat")
 assertEqual(draftNpc.threatTable[4], 250, "draft stores player B threat")
 assertTrue(type(broadcastEntries) == "table" and #broadcastEntries == 1, "host broadcasts authoritative NPC delta")
 assertEqual(broadcastEntries[1].unit.threatTable[4], 250, "remote delta carries authoritative threat")
-local remoteNpc = { eventID = 12, isPlayer = false, threatTable = broadcastEntries[1].unit.threatTable }
-local remoteRows = EventMeters:GetThreatRows({ id = "event", units = { playerA, playerB, remoteNpc } }, 12)
-assertEqual(#remoteRows, 2, "remote meter reads synchronized threat table")
-assertEqual(remoteRows[1].eventId, 4, "remote meter ranks highest threat first")
-assertEqual(remoteRows[1].amount, 250, "remote meter uses authoritative threat total")
 
 local selectionState = assert(Selector.CreateState({
     canCast = true,
@@ -137,9 +130,8 @@ local selectionState = assert(Selector.CreateState({
 assertTrue(Selector.Step(selectionState), "target selection completes")
 assertEqual(Selector.CopyResult(selectionState).primaryTargetEventId, 4, "NPC selects highest-threat player")
 
--- A local optimistic mutation must not mask a malformed transport payload. The
--- outer separator truncates this legacy payload to a single field at the server.
-local optimisticClientNpc = { eventID = 12, isPlayer = false, threatTable = { [3] = 40 } }
+-- A local UI state must not mask a malformed transport payload. The outer
+-- separator truncates this legacy payload to a single field at the server.
 local authoritativeNpc = { eventID = 12, isPlayer = false, threatTable = {} }
 Server.EventState = { units = { playerA, authoritativeNpc } }
 Server.EventDraftState = { units = { playerA, { eventID = 12, isPlayer = false, threatTable = {} } } }
@@ -149,8 +141,102 @@ local corruptedArguments = Serialization:DeserializeArguments(
     Serialization:SerializeArguments({ "channel", "PlayerA", "", legacyPayload })
 )
 assertTrue(not Server:HandleResourceDeltaBatch(corruptedArguments, "PlayerA"), "malformed nested payload is rejected")
-assertEqual(optimisticClientNpc.threatTable[3], 40, "originating client retained optimistic threat")
 assertEqual(Server.EventState.units[2].threatTable[3], nil, "server did not accept local-only threat")
 assertTrue(#warnings > 0, "malformed threat transport is diagnosable")
+
+-- Exercise the real Event Unit delta codec and client application path with a
+-- separate remote client runtime. The remote meter must only see the table
+-- materialized from the authoritative network delta.
+local RemoteAddon = {
+    Client = {},
+    Server = {},
+    Internal = {
+        Comms = { Operations = {}, ResourceSync = {} },
+        Database = { Classes = {} },
+        Tasks = {},
+    },
+    Utils = { Common = { SplitPreservingEmpty = splitPreservingEmpty } },
+}
+
+local function loadRemoteAddonFile(path)
+    local chunk, loadError = loadfile(path)
+    assert(chunk, loadError)
+    chunk(nil, RemoteAddon)
+end
+
+loadRemoteAddonFile("core/classes/EventUnit.lua")
+loadRemoteAddonFile("core/classes/EventUnitVariantIdentity.lua")
+loadRemoteAddonFile("core/classes/Event.lua")
+loadRemoteAddonFile("client/client_EventMeters.lua")
+loadRemoteAddonFile("client/client_Event.lua")
+
+local RemoteClient = RemoteAddon.Client
+local RemoteEventUnit = RemoteAddon.Internal.Database.Classes.EventUnit
+local RemoteEvent = RemoteAddon.Internal.Database.Classes.Event
+local remotePlayerA = RemoteEventUnit:New({ eventID = 3, isPlayer = true, name = "Player A", team = 1 })
+local remotePlayerB = RemoteEventUnit:New({ eventID = 4, isPlayer = true, name = "Player B", team = 1 })
+local remoteNpc = RemoteEventUnit:New({ eventID = 12, isPlayer = false, name = "NPC", team = 2, threatTable = {} })
+RemoteClient.EventState = {
+    id = "event",
+    channelName = "channel",
+    active = true,
+    level = 1,
+    difficulty = "normal",
+    units = { remotePlayerA, remotePlayerB, remoteNpc },
+}
+RemoteClient.GetState = function()
+    return { active = true, channelName = "channel", membersByName = {} }
+end
+RemoteClient.IsLocalTurnActive = function()
+    return false
+end
+RemoteClient.PruneCooldownState = function()
+    return false
+end
+RemoteClient.InvalidatePendingSpellTargetingDisplayState = function()
+    return false
+end
+RemoteClient.QueueEventWidgetRefresh = function()
+    return true
+end
+RemoteClient.QueueTargetingWidgetRefresh = function()
+    return true
+end
+RemoteClient.QueueActionBarRefresh = function()
+    return true
+end
+
+local deltaText = RemoteEvent.SerializeUnitDeltaBatchForNetwork(broadcastEntries)
+assertTrue(RemoteClient:HandleEventUnitDeltaBatch({ "channel", "event", deltaText }), "remote client applies Event Unit delta")
+assertEqual(remoteNpc.threatTable[3], 40, "remote EventUnit receives player A threat")
+assertEqual(remoteNpc.threatTable[4], 250, "remote EventUnit receives player B threat")
+local remoteRows = RemoteClient.EventMeters:GetThreatRows(RemoteClient.EventState, 12)
+assertEqual(#remoteRows, 2, "remote meter reads the applied Event Unit threat table")
+assertEqual(remoteRows[1].eventId, 4, "remote meter ranks authoritative threat")
+assertEqual(remoteRows[1].amount, 250, "remote meter receives authoritative total")
+
+RemoteClient.AutopilotPlanner = {}
+loadRemoteAddonFile("client/autopilot/PlannerIntegration.lua")
+local Planner = RemoteClient.AutopilotPlanner
+local frozenState = {
+    snapshot = {
+        unitsFrozen = true,
+        eventState = {
+            units = {
+                { eventID = 3, isPlayer = true, threatTable = {} },
+                { eventID = 12, isPlayer = false, threatTable = { [3] = 40, [4] = 250 } },
+            },
+        },
+    },
+    sourceEventState = {
+        units = {
+            { eventID = 3, isPlayer = true, threatTable = {} },
+            { eventID = 12, isPlayer = false, threatTable = { [3] = 40, [4] = 250 } },
+        },
+    },
+}
+assertTrue(not Planner.IsFrozenSnapshotStale(frozenState), "matching frozen threat table remains valid")
+frozenState.sourceEventState.units[2].threatTable[4] = 251
+assertTrue(Planner.IsFrozenSnapshotStale(frozenState), "threat-only change invalidates frozen plan")
 
 print("Threat synchronization tests passed")

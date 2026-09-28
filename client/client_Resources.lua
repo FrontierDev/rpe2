@@ -278,18 +278,6 @@ local function deserializeThreatUpdates(payload)
     return updates or {}
 end
 
-local function refreshThreatMeterWidget(client)
-    local namespace = type(client) == "table" and client.UI and client.UI.EventWidget or nil
-    local widget = type(namespace) == "table" and type(namespace.Get) == "function" and namespace:Get() or nil
-    if type(widget) == "table"
-        and type(widget.IsMetersPanelShown) == "function"
-        and widget:IsMetersPanelShown() == true
-        and type(widget.RefreshMetersPanel) == "function"
-    then
-        widget:RefreshMetersPanel()
-    end
-end
-
 local function getPlayerNameForState(state)
     bindStateSessionRuntime(state)
     local getter = state and state._getPlayerName or nil
@@ -1824,9 +1812,6 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
         type(options) == "table" and options.threatUpdates or nil,
         eventState
     )
-    if allowLocalEchoApply and #threatUpdates > 0 then
-        refreshThreatMeterWidget(self)
-    end
     self.PendingResourceDeltaBatches = self.PendingResourceDeltaBatches or {}
     local batchKey = buildResourceDeltaBatchKey(
         state.channelName,
