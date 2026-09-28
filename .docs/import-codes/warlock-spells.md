@@ -32,6 +32,8 @@ Standalone `RPE_DATASET_ENTRY_V1` import codes for the Warlock class dataset `e8
 - **Shadow Ward** copies Mage **Fire Ward** exactly except for damage school and icon: **104 + 0.52 Spell Power** Shadow-only absorption for 2 turns, Buff Action, 5-turn cooldown, **15% base Mana**.
 - **Detect Invisibility cannot currently be represented as a functional standalone spell import.** The hidden-status extension supports direct spell `hide`, but direct spell normalization has no `remove_hidden` effect. `remove_hidden` is currently preserved only for Aura event effects. A standalone import code would silently normalize incorrectly, so no fake code is included below.
 
+- **Chaos Bolt** is a 1-turn Main Action with a **5-turn cooldown**. The current direct-damage formula gives **216 + 2.24 Spell Power**. It uses an empty `damageSchoolRefs` list, which RPE2 presents as **True** damage and therefore applies no damage-school mitigation. Its power ratio is Expensive, giving a **12.3% base Mana** cost.
+
 # Destruction
 
 ## Shadow Bolt
@@ -638,6 +640,103 @@ RPE_DATASET_ENTRY_V1
                 refundOnInterrupt = 0,
                 resourceRef = "f82db71a:4c8mfm99",
             }
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Destruction",
+        tags = {  },
+        tooltipTemplate = true,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+## Chaos Bolt
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {
+            "on_spell_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseDamage = 216,
+                    damageSchoolRefs = {  },
+                    damageType = "spell",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 2.24,
+                            statRef = "f82db71a:7t7xgzcx",
+                        },
+                    },
+                    targetEvents = {
+                        "on_spell_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 0,
+                    weaponDamageMode = "none",
+                },
+                key = "wlchblt1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 5,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/ability_warlock_chaosbolt.blp",
+        id = "wlchaos1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Chaos Bolt",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 12.3,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
         },
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
