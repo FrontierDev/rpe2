@@ -1484,7 +1484,7 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         return nil
     end
 
-    local activation = self.ResolveSpellActivation and self:ResolveSpellActivation(spellRef) or nil
+    local activation = self.ResolveSpellActivation and self:ResolveSpellActivation(spellRef, options) or nil
     if not activation then
         return nil
     end
@@ -1519,7 +1519,7 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         cooldownRemaining = lockoutRemaining
     end
 
-    local cooldownChannelId, cooldownChannel = resolveSpellCooldownChannel(activation.spell)
+    local cooldownChannelId, cooldownChannel, cooldownChannelSource, cooldownChannelResolutionReason = resolveSpellCooldownChannel(activation.spell)
     local cooldownChannelName = cooldownChannel and cooldownChannel.name or nil
     local cooldownChannelConfigured = cooldownChannelId ~= nil
         and type(cooldownChannel) == "table"
@@ -1701,7 +1701,11 @@ function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
         cooldownChannelTriggersGCD = cooldownChannelTriggersGCD,
         cooldownChannelCanUseOffTurn = cooldownChannelCanUseOffTurn,
         cooldownChannelConfigured = cooldownChannelConfigured,
-        cooldownChannelReason = cooldownChannelConfigured and "" or "invalid-cooldown-channel",
+        cooldownChannelReason = cooldownChannelConfigured
+            and ""
+            or tostring(cooldownChannelResolutionReason or "invalid-cooldown-channel"),
+        cooldownChannelSource = cooldownChannelSource,
+        authoredCooldownChannel = activation.spell and activation.spell.cooldownChannel or nil,
         channelCooldownRemaining = channelCooldownRemaining,
         currentCharges = currentCharges,
         maxCharges = maxCharges,
@@ -1755,6 +1759,7 @@ function Spellcasting.ResolveSpellActivationState(self, spellRef, options)
         snapshot = options.snapshot
     else
         snapshot = Spellcasting.BuildSpellActivationSnapshot(self, spellRef, {
+            casterEventId = options.casterEventId,
             includeTargetCandidates = options.includeTargetCandidates == true,
         })
     end

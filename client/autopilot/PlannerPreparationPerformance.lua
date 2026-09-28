@@ -162,23 +162,6 @@ then
     AuraManager._autopilotPreparedAuraResolutionInstalled = true
 end
 
--- ResolveSpellActivation historically discovers an initial target, then the
--- canonical activation snapshot immediately rebuilds the complete candidate
--- set. A frozen planner proxy needs the latter but not the redundant first
--- discovery. Normal spellcasts retain the original behavior.
-if type(Client.ResolveSpellActivationTargetUnit) == "function"
-    and Client._autopilotDeferredInitialTargetInstalled ~= true
-then
-    local baseResolveSpellActivationTargetUnit = Client.ResolveSpellActivationTargetUnit
-    function Client:ResolveSpellActivationTargetUnit(activation, targetGroup)
-        if rawget(self, "__autopilotPlannerProxy") == true then
-            return nil
-        end
-        return baseResolveSpellActivationTargetUnit(self, activation, targetGroup)
-    end
-    Client._autopilotDeferredInitialTargetInstalled = true
-end
-
 local function normalizeEventId(value)
     local eventId = math.floor(tonumber(value) or 0)
     return eventId > 0 and eventId or 0
@@ -476,6 +459,14 @@ end
 
 function Planner.Step(state, deadlineMs)
     if type(state) ~= "table" then
+        return true
+    end
+    if type(Planner.IsConfigurationSnapshotStale) == "function"
+        and Planner.IsConfigurationSnapshotStale(state) == true
+    then
+        state.failureReason = "configuration-changed"
+        state.phase = "complete"
+        state.result = nil
         return true
     end
 

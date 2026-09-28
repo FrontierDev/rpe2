@@ -985,14 +985,20 @@ function Client:CancelSpellTargeting(reason)
     return true
 end
 
-function Client:ResolveSpellActivation(spellRef)
+function Client:ResolveSpellActivation(spellRef, options)
     local sessionState = self.GetState and self:GetState() or nil
     local eventState = self.GetEventState and self:GetEventState() or nil
     if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true then
         return nil
     end
 
-    local casterUnit = self.ResolveActiveSpellcasterUnit and self:ResolveActiveSpellcasterUnit(eventState) or nil
+    local explicitCasterEventId = math.floor(tonumber(type(options) == "table" and options.casterEventId) or 0)
+    local casterUnit = nil
+    if explicitCasterEventId > 0 then
+        casterUnit = findEventUnitById(eventState.units, explicitCasterEventId)
+    elseif type(self.ResolveActiveSpellcasterUnit) == "function" then
+        casterUnit = self:ResolveActiveSpellcasterUnit(eventState)
+    end
     if type(casterUnit) == "table" and type(self.ResolveLocalActiveSpellcasterResources) == "function" then
         local resolvedResources = self:ResolveLocalActiveSpellcasterResources(eventState, casterUnit, {
             applyFallbackToUnit = true,

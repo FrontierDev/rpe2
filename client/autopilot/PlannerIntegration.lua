@@ -13,6 +13,7 @@ local SequencePlanning = Client.AutopilotSequencePlanning or {}
 local TargetSelector = Client.AutopilotTargetSelector or {}
 local MovementSolver = Client.AutopilotMovementSolver or {}
 local Spatial = Client.AutopilotSpatial or {}
+local Ruleset = Addon.Internal.Ruleset or {}
 local Event = Addon.Internal
     and Addon.Internal.Database
     and Addon.Internal.Database.Classes
@@ -473,6 +474,14 @@ local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
+local function getActiveRulesetId()
+    if type(Ruleset.GetActiveRulesetId) == "function" then
+        return tostring(Ruleset.GetActiveRulesetId() or "")
+    end
+    local activeRuleset = type(Ruleset.GetActiveRuleset) == "function" and Ruleset.GetActiveRuleset() or nil
+    return tostring(type(activeRuleset) == "table" and activeRuleset.id or "")
+end
+
 local function buildFrozenClientProxy(frozenEventState)
     return setmetatable({
         GetEventState = function()
@@ -615,11 +624,12 @@ local PLANNER_REJECTION_TEXT = {
     ["insufficient-resources"] = "spell resources are insufficient",
     ["conditions"] = "authored spell conditions are not satisfied",
     ["basic-attack-type"] = "another basic-attack damage type was already used this turn",
+    ["activation-channel-metadata-missing"] = "internal activation channel metadata is missing",
     ["illegal-activation"] = "spell activation is currently illegal",
     ["not-useful"] = "projected effect has zero utility",
 }
 
-local function buildPlannerRejectionDetail(code, activation)
+local function buildPlannerRejectionDetail(state, code, activation)
     local detail = PLANNER_REJECTION_TEXT[code] or code:gsub("%-", " ")
     if code == "conditions" and type(activation) == "table" then
         local conditionState = activation.conditionState
@@ -627,6 +637,20 @@ local function buildPlannerRejectionDetail(code, activation)
         if failureText ~= "" then
             detail = detail .. ": " .. failureText
         end
+    end
+    if code == "invalid-cooldown-channel" and type(activation) == "table" then
+        local spell = type(activation.spell) == "table" and activation.spell or {}
+        local snapshot = type(state) == "table" and state.snapshot or {}
+        detail = detail .. (" [authored=%s resolvedId=%s resolvedName=%s configured=%s activeRuleset=%s plannerRevision=%s currentRevision=%s]")
+            :format(
+                tostring(activation.authoredCooldownChannel or spell.cooldownChannel or ""),
+                tostring(activation.cooldownChannelId or ""),
+                tostring(activation.cooldownChannelName or ""),
+                tostring(activation.cooldownChannelConfigured == true),
+                tostring(snapshot.activeRulesetId or ""),
+                tostring(snapshot.configurationRevision or ""),
+                tostring(getConfigurationRevision())
+            )
     end
     return detail
 end
@@ -640,7 +664,7 @@ local function recordPlannerRejection(state, eventId, spellRef, reason, activati
     state.scratch.plannerRejectionsByEventId[normalizedEventId] = entries
     local definition = state.scratch.spellDefinitionByRef and state.scratch.spellDefinitionByRef[tostring(spellRef or "")] or nil
     local spellLabel = tostring(type(definition) == "table" and definition.name or spellRef or "Spell")
-    local detail = spellLabel .. ": " .. buildPlannerRejectionDetail(code, activation)
+    local detail = spellLabel .. ": " .. buildPlannerRejectionDetail(state, code, activation)
     for index = 1, #entries do
         if entries[index] == detail then return end
     end
@@ -883,6 +907,8 @@ local function buildSnapshotResult(state)
         actorKey = state.actorKey,
         actorKeys = copyArray(state.actorKeys),
         scheduleRevision = state.scheduleRevision,
+        configurationRevision = state.snapshot.configurationRevision,
+        activeRulesetId = state.snapshot.activeRulesetId,
         members = members,
         playerPositions = playerPositions,
         actorPositions = actorPositions,
@@ -2010,6 +2036,9 @@ local function phaseRevalidate(state, deadlineMs)
     -- reactions can legitimately alter resources, auras, and health while it
     -- is being calculated; those changes must not cancel the step's plan.
     -- Step changes are still rejected by Client:IsAutopilotPlanStateStale.
+    if Planner.IsConfigurationSnapshotStale(state) == true then
+        state.failureReason = "configuration-changed"
+    end
     state.phase = "finalize"
     return true
 end
@@ -2072,6 +2101,8 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
     end
 
     state.sourceEventState = eventState
+    state.configurationRevision = getConfigurationRevision()
+    state.activeRulesetId = getActiveRulesetId()
     state.phase = "validate"
     state.snapshot = {
         eventState = cloneEventShell(eventState),
@@ -2087,7 +2118,8 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         controlStateByTargetEventId = {},
         activeCastSummaries = {},
         activeCastsByEventId = {},
-        configurationRevision = getConfigurationRevision(),
+        configurationRevision = state.configurationRevision,
+        activeRulesetId = state.activeRulesetId,
         auraRevision = getAuraRevision(eventState.id),
         spatialRuntime = {
             eventId = tostring(eventState.id or ""),
@@ -2213,6 +2245,12 @@ end
 
 function Planner.Step(state, deadlineMs)
     if type(state) ~= "table" then
+        return true
+    end
+    if Planner.IsConfigurationSnapshotStale(state) == true then
+        state.failureReason = "configuration-changed"
+        state.phase = "complete"
+        state.result = nil
         return true
     end
     local startedAt = nowMilliseconds()
@@ -2364,13 +2402,28 @@ function Planner.IsFrozenSnapshotStale(state)
     return false
 end
 
+function Planner.IsConfigurationSnapshotStale(state)
+    local snapshot = type(state) == "table" and state.snapshot or nil
+    if type(snapshot) ~= "table" then
+        return true
+    end
+    return getConfigurationRevision() ~= math.max(0, math.floor(tonumber(snapshot.configurationRevision) or 0))
+        or getActiveRulesetId() ~= tostring(snapshot.activeRulesetId or "")
+end
+
 local baseIsAutopilotPlanStateStale = Client.IsAutopilotPlanStateStale
 if type(baseIsAutopilotPlanStateStale) == "function" then
     function Client:IsAutopilotPlanStateStale(state)
         if baseIsAutopilotPlanStateStale(self, state) == true then
             return true
         end
-        return Planner.IsFrozenSnapshotStale(state) == true
+        return Planner.IsConfigurationSnapshotStale(state) == true
+            or Planner.IsFrozenSnapshotStale(state) == true
+    end
+else
+    function Client:IsAutopilotPlanStateStale(state)
+        return Planner.IsConfigurationSnapshotStale(state) == true
+            or Planner.IsFrozenSnapshotStale(state) == true
     end
 end
 

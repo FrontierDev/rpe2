@@ -23,30 +23,6 @@ if type(basePlannerStep) ~= "function" then
     return
 end
 
--- PlannerPreparationPerformance temporarily skipped the canonical initial-target
--- resolver for frozen planner proxies. That shortcut changes the condition
--- context because spell conditions are evaluated before the later candidate
--- collection pass. Preserve the canonical resolver exactly for planner proxies;
--- the prepared registry caches still remove the expensive first-use scans.
-local preparedResolveSpellActivationTargetUnit = Client.ResolveSpellActivationTargetUnit
-if type(preparedResolveSpellActivationTargetUnit) == "function"
-    and Client._autopilotCanonicalInitialTargetRestored ~= true
-then
-    function Client:ResolveSpellActivationTargetUnit(activation, targetGroup)
-        if rawget(self, "__autopilotPlannerProxy") == true then
-            rawset(self, "__autopilotPlannerProxy", nil)
-            local results = { pcall(preparedResolveSpellActivationTargetUnit, self, activation, targetGroup) }
-            rawset(self, "__autopilotPlannerProxy", true)
-            if results[1] ~= true then
-                error(results[2], 0)
-            end
-            return results[2]
-        end
-        return preparedResolveSpellActivationTargetUnit(self, activation, targetGroup)
-    end
-    Client._autopilotCanonicalInitialTargetRestored = true
-end
-
 local function nowMilliseconds()
     if type(debugprofilestop) == "function" then
         return tonumber(debugprofilestop()) or 0
@@ -331,6 +307,14 @@ local function logSnapshotBreakdown(state)
 end
 
 local function runPlannerStep(state, deadlineMs)
+    if type(Planner.IsConfigurationSnapshotStale) == "function"
+        and Planner.IsConfigurationSnapshotStale(state) == true
+    then
+        state.failureReason = "configuration-changed"
+        state.phase = "complete"
+        state.result = nil
+        return true
+    end
     local entryPhase = tostring(state.phase or "")
     if entryPhase == "snapshot-units" then
         local startedAt = nowMilliseconds()

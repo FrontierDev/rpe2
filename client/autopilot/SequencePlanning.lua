@@ -278,13 +278,13 @@ local function buildActionEconomyInput(candidate)
     local activation = type(candidate) == "table" and candidate.activationSnapshot or nil
     local spell = type(activation) == "table" and activation.spell or nil
     if type(ActionEconomy.CreateInput) ~= "function" or type(activation) ~= "table" or type(spell) ~= "table" then
-        return nil
+        return nil, "activation-snapshot-missing"
     end
 
     if type(Spellcasting.ResolvePersistentCastTurns) ~= "function"
         or type(Spellcasting.NormalizeTurnCount) ~= "function"
     then
-        return nil
+        return nil, "spellcasting-helpers-unavailable"
     end
 
     local persistentCastTurns = Spellcasting.ResolvePersistentCastTurns(spell)
@@ -330,17 +330,29 @@ function SequencePlanning.BuildSequence(candidates, unit)
     end
 
     local inputs = {}
+    local rejected = {}
     for index = 1, #(candidates or {}) do
-        local input = buildActionEconomyInput(candidates[index])
+        local candidate = candidates[index]
+        local input, reason = buildActionEconomyInput(candidate)
         if type(input) == "table" then
             inputs[#inputs + 1] = input
+        else
+            rejected[#rejected + 1] = {
+                spellRef = tostring(type(candidate) == "table" and candidate.spellRef or ""),
+                inputIndex = index,
+                reason = reason or "candidate-unavailable",
+            }
         end
     end
 
-    return ActionEconomy.BuildSequence(inputs, {
+    local sequence = ActionEconomy.BuildSequence(inputs, {
         availableResources = buildAvailableResources(unit),
         compareCandidates = SpellEvaluator.CompareCandidates,
     })
+    for index = 1, #rejected do
+        sequence.rejected[#sequence.rejected + 1] = rejected[index]
+    end
+    return sequence
 end
 
 local function reserveCandidateHealing(ledger, candidate, context)

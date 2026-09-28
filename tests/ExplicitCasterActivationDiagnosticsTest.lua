@@ -24,6 +24,7 @@ local eventState
 local onCasterTurn = true
 local spells = {}
 local npc
+local resolvedCasterEventId = nil
 
 local Addon = {
     Client = {
@@ -65,7 +66,8 @@ local Addon = {
         GetSpellcastEntry = function()
             return nil
         end,
-        ResolveSpellActivation = function(_, spellRef)
+        ResolveSpellActivation = function(_, spellRef, options)
+            resolvedCasterEventId = type(options) == "table" and options.casterEventId or nil
             local spell = spells[spellRef]
             if not spell then return nil end
             return {
@@ -160,6 +162,7 @@ Addon.Client.CooldownsByEventId[eventState.id] = {
 }
 local channel = assertFailed("channel", "channel-cooldown")
 assertEqual(channel.channelCooldownRemaining, 2, "channel cooldown details are preserved")
+assertEqual(resolvedCasterEventId, npc.eventID, "canonical activation receives the requested explicit caster")
 
 resetState()
 Addon.Client.CooldownsByEventId[eventState.id] = {
@@ -205,6 +208,10 @@ local Planner = Addon.Client.AutopilotPlanner
 assertTrue(type(Planner.RecordPlannerRejection) == "function", "planner rejection recorder is available")
 
 local plannerState = {
+    snapshot = {
+        configurationRevision = 0,
+        activeRulesetId = "",
+    },
     scratch = {
         plannerRejectionsByEventId = {},
         spellDefinitionByRef = {
@@ -222,5 +229,12 @@ assertTrue(
     not string.find(plannerDiagnostic, "activation snapshot could not be built", 1, true),
     "canonical activation failures are not relabeled as unavailable"
 )
+
+assertTrue(Planner.IsConfigurationSnapshotStale(plannerState) == false, "matching planner configuration remains valid")
+Addon.Internal.ConfigurationRevision = 1
+assertTrue(Planner.IsConfigurationSnapshotStale(plannerState) == true, "configuration revision invalidates planner state")
+Addon.Internal.ConfigurationRevision = 0
+Addon.Internal.Ruleset.GetActiveRulesetId = function() return "other-ruleset" end
+assertTrue(Planner.IsConfigurationSnapshotStale(plannerState) == true, "active ruleset change invalidates planner state")
 
 print("ExplicitCasterActivationDiagnosticsTest passed")
