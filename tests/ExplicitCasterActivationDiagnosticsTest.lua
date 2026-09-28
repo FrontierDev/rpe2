@@ -153,6 +153,11 @@ end
 
 local function resetState()
     Addon.Client.CooldownsByEventId = {}
+    -- GetEventCooldownBucket caches the inherited cooldown table onto the
+    -- planner proxy. Clear that per-proxy reference whenever the canonical
+    -- client cooldown table is replaced so each diagnostic case observes the
+    -- state it just installed.
+    plannerProxy.CooldownsByEventId = nil
     onCasterTurn = true
 end
 
