@@ -71,6 +71,11 @@ Spells:
 - Shield Block — `7bbb4cb9:g36ujwt9`
 - Shield Bash — `7bbb4cb9:ti2j4umn`
 
+Models:
+
+- FileDataID `1711518`, DisplayID `79677`
+- FileDataID `1711518`, DisplayID `79678`
+
 ### Destroyer
 
 An aggressive Normal Felguard that trades durability for offensive pressure.
@@ -93,6 +98,12 @@ Spells:
 - Rage Attack — `f82db71a:npcrage1`
 - Cleave — `7bbb4cb9:e0mooybr`
 - Demoralizing Shout — `7bbb4cb9:demoshot`
+
+Models:
+
+- FileDataID `1100490`
+- Multiple DisplayIDs are valid for this model family; `64802` must not be used.
+- The import intentionally uses the FileDataID-only appearance until the allowed DisplayID set is explicitly enumerated.
 
 ### Lieutenant
 
@@ -118,6 +129,14 @@ Spells:
 - Battle Shout — `7bbb4cb9:9gh28pe5`
 - Mortal Strike — `7bbb4cb9:0jiq0uoc`
 - Multiattack — `f82db71a:npcmulti`
+
+Models:
+
+- FileDataID `1279257`, DisplayID `64753`
+- FileDataID `1279257`, DisplayID `64754`
+- FileDataID `1279257`, DisplayID `64755`
+- FileDataID `1279257`, DisplayID `65792`
+- FileDataID `1279257`, DisplayID `73411`
 
 At Level 60 the Lieutenant resolves to 10,500 authored Health, 3,987.5 Armor and 750 Melee Attack Power. With the current five-player scaling for Elite units, that is approximately 15,750 runtime Health before event difficulty modifiers.
 
@@ -153,6 +172,16 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Legionnaire",
                 challengeLevel = "normal",
+                appearances = {
+                    {
+                        displayId = 79677,
+                        fileDataId = 1711518,
+                    },
+                    {
+                        displayId = 79678,
+                        fileDataId = 1711518,
+                    },
+                },
                 resourceModifiers = {
                     {
                         resourceRef = "f82db71a:q2ktkztt",
@@ -201,6 +230,11 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Destroyer",
                 challengeLevel = "normal",
+                appearances = {
+                    {
+                        fileDataId = 1100490,
+                    },
+                },
                 resourceModifiers = {
                     {
                         resourceRef = "f82db71a:q2ktkztt",
@@ -243,6 +277,28 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Lieutenant",
                 challengeLevel = "elite",
+                appearances = {
+                    {
+                        displayId = 64753,
+                        fileDataId = 1279257,
+                    },
+                    {
+                        displayId = 64754,
+                        fileDataId = 1279257,
+                    },
+                    {
+                        displayId = 64755,
+                        fileDataId = 1279257,
+                    },
+                    {
+                        displayId = 65792,
+                        fileDataId = 1279257,
+                    },
+                    {
+                        displayId = 73411,
+                        fileDataId = 1279257,
+                    },
+                },
                 resourceModifiers = {
                     {
                         resourceRef = "f82db71a:q2ktkztt",
