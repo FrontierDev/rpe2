@@ -264,11 +264,42 @@ local function applyClientResourceDeltasToServerState(server, state, clientName,
         end
     end
 
-    if eventUpdated and type(server.AdvanceLiveUnitRevision) == "function" then
-        server:AdvanceLiveUnitRevision("resource-delta")
-    end
+    -- Accept a valid client command even when it only affects the draft/cache;
+    -- only a live EventUnit change is eligible for the authoritative broadcast.
+    return true, eventUpdated, targetUnit
+end
 
-    return true
+local function publishAuthoritativeResourceMutation(server, targetEventId, clientName)
+    local eventState = server and server.EventState or nil
+    if type(eventState) ~= "table" or eventState.active ~= true then
+        return false
+    end
+    local targetUnit = findEventUnitById(eventState.units, targetEventId)
+    if not targetUnit then
+        local normalizedName = Common.NormalizeName(clientName)
+        for index = 1, #(eventState.units or {}) do
+            local unit = eventState.units[index]
+            local ownerName = Common.NormalizeName(unit and (unit.ownerID or unit.controllerID or unit.name) or nil)
+            if normalizedName ~= "" and ownerName == normalizedName then
+                targetUnit = unit
+                break
+            end
+        end
+    end
+    if not targetUnit then
+        return false
+    end
+    if type(server.BroadcastEventDeltaBatch) ~= "function" then
+        if Debug and Debug.Error then
+            Debug.Error("Resource mutation was committed without the Event Unit delta broadcaster.")
+        end
+        return false
+    end
+    return server:BroadcastEventDeltaBatch({ {
+        operation = "upsert",
+        eventID = tonumber(targetUnit.eventID) or 0,
+        unit = targetUnit,
+    } }, false) == true
 end
 
 Server.State = Server.State or nil
@@ -608,8 +639,8 @@ function Server:HandleResource(arguments, sender)
         return true
     end
 
-    if eventUpdated and type(self.AdvanceLiveUnitRevision) == "function" then
-        self:AdvanceLiveUnitRevision("resource-sync")
+    if eventUpdated then
+        publishAuthoritativeResourceMutation(self, targetEventId, clientName)
     end
 
     return true
@@ -637,7 +668,17 @@ function Server:HandleResourceDelta(arguments, sender)
     local resourceDeltas = ResourceSync.NormalizeResourceDeltas and ResourceSync.NormalizeResourceDeltas(arguments and arguments[3] or "") or {}
     local handled = false
     if type(resourceDeltas) == "table" and #resourceDeltas > 0 then
-        handled = applyClientResourceDeltasToServerState(self, state, clientName, targetEventId, resourceDeltas)
+        local applied, eventUpdated = applyClientResourceDeltasToServerState(
+            self,
+            state,
+            clientName,
+            targetEventId,
+            resourceDeltas
+        )
+        if eventUpdated then
+            publishAuthoritativeResourceMutation(self, targetEventId, clientName)
+        end
+        handled = applied or handled
     end
     local threatUpdates = deserializeThreatUpdates(arguments and arguments[5] or "", "RESOURCE_DELTA", sender)
     if type(threatUpdates) == "table" and #threatUpdates > 0 then
@@ -693,13 +734,17 @@ function Server:HandleResourceDeltaBatch(arguments, sender)
 
     local handled = false
     for index = 1, #deltaOrder do
-        handled = applyClientResourceDeltasToServerState(
+        local applied, eventUpdated = applyClientResourceDeltasToServerState(
             self,
             state,
             clientName,
             deltaOrder[index],
             deltasByTargetEventId[deltaOrder[index]]
-        ) or handled
+        )
+        if eventUpdated then
+            publishAuthoritativeResourceMutation(self, deltaOrder[index], clientName)
+        end
+        handled = applied or handled
     end
 
     local threatUpdates = deserializeThreatUpdates(arguments and arguments[4] or "", "RESOURCE_DELTA_BATCH", sender)

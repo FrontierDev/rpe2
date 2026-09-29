@@ -393,6 +393,21 @@ function Client:StartAutopilotStep(eventStateOverride)
             if type(Planner.ReleaseScratch) == "function" then
                 Planner.ReleaseScratch(jobState)
             end
+
+            -- A frozen-state change (for example an NPC becoming inactive)
+            -- invalidates only this disposable plan.  Rebuild the current step
+            -- immediately from the authoritative event state so the planner
+            -- cannot remain stuck in cancelled-stale until a manual replan.
+            local normalizedReason = tostring(cancelReason or "")
+            if string.find(normalizedReason, "stale", 1, true)
+                and type(Server.EventState) == "table"
+                and isHostAutopilotEvent(Server.EventState)
+                and getEventId(Server.EventState) == tostring(jobState and jobState.eventId or "")
+                and tonumber(Server.EventState.turnNumber) == tonumber(jobState and jobState.turnNumber)
+                and tonumber(Server.EventState.tickNumber) == tonumber(jobState and jobState.tickNumber)
+            then
+                Client:StartAutopilotStep(Server.EventState)
+            end
         end,
         onComplete = function(jobState)
             local jobPlan = jobState and jobState.planRecord or nil

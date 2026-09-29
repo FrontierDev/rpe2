@@ -185,18 +185,19 @@ local function buildThreatSignature(values)
     return table.concat(records, "\29")
 end
 
-local function buildUnitFrozenSignature(unit)
+local function buildUnitFrozenSignature(unit, tauntState)
     return table.concat({
         tostring(normalizeEventId(unit and unit.eventID)),
         unit and unit.isPlayer == true and "1" or "0",
         tostring(unit and unit.active ~= false and 1 or 0),
         tostring(unit and unit.dead == true and 1 or 0),
+        tostring(unit and unit.hidden == true and 1 or 0),
         tostring(tonumber(unit and unit.team) or 0),
         tostring(normalizeRaidMarker(unit and unit.raidMarker)),
         buildEntryListSignature(unit and unit.resources, { "resourceRef", "currentValue", "maxValue" }),
         buildEntryListSignature(unit and unit.stats, { "statRef", "value", "currentValue" }),
         buildThreatSignature(unit and unit.threatTable),
-        buildTauntSignature(unit and unit.tauntState),
+        buildTauntSignature(tauntState ~= nil and tauntState or unit and unit.tauntState),
     }, "\31")
 end
 
@@ -2388,10 +2389,8 @@ function Planner.IsFrozenSnapshotStale(state)
         local liveUnit = liveByEventId[eventId]
         local liveTauntState = getHostLocalTauntState(liveEventState, eventId)
         if type(liveUnit) ~= "table"
-            or buildThreatSignature(frozenUnit and frozenUnit.threatTable)
-                ~= buildThreatSignature(liveUnit and liveUnit.threatTable)
-            or buildTauntSignature(frozenUnit and frozenUnit.tauntState)
-                ~= buildTauntSignature(liveTauntState)
+            or buildUnitFrozenSignature(frozenUnit)
+                ~= buildUnitFrozenSignature(liveUnit, liveTauntState)
         then
             return true
         end

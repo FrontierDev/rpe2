@@ -165,13 +165,16 @@ Addon.Internal.Comms.ResourceSync.CloneResources = function(resources) return re
 Server.State = { active = true, channelName = "channel", clientsByName = {}, clientOrder = {} }
 Server.EventState = { active = true, units = { resourceTarget }, liveUnitRevision = 7 }
 Server.EventDraftState = { units = { resourceDraftTarget } }
-Server.AdvanceLiveUnitRevision = function(self)
+local resourceBroadcastEntries = nil
+Server.BroadcastEventDeltaBatch = function(self, entries)
+    resourceBroadcastEntries = entries
     self.EventState.liveUnitRevision = self.EventState.liveUnitRevision + 1
-    return self.EventState.liveUnitRevision
+    return true
 end
 assertTrue(Server:HandleResourceDelta({ "channel", "PlayerA", "resource", 3 }, "PlayerA"), "server accepts resource delta")
 assertEqual(resourceTarget.resources.health.currentValue, 6, "authoritative event HP is committed")
 assertEqual(Server.EventState.liveUnitRevision, 8, "authoritative resource commit advances live-unit revision")
+assertEqual(resourceBroadcastEntries[1].unit.resources.health.currentValue, 6, "resource commit is published in the authoritative unit delta")
 
 Addon.Internal.Comms.ResourceSync.NormalizeResources = function()
     return { { resourceRef = "health", currentValue = 4, maxValue = 10 } }
@@ -184,6 +187,7 @@ Addon.Internal.Comms.ResourceSync.ApplyResourcesToEventUnitByEventID = function(
 end
 assertTrue(Server:HandleResource({ "channel", "PlayerA", "resources", 3 }, "PlayerA"), "server accepts full resource sync")
 assertEqual(Server.EventState.liveUnitRevision, 9, "full authoritative resource sync advances live-unit revision")
+assertEqual(resourceBroadcastEntries[1].unit.resources[1].currentValue, 4, "full resource sync is published in the authoritative unit delta")
 
 -- Exercise the real Event Unit delta codec and client application path with a
 -- separate remote client runtime. The remote meter must only see the table
@@ -279,5 +283,12 @@ local frozenState = {
 assertTrue(not Planner.IsFrozenSnapshotStale(frozenState), "matching frozen threat table remains valid")
 frozenState.sourceEventState.units[2].threatTable[4] = 251
 assertTrue(Planner.IsFrozenSnapshotStale(frozenState), "threat-only change invalidates frozen plan")
+frozenState.sourceEventState.units[2].threatTable[4] = 250
+assertTrue(not Planner.IsFrozenSnapshotStale(frozenState), "restored frozen state remains valid")
+frozenState.sourceEventState.units[2].active = false
+assertTrue(Planner.IsFrozenSnapshotStale(frozenState), "unit activation change invalidates frozen plan")
+frozenState.sourceEventState.units[2].active = true
+frozenState.sourceEventState.units[2].hidden = true
+assertTrue(Planner.IsFrozenSnapshotStale(frozenState), "unit visibility change invalidates frozen plan")
 
 print("Threat synchronization tests passed")

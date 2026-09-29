@@ -66,14 +66,22 @@ Combat.CloneValue = function(_, value) return value end
 local request = { "check-1", "event", 10, 20, "spell", "component", 12, 4, "hit" }
 assertTrue(Combat:HandleDamageHitCheckRequest(Client, request, "Attacker"), "valid request is accepted")
 assertEqual(sent[#sent].opcode, opcodes.COMBAT_HIT_CHECK_ACK, "valid request sends an acknowledgement")
+assertEqual(Client.ActiveCombatReactionEntry.checkId, "check-1", "first received hit check activates one reaction")
 assertTrue(Combat:HandleDamageHitCheckRequest(Client, request, "Attacker"), "duplicate request is accepted idempotently")
 assertEqual(sent[#sent].opcode, opcodes.COMBAT_HIT_CHECK_ACK, "duplicate request is acknowledged again")
-assertEqual(#Client.CombatReactionQueue, 0, "duplicate request is not queued twice")
+assertEqual(Client.ActiveCombatReactionEntry.checkId, "check-1", "retried hit check leaves the original reaction active")
+assertEqual(#Client.CombatReactionQueue, 0, "retried hit check is not queued twice")
 
 eventState.active = false
 assertTrue(not Combat:HandleDamageHitCheckRequest(Client, { "check-reject", "event", 10, 20, "spell", "component", 12, 4, "hit" }, "Attacker"), "stale request is rejected")
 assertEqual(sent[#sent].opcode, opcodes.COMBAT_HIT_CHECK_REJECT, "stale request sends explicit rejection")
+assertEqual(sent[#sent].arguments[3], "event-inactive", "rejection preserves its explicit reason")
 eventState.active = true
+
+local rejectedPending = { checkId = "check-rejected", eventId = "event", requestTargetName = "Defender", eventState = eventState }
+Client:SetPendingCombatHitCheck(rejectedPending)
+assertTrue(Combat:HandleDamageHitCheckReject(Client, { "check-rejected", "event", "event-inactive" }, "Defender"), "sender consumes explicit rejection")
+assertEqual(Client:GetPendingCombatHitCheck("check-rejected"), nil, "explicit rejection terminates the pending hit check")
 
 local pending = {
     checkId = "check-retry", eventId = "event", attackerEventId = 10, defenderEventId = 20,
@@ -91,12 +99,20 @@ local earlyOutcome = {
     eventState = eventState, defenderUnit = eventState.units[2], attackerUnit = eventState.units[1],
     turnNumber = 1, tickNumber = 0, defenceSystem = "simple",
 }
+local appliedOutcomeCount = 0
+Combat.ApplyResolvedDamage = function()
+    appliedOutcomeCount = appliedOutcomeCount + 1
+    return true, { appliedDelta = -4, resourceDeltas = {} }
+end
 Client:SetPendingCombatHitCheck(earlyOutcome)
 assertTrue(Combat:HandleCombatDamageResolved(Client, { "out-of-order", "event", "physical", "-4", "1" }, "Defender"), "early outcome is buffered")
 assertTrue(type(earlyOutcome.pendingDamageOutcome) == "table", "early outcome is retained until hit response")
 assertTrue(Combat:HandleDamageHitCheckResponse(Client, { "out-of-order", "event", "pass", "", "" }, "Defender"), "later hit response consumes buffered outcome")
 assertEqual(Client:GetPendingCombatHitCheck("out-of-order"), nil, "buffered outcome completes exactly one hit transaction")
+assertEqual(appliedOutcomeCount, 1, "first damage outcome applies resources exactly once")
 assertEqual(sent[#sent].opcode, opcodes.COMBAT_DAMAGE_RESOLVED_ACK, "outcome is ACKed only after completion")
+assertTrue(Combat:HandleCombatDamageResolved(Client, { "out-of-order", "event", "physical", "-4", "1" }, "Defender"), "resent outcome is acknowledged idempotently")
+assertEqual(appliedOutcomeCount, 1, "resent damage outcome cannot apply resources twice")
 
 Client.PendingCombatDamageOutcomes = {
     ["damage-1"] = {
@@ -113,10 +129,10 @@ assertTrue(Combat:HandleCombatDamageResolvedAck(Client, { "damage-1", "event" },
 assertEqual(Client.PendingCombatDamageOutcomes["damage-1"], nil, "outcome ACK clears retry state")
 
 Client.ActiveCombatReactionEntry = { checkId = "stale", eventId = "event", eventState = eventState, turnNumber = 1, tickNumber = 0, createdAtMs = 0 }
-Client.CombatReactionQueue = { { checkId = "next", eventId = "event", eventState = eventState, turnNumber = 1, tickNumber = 0, createdAtMs = 1 } }
+Client.CombatReactionQueue = { { checkId = "next", eventId = "event", eventState = eventState, turnNumber = 1, tickNumber = 0, createdAtMs = 15999 } }
 Client:PruneCombatReactionTransactions("test", 16000)
-assertEqual(Client.ActiveCombatReactionEntry, nil, "expired active reaction is cleared")
-assertEqual(#Client.CombatReactionQueue, 0, "expired queued reaction is cleared")
+assertEqual(Client.ActiveCombatReactionEntry.checkId, "next", "stale active reaction promotes the next valid queued reaction")
+assertEqual(#Client.CombatReactionQueue, 0, "promoted reaction is removed from the queue")
 
 Client:SetPendingCombatHitCheck({ checkId = "event-end", eventId = "event", eventState = eventState })
 Client.ActiveCombatReactionEntry = { checkId = "event-end-active", eventId = "event" }

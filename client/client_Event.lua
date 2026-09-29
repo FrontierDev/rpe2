@@ -3466,10 +3466,15 @@ function Client:HandleEventUnitDeltaBatch(arguments)
         eventState.liveUnitRevision = receivedRevision
     end
 
-    if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
+    -- Revisioned unit deltas are the authoritative resource transport.  Do not
+    -- merge a local profile/cache over them after accepting the delta.
+    if receivedRevision <= 0 and ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
         ResourceSync.ApplyTrackedPlayerResourcesToEventUnits(sessionState.membersByName, eventState.units)
     end
-    applyLocalProfileResourcesToEventUnits(sessionState, eventState.units)
+    applyLocalProfileResourcesToEventUnits(sessionState, eventState.units, {
+        preserveInboundResources = receivedRevision > 0,
+        skipProfileFallback = receivedRevision > 0,
+    })
     if ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(eventState)
     end

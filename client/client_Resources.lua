@@ -1985,6 +1985,18 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
     return true
 end
 
+-- Resource packets are client-to-server commands.  Once an event has entered
+-- the revisioned unit stream, peers must not apply those commands directly:
+-- the server publishes the committed unit as an Event Unit delta instead.
+-- This keeps an old channel packet from overwriting a newer repair snapshot.
+local function shouldDeferPeerResourceMutationToEventDelta(client)
+    local eventState = client and client.GetEventState and client:GetEventState()
+        or client and client.EventState
+    return type(eventState) == "table"
+        and eventState.active == true
+        and math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) > 0
+end
+
 function Client:SendClientResourceDeltas(state, reason, playerNameOverride, resourceDeltasOverride, targetEventIdOverride, options)
     if not state or state.active ~= true then
         if Debug and Debug.Error then
@@ -2030,7 +2042,10 @@ function Client:SendClientResourceDeltas(state, reason, playerNameOverride, reso
     end
 
     local targetEventId = tonumber(targetEventIdOverride) or nil
-    local allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true or false
+    local allowLocalEchoApply = type(options) == "table"
+        and options.allowLocalEchoApply == true
+        and not shouldDeferPeerResourceMutationToEventDelta(self)
+        or false
     local threatUpdates = filterThreatUpdatesForEvent(
         type(options) == "table" and options.threatUpdates or nil,
         self.GetEventState and self:GetEventState() or self.EventState
@@ -2135,7 +2150,10 @@ function Client:SendClientResourceDeltaBatch(state, reason, playerNameOverride, 
         return false
     end
 
-    local allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true or false
+    local allowLocalEchoApply = type(options) == "table"
+        and options.allowLocalEchoApply == true
+        and not shouldDeferPeerResourceMutationToEventDelta(self)
+        or false
     local threatUpdates = filterThreatUpdatesForEvent(
         type(options) == "table" and options.threatUpdates or nil,
         self.GetEventState and self:GetEventState() or self.EventState
@@ -2230,6 +2248,14 @@ function Client:HandleResource(arguments, sender)
         return false
     end
 
+    local eventState = self:GetEventState()
+    if shouldDeferPeerResourceMutationToEventDelta(self) then
+        if Debug and Debug.Internal then
+            Debug.Internal("RESOURCE receive deferred to authoritative Event Unit delta.")
+        end
+        return true
+    end
+
     local targetEventId = tonumber(arguments and arguments[4]) or 0
     local resourcePayload = arguments and arguments[3] or ""
     local resourceSignature = table.concat({
@@ -2255,7 +2281,6 @@ function Client:HandleResource(arguments, sender)
     local resources = ResourceSync.NormalizeResources and ResourceSync.NormalizeResources(resourcePayload) or {}
     local targetUnitIsPlayer = false
     local resourceOwnerName = playerName
-    local eventState = self:GetEventState()
     if eventState and targetEventId > 0 then
         for index = 1, #((eventState.units) or {}) do
             local unit = eventState.units[index]
@@ -2383,6 +2408,12 @@ function Client:HandleResourceDelta(arguments, sender)
         end
         return false
     end
+    if shouldDeferPeerResourceMutationToEventDelta(self) then
+        if Debug and Debug.Internal then
+            Debug.Internal("RESOURCE_DELTA receive deferred to authoritative Event Unit delta.")
+        end
+        return true
+    end
     local transportActionOwner = getTrustedTransportActionOwner(arguments, sender)
 
     local targetEventId = tonumber(arguments and arguments[4]) or 0
@@ -2491,6 +2522,12 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
             Debug.Error("RESOURCE_DELTA_BATCH receive ignored: player name is empty for sender=%s.", tostring(sender or "unknown"))
         end
         return false
+    end
+    if shouldDeferPeerResourceMutationToEventDelta(self) then
+        if Debug and Debug.Internal then
+            Debug.Internal("RESOURCE_DELTA_BATCH receive deferred to authoritative Event Unit delta.")
+        end
+        return true
     end
     local transportActionOwner = getTrustedTransportActionOwner(arguments, sender)
 

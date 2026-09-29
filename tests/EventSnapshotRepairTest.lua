@@ -38,6 +38,7 @@ local function loadAddonFile(path)
 end
 
 loadAddonFile("client/client_Event.lua")
+loadAddonFile("client/client_Resources.lua")
 
 local Client = Addon.Client
 local Event = Addon.Internal.Database.Classes.Event
@@ -105,5 +106,15 @@ assertEqual(Client:HandleEventUnits({ "channel", "event", "stale-snapshot", 4 })
 assertEqual(eventState.liveUnitRevision, 5, "stale snapshot cannot roll back revision")
 assertEqual(eventState.units[1].resources[1].currentValue, 5, "stale snapshot cannot roll back HP")
 assertEqual(Client.EventSnapshotRepairRequestedRevision, 6, "stale snapshot cannot cancel newer repair")
+
+-- Channel resource commands are not an authority after a revisioned snapshot
+-- has been accepted.  A delayed historical delta must therefore be unable to
+-- roll the repaired HP backward without producing a revision mismatch.
+Client.State = sessionState
+eventState.liveUnitRevision = 6
+eventState.units[1].resources[1].currentValue = 6
+assertEqual(Client:HandleResourceDelta({ "channel", "Remote", "historical-delta", 1 }, "Remote"), true, "late resource command is acknowledged")
+assertEqual(eventState.liveUnitRevision, 6, "late resource command cannot alter the authoritative revision")
+assertEqual(eventState.units[1].resources[1].currentValue, 6, "late resource command cannot corrupt repaired HP")
 
 return true
