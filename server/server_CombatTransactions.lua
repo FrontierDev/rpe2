@@ -44,17 +44,10 @@ local function findUnit(units, eventId)
 end
 
 local function isDead(unit, eventState, Combat)
-    if Combat and type(Combat.IsUnitDead) == "function" then
-        return Combat:IsUnitDead(unit, { eventState = eventState }) == true
+    if not Combat or type(Combat.IsUnitDead) ~= "function" then
+        return nil
     end
-    local healthRef = eventState and eventState.healthResourceRef
-    for index = 1, #((unit and unit.resources) or {}) do
-        local resource = unit.resources[index]
-        if tostring(resource and resource.resourceRef or "") == tostring(healthRef or "") then
-            return (tonumber(resource.currentValue) or tonumber(resource.maxValue) or 0) <= 0
-        end
-    end
-    return false
+    return Combat:IsUnitDead(unit, { eventState = eventState }) == true
 end
 
 local function reject(reason)
@@ -103,9 +96,7 @@ local function buildRequestEntry(envelope, eventState, request, actor, defender,
 end
 
 local function handleCombatHit(envelope, transactionContext)
-    local eventState = Server.EventState
-        or (Server.GetEventState and Server:GetEventState())
-        or (transactionContext and transactionContext.eventState)
+    local eventState = Server.GetEventState and Server:GetEventState() or Server.EventState
     if type(eventState) ~= "table" or eventState.active ~= true then
         return reject("event-inactive")
     end
@@ -125,7 +116,12 @@ local function handleCombatHit(envelope, transactionContext)
     if actor.active == false or defender.active == false then
         return reject("event-unit-inactive")
     end
-    if isDead(actor, eventState, Combat) or isDead(defender, eventState, Combat) then
+    local actorDead = isDead(actor, eventState, Combat)
+    local defenderDead = isDead(defender, eventState, Combat)
+    if actorDead == nil or defenderDead == nil then
+        return reject("combat-authority-unavailable")
+    end
+    if actorDead or defenderDead then
         return reject("event-unit-dead")
     end
     if tonumber(envelope.turnNumber) ~= tonumber(eventState.turnNumber)
@@ -143,7 +139,7 @@ local function handleCombatHit(envelope, transactionContext)
     local request = type(input.request) == "table" and input.request or nil
     local reaction = type(input.reaction) == "table" and input.reaction or nil
     local initialInput = transactionContext and transactionContext.record and transactionContext.record.initialInput or nil
-    local initialRequest = type(initialInput) == "table" and initialInput.request or nil
+    local initialRequest = type(initialInput) == "table" and initialInput.request or input.request
     if not request or not reaction or not initialRequest
         or type(EventTransactions.Encode) ~= "function"
         or EventTransactions.Encode(initialRequest) ~= EventTransactions.Encode(request)
@@ -237,6 +233,7 @@ local function handleCombatHit(envelope, transactionContext)
     }
 end
 
-if ServerTransactions and type(ServerTransactions.Register) == "function" then
-    ServerTransactions:Register("combat-hit", handleCombatHit)
+if type(ServerTransactions) ~= "table" or type(ServerTransactions.Register) ~= "function" then
+    error("Authoritative EventTransactions server service is unavailable for combat-hit.")
 end
+ServerTransactions:Register("combat-hit", handleCombatHit)

@@ -1301,7 +1301,13 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
         return false
     end
 
-    local resourceDeltas = ResourceSync.CoalesceResourceDeltas and ResourceSync.CoalesceResourceDeltas(resourceDeltasOverride) or {}
+    if type(ResourceSync.CoalesceResourceDeltas) ~= "function" then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA queue rejected: resource normalization is unavailable.")
+        end
+        return false, "resource-sync-unavailable"
+    end
+    local resourceDeltas = ResourceSync.CoalesceResourceDeltas(resourceDeltasOverride)
     if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
         if Debug and Debug.Error then
             Debug.Error("RESOURCE_DELTA queue skipped: resolved delta payload is empty for targetEventId=%s.", tostring(targetEventId))
@@ -1346,7 +1352,7 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
         self.PendingResourceDeltaBatches[batchKey] = batch
     else
         batch.reason = mergeReasons(batch.reason, reason or "resource-delta-sync")
-        batch.resourceDeltas = ResourceSync.CoalesceResourceDeltas and ResourceSync.CoalesceResourceDeltas(batch.resourceDeltas, resourceDeltas) or batch.resourceDeltas
+        batch.resourceDeltas = ResourceSync.CoalesceResourceDeltas(batch.resourceDeltas, resourceDeltas)
         batch.threatUpdates = coalesceThreatUpdates(batch.threatUpdates, threatUpdates)
     end
 
@@ -1443,6 +1449,16 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
 
     local targetEventId = tonumber(targetEventIdOverride) or authoritativeTargetEventId or 0
     if targetEventId > 0 then
+        if type(ResourceSync.NormalizeResources) ~= "function" then
+            if Debug and Debug.Error then
+                Debug.Error("RESOURCE replace rejected: resource normalization is unavailable.")
+            end
+            return false, "resource-sync-unavailable"
+        end
+        resources = ResourceSync.NormalizeResources(resources)
+        if type(resources) ~= "table" or #resources == 0 then
+            return false, "empty-resources"
+        end
         local targetUnit = getLiveResourceTarget(self, targetEventId)
         if not targetUnit then
             if Debug and Debug.Error then
@@ -1650,9 +1666,13 @@ function Client:SendClientResourceDeltas(state, reason, playerNameOverride, reso
         return false
     end
 
-    local resourceDeltas = ResourceSync.CoalesceResourceDeltas
-        and ResourceSync.CoalesceResourceDeltas(resourceDeltasOverride)
-        or resourceDeltasOverride
+    if type(ResourceSync.CoalesceResourceDeltas) ~= "function" then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA rejected: resource normalization is unavailable.")
+        end
+        return false, "resource-sync-unavailable"
+    end
+    local resourceDeltas = ResourceSync.CoalesceResourceDeltas(resourceDeltasOverride)
     local targetEventId = tonumber(targetEventIdOverride) or 0
     local targetUnit = getLiveResourceTarget(self, targetEventId)
     if not targetUnit then
@@ -1694,9 +1714,13 @@ function Client:SendClientResourceDeltaBatch(state, reason, playerNameOverride, 
         return false
     end
 
-    local targetedResourceDeltas = ResourceSync.CoalesceTargetedResourceDeltas
-        and ResourceSync.CoalesceTargetedResourceDeltas(targetedResourceDeltasOverride)
-        or targetedResourceDeltasOverride
+    if type(ResourceSync.CoalesceTargetedResourceDeltas) ~= "function" then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA_BATCH rejected: resource normalization is unavailable.")
+        end
+        return false, "resource-sync-unavailable"
+    end
+    local targetedResourceDeltas = ResourceSync.CoalesceTargetedResourceDeltas(targetedResourceDeltasOverride)
     if type(targetedResourceDeltas) ~= "table" or #targetedResourceDeltas == 0 then
         return false, "empty-targeted-resource-deltas"
     end
@@ -1791,7 +1815,13 @@ function Client:HandleResource(arguments, sender)
     end
     state.LastResourceSyncSignature = resourceSignature
 
-    local resources = ResourceSync.NormalizeResources and ResourceSync.NormalizeResources(resourcePayload) or {}
+    if type(ResourceSync.NormalizeResources) ~= "function" then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE receive rejected: resource normalization is unavailable.")
+        end
+        return false
+    end
+    local resources = ResourceSync.NormalizeResources(resourcePayload)
     local targetUnitIsPlayer = false
     local resourceOwnerName = playerName
     if eventState and targetEventId > 0 then
@@ -1891,20 +1921,4 @@ function Client:HandleResource(arguments, sender)
     end
 
     return true
-end
-
-function Client:HandleResourceDelta(arguments, sender)
-    local state = self.State
-    if not state or state.active ~= true then
-        return false
-    end
-    return arguments and arguments[1] == state.channelName
-end
-
-function Client:HandleResourceDeltaBatch(arguments, sender)
-    local state = self.State
-    if not state or state.active ~= true then
-        return false
-    end
-    return arguments and arguments[1] == state.channelName
 end

@@ -1185,23 +1185,6 @@ local function installOutcomeHooks()
         end
     end
 
-    local baseHandleDamageHitCheckResponse = Combat.HandleDamageHitCheckResponse
-    if type(baseHandleDamageHitCheckResponse) == "function" then
-        function Combat:HandleDamageHitCheckResponse(client, arguments, sender, ...)
-            local checkId = tostring(arguments and arguments[1] or "")
-            local entry = checkId ~= ""
-                and type(client) == "table"
-                and type(client.GetPendingCombatHitCheck) == "function"
-                and client:GetPendingCombatHitCheck(checkId)
-                or nil
-            local results = pack(baseHandleDamageHitCheckResponse(self, client, arguments, sender, ...))
-            if results[1] == true and type(entry) == "table" and type(entry.lastDamageResult) == "table" then
-                Helper.UpdateDamageOutcome(entry, entry.lastDamageResult)
-            end
-            return unpack(results, 1, results.n)
-        end
-    end
-
     local baseHandleCombatTransactionTerminal = Client.HandleCombatTransactionTerminal
     if type(baseHandleCombatTransactionTerminal) == "function" then
         function Client:HandleCombatTransactionTerminal(entry, envelope, ...)

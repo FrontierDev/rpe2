@@ -366,30 +366,6 @@ Operations.Opcodes = Operations.Opcodes or {
             return handled
         end,
     },
-    [14] = {
-        key = "COMBAT_HIT_CHECK_REQUEST",
-        name = "combat-hit-check-request",
-        ["function"] = function(arguments, sender, distribution, target, message)
-            local client = Addon.Client
-            if not client or type(client.HandleCombatHitCheckRequest) ~= "function" then
-                return false
-            end
-
-            return client:HandleCombatHitCheckRequest(arguments, sender, distribution, target, message)
-        end,
-    },
-    [15] = {
-        key = "COMBAT_HIT_CHECK_RESPONSE",
-        name = "combat-hit-check-response",
-        ["function"] = function(arguments, sender, distribution, target, message)
-            local client = Addon.Client
-            if not client or type(client.HandleCombatHitCheckResponse) ~= "function" then
-                return false
-            end
-
-            return client:HandleCombatHitCheckResponse(arguments, sender, distribution, target, message)
-        end,
-    },
     [17] = {
         key = "AURA_APPLY",
         name = "aura-apply",

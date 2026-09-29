@@ -10,7 +10,6 @@ Addon.Utils = Addon.Utils or {}
 local Client = Addon.Client
 local Combat = Addon.Client.Combat
 local Comms = Addon.Internal.Comms or {}
-local Operations = Comms.Operations or {}
 local EventTransactions = Comms.EventTransactions
 local Ruleset = Addon.Internal.Ruleset or {}
 local Registry = Addon.Internal.Registry or {}
@@ -21,13 +20,6 @@ local Dice = Addon.Utils.Dice or {}
 local Normalization = Addon.Client.Combat.Normalization or {}
 local Debug = Addon.Debug
 local UI = Addon.UI or {}
-
-local HIT_CHECK_REQUEST_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_HIT_CHECK_REQUEST") or nil
-local HIT_CHECK_RESPONSE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_HIT_CHECK_RESPONSE") or nil
-local DAMAGE_RESOLVED_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_DAMAGE_RESOLVED") or nil
-local DAMAGE_RESOLVED_ACK_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_DAMAGE_RESOLVED_ACK") or nil
-local HIT_CHECK_ACK_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_HIT_CHECK_ACK") or nil
-local HIT_CHECK_REJECT_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_HIT_CHECK_REJECT") or nil
 
 local RESULT_PASS = "pass"
 local RESULT_FAIL = "fail"
@@ -49,11 +41,7 @@ local REACTION_ATTACK_TYPES = { "melee", "ranged", "spell" }
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 local SPELLCAST_SLOW_HELPER_MS = 25
 local SPELLCAST_SLOW_TOTAL_MS = 100
-local MAX_DAMAGE_OUTCOME_RETRIES = 3
-local MAX_HIT_CHECK_RETRIES = 3
-local COMBAT_TRANSACTION_ACK_TIMEOUT_MS = 1500
 local COMBAT_REACTION_TIMEOUT_MS = 15000
-local scheduleCombatTransactionPump
 
 local function getNowMilliseconds()
     if type(GetTimePreciseSec) == "function" then
@@ -761,137 +749,7 @@ local function emitReactionCombatLog(entry, detailText, accentColor, role)
     })
 end
 
-local function sendCombatWhisper(targetName, opcode, arguments, metadataOverrides)
-    local normalizedTarget = getResolvedName(targetName)
-    if type(Comms.SendMessage) ~= "function" or normalizedTarget == "" or not opcode then
-        return false
-    end
-
-    local metadata = nil
-    local spellcasting = Client.Spellcasting
-    if spellcasting and type(spellcasting.BuildSendMetadata) == "function" then
-        metadata = spellcasting.BuildSendMetadata(opcode)
-    else
-        metadata = {
-            opcode = opcode,
-            scope = "client",
-        }
-    end
-
-    if type(metadataOverrides) == "table" then
-        for key, value in pairs(metadataOverrides) do
-            metadata[key] = value
-        end
-    end
-
-    return Comms:SendMessage("WHISPER", opcode, arguments, normalizedTarget, metadata) and true or false
-end
-
-local function getPendingDamageOutcomes(client, create)
-    if type(client) ~= "table" then
-        return nil
-    end
-    if type(client.PendingCombatDamageOutcomes) ~= "table" and create == true then
-        client.PendingCombatDamageOutcomes = {}
-    end
-    return client.PendingCombatDamageOutcomes
-end
-
-function Client:ClearPendingCombatDamageOutcome(checkId, eventId)
-    local outcomes = getPendingDamageOutcomes(self, false)
-    local normalizedCheckId = normalizeToken(checkId)
-    if type(outcomes) ~= "table" or not normalizedCheckId then
-        return false
-    end
-
-    local outcome = outcomes[normalizedCheckId]
-    if type(outcome) ~= "table"
-        or (eventId ~= nil and tostring(outcome.eventId or "") ~= tostring(eventId or ""))
-    then
-        return false
-    end
-
-    outcomes[normalizedCheckId] = nil
-    return true
-end
-
-function Combat:ClearPendingDamageOutcomes(eventId)
-    local outcomes = getPendingDamageOutcomes(Client, false)
-    if type(outcomes) ~= "table" then
-        return false
-    end
-
-    local normalizedEventId = eventId ~= nil and tostring(eventId or "") or nil
-    for checkId, outcome in pairs(outcomes) do
-        if normalizedEventId == nil
-            or tostring(type(outcome) == "table" and outcome.eventId or "") == normalizedEventId
-        then
-            outcomes[checkId] = nil
-        end
-    end
-    return true
-end
-
-local function sendPendingDamageOutcome(client, outcome)
-    if type(client) ~= "table"
-        or type(outcome) ~= "table"
-        or type(outcome.arguments) ~= "table"
-        or tostring(outcome.targetName or "") == ""
-    then
-        return false
-    end
-
-    outcome.createdAtMs = tonumber(outcome.createdAtMs) or getNowMilliseconds()
-    outcome.sendAttempts = (tonumber(outcome.sendAttempts) or 0) + 1
-    outcome.lastSentAtMs = getNowMilliseconds()
-    outcome.nextRetryAtMs = outcome.lastSentAtMs + COMBAT_TRANSACTION_ACK_TIMEOUT_MS
-    local function handleFailure(_, reason)
-        local outcomes = getPendingDamageOutcomes(client, false)
-        local current = outcomes and outcomes[outcome.checkId] or nil
-        if current ~= outcome then
-            return
-        end
-
-        outcome.lastFailure = tostring(reason or "send-failed")
-        -- Queue failure is not proof that the peer did not receive an earlier
-        -- attempt.  Keep the same idempotency key and let the deadline pump
-        -- make the bounded retry decision.
-        outcome.nextRetryAtMs = getNowMilliseconds() + COMBAT_TRANSACTION_ACK_TIMEOUT_MS
-    end
-
-    local sent = sendCombatWhisper(
-        outcome.targetName,
-        DAMAGE_RESOLVED_OPCODE,
-        outcome.arguments,
-        { onFailed = handleFailure }
-    )
-    if not sent then
-        handleFailure(nil, "enqueue-failed")
-    end
-    scheduleCombatTransactionPump(client)
-    return sent
-end
-
-local function sendDamageOutcomeAcknowledgement(targetName, checkId, eventId)
-    return sendCombatWhisper(targetName, DAMAGE_RESOLVED_ACK_OPCODE, {
-        checkId,
-        eventId,
-    })
-end
-
-local function sendHitCheckAcknowledgement(targetName, checkId, eventId)
-    return sendCombatWhisper(targetName, HIT_CHECK_ACK_OPCODE, { checkId, eventId })
-end
-
-local function sendHitCheckRejection(targetName, checkId, eventId, reason)
-    return sendCombatWhisper(targetName, HIT_CHECK_REJECT_OPCODE, {
-        checkId,
-        eventId,
-        tostring(reason or "rejected"),
-    })
-end
-
-local function isCurrentCombatTransaction(client, entry)
+local function isCurrentCombatReaction(client, entry)
     local eventState = type(client) == "table" and client.GetEventState and client:GetEventState() or nil
     if type(eventState) ~= "table" or eventState.active ~= true
         or tostring(eventState.id or "") ~= tostring(entry and entry.eventId or "")
@@ -933,120 +791,6 @@ local function logCombatTransactionFailure(kind, entry, reason)
     end
 end
 
-local function recordCombatTransportDiagnostics(client)
-    local diagnostics = Comms.Diagnostics
-    local store = type(diagnostics) == "table" and type(diagnostics.GetTransportDiagnosticsStore) == "function"
-        and diagnostics:GetTransportDiagnosticsStore() or nil
-    if type(store) ~= "table" then
-        return false
-    end
-    local pendingRequests, pendingOutcomes = {}, {}
-    for checkId, entry in pairs(client.PendingCombatHitChecksByCheckId or {}) do
-        pendingRequests[#pendingRequests + 1] = {
-            checkId = checkId,
-            eventId = entry.eventId,
-            acknowledged = entry.requestAcknowledged == true,
-            attempts = tonumber(entry.requestAttempts) or 0,
-            nextRetryAtMs = entry.requestRetryAtMs,
-        }
-    end
-    for checkId, outcome in pairs(getPendingDamageOutcomes(client, false) or {}) do
-        pendingOutcomes[#pendingOutcomes + 1] = {
-            checkId = checkId,
-            eventId = outcome.eventId,
-            attempts = tonumber(outcome.sendAttempts) or 0,
-            nextRetryAtMs = outcome.nextRetryAtMs,
-        }
-    end
-    store.combatTransactions = {
-        pendingHitChecks = pendingRequests,
-        pendingDamageOutcomes = pendingOutcomes,
-        activeReactionCheckId = client.ActiveCombatReactionEntry and client.ActiveCombatReactionEntry.checkId or nil,
-        queuedReactionCount = #(client.CombatReactionQueue or {}),
-    }
-    return true
-end
-
-scheduleCombatTransactionPump = function(client)
-    if type(client) ~= "table" or client.CombatTransactionPumpScheduled == true or not (C_Timer and C_Timer.After) then
-        return false
-    end
-    client.CombatTransactionPumpScheduled = true
-    C_Timer.After(COMBAT_TRANSACTION_ACK_TIMEOUT_MS / 1000, function()
-        client.CombatTransactionPumpScheduled = nil
-        if type(Combat.ProcessPendingCombatTransactions) == "function" then
-            Combat:ProcessPendingCombatTransactions(client)
-        end
-    end)
-    return true
-end
-
-local function sendPendingHitCheckRequest(client, entry)
-    if type(entry) ~= "table" or type(entry.requestArguments) ~= "table" or tostring(entry.requestTargetName or "") == "" then
-        return false
-    end
-    entry.createdAtMs = tonumber(entry.createdAtMs) or getNowMilliseconds()
-    entry.requestAttempts = (tonumber(entry.requestAttempts) or 0) + 1
-    entry.lastRequestAtMs = getNowMilliseconds()
-    entry.requestRetryAtMs = entry.lastRequestAtMs + COMBAT_TRANSACTION_ACK_TIMEOUT_MS
-    local sent = sendCombatWhisper(entry.requestTargetName, HIT_CHECK_REQUEST_OPCODE, entry.requestArguments, {
-        onFailed = function(_, reason)
-            entry.lastRequestFailure = tostring(reason or "send-failed")
-            entry.requestRetryAtMs = getNowMilliseconds() + COMBAT_TRANSACTION_ACK_TIMEOUT_MS
-        end,
-    })
-    scheduleCombatTransactionPump(client)
-    -- Tracking the request is the success condition here. A local enqueue
-    -- failure is retried by the same ACK deadline path as a dropped packet.
-    return true
-end
-
-function Combat:ProcessPendingCombatTransactions(client, nowMs)
-    client = client or Client
-    local now = tonumber(nowMs) or getNowMilliseconds()
-    if type(client.PruneCombatReactionTransactions) == "function" then
-        client:PruneCombatReactionTransactions("transaction-pump", now)
-    end
-    local pending = type(client.PendingCombatHitChecksByCheckId) == "table" and client.PendingCombatHitChecksByCheckId or {}
-    for checkId, entry in pairs(pending) do
-        local current, reason = isCurrentCombatTransaction(client, entry)
-        if not current or now - (tonumber(entry.createdAtMs) or now) >= COMBAT_REACTION_TIMEOUT_MS then
-            client:ClearPendingCombatHitCheck(checkId)
-            logCombatTransactionFailure("hit-check", entry, reason or "expired")
-        elseif entry.requestAcknowledged ~= true and now >= (tonumber(entry.requestRetryAtMs) or 0) then
-            if (tonumber(entry.requestAttempts) or 0) >= MAX_HIT_CHECK_RETRIES then
-                client:ClearPendingCombatHitCheck(checkId)
-                logCombatTransactionFailure("hit-check", entry, "ack-timeout")
-            else
-                sendPendingHitCheckRequest(client, entry)
-            end
-        end
-    end
-    local outcomes = getPendingDamageOutcomes(client, false) or {}
-    for checkId, outcome in pairs(outcomes) do
-        local current, reason = isCurrentCombatTransaction(client, outcome)
-        if not current or now - (tonumber(outcome.createdAtMs) or now) >= COMBAT_REACTION_TIMEOUT_MS then
-            outcomes[checkId] = nil
-            logCombatTransactionFailure("damage-outcome", outcome, reason or "expired")
-        elseif now >= (tonumber(outcome.nextRetryAtMs) or 0) then
-            if (tonumber(outcome.sendAttempts) or 0) >= MAX_DAMAGE_OUTCOME_RETRIES then
-                outcomes[checkId] = nil
-                logCombatTransactionFailure("damage-outcome", outcome, "ack-timeout")
-            else
-                sendPendingDamageOutcome(client, outcome)
-            end
-        end
-    end
-    if next(pending) ~= nil or next(outcomes) ~= nil
-        or type(client.ActiveCombatReactionEntry) == "table"
-        or #(client.CombatReactionQueue or {}) > 0
-    then
-        scheduleCombatTransactionPump(client)
-    end
-    recordCombatTransportDiagnostics(client)
-    return true
-end
-
 local function finalizeDamageCombatEvents(client, entry, landed)
     if type(entry) ~= "table" then
         return false
@@ -1073,10 +817,6 @@ end
 
 function Combat:ResolveSenderForUnit(eventState, eventUnit)
     return resolveSenderForUnit(eventState, eventUnit)
-end
-
-function Combat:SendCombatWhisper(targetName, opcode, arguments)
-    return sendCombatWhisper(targetName, opcode, arguments)
 end
 
 function Combat:FinalizeLocalDamageResult(entry, damageResult)
@@ -1540,45 +1280,6 @@ function Combat:LogDefenceAttempt(entry, resultToken, resolution)
     return true
 end
 
-function Client:SetPendingCombatHitCheck(entry)
-    local checkId = entry and entry.checkId or nil
-    if not checkId then
-        return nil
-    end
-
-    entry.createdAtMs = tonumber(entry.createdAtMs) or getNowMilliseconds()
-    entry.turnNumber = tonumber(entry.turnNumber) or tonumber(entry.eventState and entry.eventState.turnNumber) or 0
-    entry.tickNumber = tonumber(entry.tickNumber) or tonumber(entry.eventState and entry.eventState.tickNumber) or 0
-    self.PendingCombatHitChecksByCheckId = self.PendingCombatHitChecksByCheckId or {}
-    self.PendingCombatHitChecksByCheckId[checkId] = entry
-    return entry
-end
-
-function Client:SendPendingCombatHitCheckRequest(entry, targetName, arguments)
-    if type(entry) ~= "table" or tostring(targetName or "") == "" or type(arguments) ~= "table" then
-        return false
-    end
-    entry.requestTargetName = getResolvedName(targetName)
-    entry.requestArguments = arguments
-    entry.requestAcknowledged = nil
-    entry.requestRetryAtMs = 0
-    return sendPendingHitCheckRequest(self, entry)
-end
-
-function Client:GetPendingCombatHitCheck(checkId)
-    return self.PendingCombatHitChecksByCheckId and self.PendingCombatHitChecksByCheckId[checkId] or nil
-end
-
-function Client:ClearPendingCombatHitCheck(checkId)
-    if type(self.PendingCombatHitChecksByCheckId) ~= "table" then
-        return nil
-    end
-
-    local previous = self.PendingCombatHitChecksByCheckId[checkId]
-    self.PendingCombatHitChecksByCheckId[checkId] = nil
-    return previous
-end
-
 local function ensureCombatReactionQueue(client)
     client.CombatReactionQueue = client.CombatReactionQueue or {}
     return client.CombatReactionQueue
@@ -1843,6 +1544,19 @@ function Client:HandleCombatTransactionTerminal(entry, envelope)
     local resolution = entry.lastResolution
     if envelope.state == "committed" and resultToken then
         entry.lastResolution = resolution
+        if type(Combat.RecordResolvedCombatAttackHistory) == "function" then
+            Combat:RecordResolvedCombatAttackHistory(
+                self,
+                entry,
+                resultToken,
+                action,
+                resolution,
+                outcome.defended == true
+            )
+        end
+        if type(Combat.LogDefenceAttempt) == "function" then
+            Combat:LogDefenceAttempt(entry, resultToken, resolution)
+        end
         if type(Combat.LogAttackAttempt) == "function" then
             Combat:LogAttackAttempt(entry, resultToken, resolution)
         end
@@ -1925,7 +1639,6 @@ function Client:ShowCombatReaction(entry)
 
     self:SetActiveCombatReaction(entry)
     enqueueReactionPresentationWork(refreshReactionWidgetDeferred, self, "combat-hit-check")
-    scheduleCombatTransactionPump(self)
     return true
 end
 
@@ -1940,7 +1653,7 @@ end
 function Client:PruneCombatReactionTransactions(reason, nowMs)
     local now = tonumber(nowMs) or getNowMilliseconds()
     local function stale(entry)
-        local current = isCurrentCombatTransaction(self, entry)
+        local current = isCurrentCombatReaction(self, entry)
         return not current or now - (tonumber(entry and entry.createdAtMs) or now) >= COMBAT_REACTION_TIMEOUT_MS
     end
     local active = self.ActiveCombatReactionEntry
@@ -1978,19 +1691,6 @@ function Client:ClearCombatReactionRuntime(eventId, reason)
             table.remove(queue, index)
         end
     end
-    for checkId, entry in pairs(self.PendingCombatHitChecksByCheckId or {}) do
-        if matches(entry) then
-            self.PendingCombatHitChecksByCheckId[checkId] = nil
-        end
-    end
-    for checkId, entry in pairs(self.ProcessedCombatHitCheckRequests or {}) do
-        if matches(entry) then
-            self.ProcessedCombatHitCheckRequests[checkId] = nil
-        end
-    end
-    if type(Combat.ClearPendingDamageOutcomes) == "function" then
-        Combat:ClearPendingDamageOutcomes(normalizedEventId)
-    end
     if reason and type(Debug) == "table" and type(Debug.Internal) == "function" then
         Debug.Internal("Combat reaction runtime cleared: eventId=%s reason=%s.", tostring(normalizedEventId or ""), tostring(reason))
     end
@@ -2003,7 +1703,6 @@ function Combat:CompleteHitCheck(entry, resultToken, reason)
         return false, buildCombatResult(entry, nil, "invalid")
     end
 
-    Client:ClearPendingCombatHitCheck(entry.checkId)
     self:LogAttackAttempt(entry, normalizedResult, entry.lastResolution)
     self:PrintHitCheckResult(normalizedResult)
     if normalizedResult == RESULT_PASS
@@ -2215,30 +1914,9 @@ function Client:ResolveCombatReactionAction(actionId)
     end
 
     entry.lastResolution = resolution
-    Combat:LogDefenceAttempt(entry, resultToken, resolution)
     entry.context = entry.context or {}
     entry.context.immediate = true
     entry.context.pendingScope = "reaction"
-
-    if entry.localOnly == true then
-        self:HideCombatReaction()
-        local completed, result = Combat:CompleteHitCheck(entry, resultToken, "player-local")
-        if completed then
-            Combat:RecordResolvedCombatAttackHistory(self, entry, resultToken, action, resolution)
-            if resultToken == RESULT_FAIL then
-                Combat:EmitSuccessfulDefenceEvent(self, entry, action, resultToken, resolution)
-            end
-        end
-        if completed and resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
-            local _, damageResult = Combat:ApplyResolvedDamage(entry)
-            entry.lastDamageResult = damageResult
-            Combat:FinalizeLocalDamageResult(entry, damageResult)
-        elseif completed and resultToken == RESULT_FAIL then
-            Combat:ShowDefenceCombatText(entry, resolution)
-        end
-        self:ShowNextQueuedCombatReaction()
-        return completed, result
-    end
 
     if entry.sharedTransaction and EventTransactions and type(EventTransactions.Client) == "table"
         and type(EventTransactions.Client.SubmitInput) == "function"
@@ -2263,424 +1941,17 @@ function Client:ResolveCombatReactionAction(actionId)
             self:ShowNextQueuedCombatReaction()
             return false
         end
-        Combat:LogDefenceAttempt(entry, resultToken, resolution)
         self:HideCombatReaction()
         return true
     end
 
-    local attackerName = resolveSenderForUnit(entry.eventState, entry.attackerUnit)
-    local successfullyDefended = isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
-    local defenceStatRef = successfullyDefended and normalizeDefenceStatRef(resolution and resolution.defenceStatRef) or nil
-    local responseArguments = {
-        entry.checkId,
-        entry.eventId,
-        resultToken,
-        successfullyDefended and "defended" or "",
-        defenceStatRef or "",
-    }
-    if attackerName == "" or not sendCombatWhisper(attackerName, HIT_CHECK_RESPONSE_OPCODE, responseArguments) then
-        self:HideCombatReaction()
-        logCombatTransactionFailure("reaction", entry, "response-send-failed")
-        self:ShowNextQueuedCombatReaction()
-        return false
+    if type(Debug) == "table" and type(Debug.Error) == "function" then
+        Debug.Error("Shared combat transaction unavailable for reaction %s.", tostring(entry.checkId or ""))
     end
-
-    Combat:EmitSuccessfulDefenceEvent(self, entry, action, resultToken, resolution)
     self:HideCombatReaction()
-    Combat:RecordResolvedCombatAttackHistory(self, entry, resultToken, action, resolution)
-    if resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
-        local _, damageResult = Combat:ApplyResolvedDamage(entry)
-        entry.lastDamageResult = damageResult
-        Combat:FinalizeLocalDamageResult(entry, damageResult)
-
-        local damageOutcome = {
-            checkId = normalizeToken(entry.checkId),
-            eventId = entry.eventId,
-            targetName = attackerName,
-            retryCount = 0,
-            sendAttempts = 0,
-            createdAtMs = getNowMilliseconds(),
-            turnNumber = entry.turnNumber,
-            tickNumber = entry.tickNumber,
-            arguments = {
-                entry.checkId,
-                entry.eventId,
-                type(damageResult) == "table" and normalizeToken(damageResult.damageSchoolRef) or "",
-                type(damageResult) == "table" and tostring(tonumber(damageResult.appliedDelta) or 0) or "0",
-                type(damageResult) == "table" and (damageResult.applied == true and "1" or "0") or "0",
-            },
-        }
-        local outcomes = getPendingDamageOutcomes(self, true)
-        outcomes[damageOutcome.checkId] = damageOutcome
-        local damageOutcomeSent = sendPendingDamageOutcome(self, damageOutcome)
-        if not damageOutcomeSent and type(Debug) == "table" and type(Debug.Internal) == "function" then
-            Debug.Internal("Authoritative combat damage hand-off queued for retry: checkId=%s.", tostring(entry.checkId or ""))
-        end
-    elseif resultToken == RESULT_FAIL then
-        finalizeDamageCombatEvents(Client, entry, false)
-        Combat:ShowDefenceCombatText(entry, resolution)
-    end
+    logCombatTransactionFailure("reaction", entry, "shared-transaction-unavailable")
     self:ShowNextQueuedCombatReaction()
-    return true
-end
-
-function Combat:HandleDamageHitCheckRequest(client, arguments, sender)
-    local checkId = normalizeToken(arguments and arguments[1])
-    local eventId = normalizeToken(arguments and arguments[2])
-    local attackerEventId = tonumber(arguments and arguments[3]) or 0
-    local defenderEventId = tonumber(arguments and arguments[4]) or 0
-    local spellRef = normalizeToken(arguments and arguments[5])
-    local componentKey = normalizeToken(arguments and arguments[6])
-    local attackerTotal = tonumber(arguments and arguments[7]) or nil
-    local rawDamage = tonumber(arguments and arguments[8]) or 0
-    local resultType = normalizeToken(arguments and arguments[9]) or "hit"
-    local senderName = getResolvedName(sender)
-    local sessionState = client.GetState and client:GetState() or nil
-    local eventState = client.GetEventState and client:GetEventState() or nil
-    local function reject(reason, expectedSender)
-        if type(client) == "table" then
-            client.ProcessedCombatHitCheckRequests = client.ProcessedCombatHitCheckRequests or {}
-            if checkId then
-                client.ProcessedCombatHitCheckRequests[checkId] = {
-                    eventId = eventId,
-                    accepted = false,
-                    reason = reason,
-                    createdAtMs = getNowMilliseconds(),
-                }
-            end
-        end
-        logCombatTransactionFailure("incoming-hit-check", {
-            checkId = checkId, eventId = eventId, attackerEventId = attackerEventId, defenderEventId = defenderEventId,
-        }, ("%s sender=%s expected=%s"):format(tostring(reason), senderName, tostring(expectedSender or "")))
-        if type(Debug) == "table" and type(Debug.Internal) == "function" then
-            local localUnit = type(eventState) == "table" and client.ResolveLocalEventUnit and client:ResolveLocalEventUnit(eventState) or nil
-            Debug.Internal(
-                "Combat hit-check rejected: checkId=%s eventId=%s attacker=%s defender=%s sender=%s expected=%s localPlayerEventId=%s turn=%s tick=%s reason=%s.",
-                tostring(checkId or ""), tostring(eventId or ""), tostring(attackerEventId), tostring(defenderEventId),
-                senderName, tostring(expectedSender or ""), tostring(localUnit and localUnit.eventID or ""),
-                tostring(eventState and eventState.turnNumber or ""), tostring(eventState and eventState.tickNumber or ""), tostring(reason)
-            )
-        end
-        if senderName ~= "" and checkId and eventId then
-            sendHitCheckRejection(senderName, checkId, eventId, reason)
-        end
-        return false
-    end
-
-    if not checkId or not eventId or attackerEventId <= 0 or defenderEventId <= 0 or not spellRef or not componentKey or attackerTotal == nil then
-        return reject("invalid-request")
-    end
-    client.ProcessedCombatHitCheckRequests = client.ProcessedCombatHitCheckRequests or {}
-    local previous = client.ProcessedCombatHitCheckRequests[checkId]
-    if type(previous) == "table" and tostring(previous.eventId or "") == eventId then
-        if previous.accepted == true then
-            sendHitCheckAcknowledgement(senderName, checkId, eventId)
-            return true
-        end
-        sendHitCheckRejection(senderName, checkId, eventId, previous.reason or "previously-rejected")
-        return false
-    end
-    if type(sessionState) ~= "table" or sessionState.active ~= true or type(eventState) ~= "table" or eventState.active ~= true or eventState.id ~= eventId then
-        return reject("event-inactive")
-    end
-
-    local attackerUnit = findEventUnitById(eventState.units, attackerEventId)
-    local defenderUnit = findEventUnitById(eventState.units, defenderEventId)
-    if not attackerUnit or not defenderUnit then
-        return reject("event-unit-missing")
-    end
-
-    local expectedSender = resolveSenderForUnit(eventState, attackerUnit)
-    if expectedSender == "" or expectedSender ~= getResolvedName(sender) then
-        return reject("sender-mismatch", expectedSender)
-    end
-
-    local localEventUnit = client.ResolveLocalEventUnit and client:ResolveLocalEventUnit(eventState) or nil
-    if tonumber(localEventUnit and localEventUnit.eventID) ~= defenderEventId then
-        return reject("defender-not-local")
-    end
-
-    local _, spell, component = Combat:ResolveSpellComponent(spellRef, componentKey)
-    if not spell or not component or Normalization.NormalizeEffectType(component.effect and component.effect.type) ~= "damage" then
-        return reject("spell-component-invalid")
-    end
-
-    local entry = {
-        checkId = checkId,
-        eventId = eventId,
-        spellRef = spellRef,
-        componentKey = componentKey,
-        attackType = Combat:ResolveHitCheckAttackType(component.effect, component),
-        defenceSystem = Combat:ResolveDefenceSystem(),
-        attackerUnit = attackerUnit,
-        defenderUnit = defenderUnit,
-        attackerEventId = attackerEventId,
-        defenderEventId = defenderEventId,
-        turnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1)),
-        tickNumber = math.max(0, math.floor(tonumber(eventState.tickNumber) or 0)),
-        createdAtMs = getNowMilliseconds(),
-        attackerTotal = attackerTotal,
-        rawDamage = rawDamage,
-        resultType = resultType,
-        effect = component.effect,
-        component = component,
-        targetEvents = Combat:CloneValue(component.effect and component.effect.targetEvents or {}),
-        context = {
-            spellRef = spellRef,
-            eventState = eventState,
-            sessionState = sessionState,
-            healthResourceRef = eventState and eventState.healthResourceRef or nil,
-            immediate = true,
-            pendingScope = "reaction",
-        },
-        sessionState = sessionState,
-        eventState = eventState,
-    }
-    if not entry.defenceSystem then
-        return reject("defence-system-invalid")
-    end
-
-    if client:ShowCombatReaction(entry) ~= true then
-        return reject("reaction-queue-failed")
-    end
-    client.ProcessedCombatHitCheckRequests[checkId] = {
-        eventId = eventId,
-        accepted = true,
-        createdAtMs = entry.createdAtMs,
-    }
-    sendHitCheckAcknowledgement(senderName, checkId, eventId)
-    return true
-end
-
-function Combat:HandleDamageHitCheckAck(client, arguments, sender)
-    local checkId = normalizeToken(arguments and arguments[1])
-    local eventId = normalizeToken(arguments and arguments[2])
-    local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
-    if type(entry) ~= "table" or not eventId or tostring(entry.eventId or "") ~= eventId
-        or tostring(entry.requestTargetName or "") ~= getResolvedName(sender)
-    then
-        return false
-    end
-    entry.requestAcknowledged = true
-    entry.requestRetryAtMs = nil
-    return true
-end
-
-function Combat:HandleDamageHitCheckReject(client, arguments, sender)
-    local checkId = normalizeToken(arguments and arguments[1])
-    local eventId = normalizeToken(arguments and arguments[2])
-    local reason = tostring(arguments and arguments[3] or "rejected")
-    local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
-    if type(entry) ~= "table" or not eventId or tostring(entry.eventId or "") ~= eventId
-        or tostring(entry.requestTargetName or "") ~= getResolvedName(sender)
-    then
-        return false
-    end
-    client:ClearPendingCombatHitCheck(checkId)
-    logCombatTransactionFailure("hit-check", entry, "rejected:" .. reason)
-    return true
-end
-
-function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
-    local checkId = normalizeToken(arguments and arguments[1])
-    local eventId = normalizeToken(arguments and arguments[2])
-    local resultToken = normalizeResultToken(arguments and arguments[3])
-    local successfullyDefended = resultToken == RESULT_FAIL
-        and tostring(arguments and arguments[4] or "") == "defended"
-    local defenceStatRef = successfullyDefended and normalizeDefenceStatRef(arguments and arguments[5]) or nil
-    local authoritativeDamageSchoolRef = normalizeToken(arguments and arguments[6])
-    local authoritativeAppliedDelta = tonumber(arguments and arguments[7])
-    local authoritativeDamageOutcomeToken = tostring(arguments and arguments[8] or "")
-    local hasAuthoritativeDamageOutcome = authoritativeDamageOutcomeToken == "0"
-        or authoritativeDamageOutcomeToken == "1"
-    local authoritativeDamageApplied = tostring(arguments and arguments[8] or "") == "1"
-    local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
-    if not entry or not eventId or eventId ~= entry.eventId or not resultToken then
-        return false
-    end
-
-    local expectedSender = resolveSenderForUnit(entry.eventState, entry.defenderUnit)
-    if expectedSender ~= "" and expectedSender ~= getResolvedName(sender) then
-        return false
-    end
-
-    if successfullyDefended then
-        entry.lastResolution = {
-            defenceSystem = entry.defenceSystem,
-            defenceStatRef = defenceStatRef,
-        }
-    end
-
-    if resultToken == RESULT_PASS and not hasAuthoritativeDamageOutcome then
-        entry.damageResolutionPending = true
-        entry.pendingDamageResultToken = RESULT_PASS
-        local bufferedOutcome = entry.pendingDamageOutcome
-        if type(bufferedOutcome) == "table" then
-            entry.pendingDamageOutcome = nil
-            return self:HandleCombatDamageResolved(client, bufferedOutcome.arguments, bufferedOutcome.sender)
-        end
-        return true, buildCombatResult(entry, nil, "damage_pending")
-    end
-
-    local completed, result = Combat:CompleteHitCheck(entry, resultToken, "player-response")
-    if completed then
-        Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, nil, nil, successfullyDefended)
-    end
-    if completed and resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
-        local _, damageResult = Combat:ApplyResolvedDamage(entry, true)
-        entry.lastDamageResult = damageResult
-        if hasAuthoritativeDamageOutcome and type(damageResult) == "table" then
-            damageResult.applied = authoritativeDamageApplied
-            damageResult.appliedDelta = authoritativeAppliedDelta or 0
-            damageResult.damageSchoolRef = authoritativeDamageSchoolRef
-        end
-        local context = type(entry) == "table" and entry.context or nil
-        local castEntry = type(context) == "table" and context.castEntry or nil
-        local spell = type(context) == "table" and context.spell or nil
-        local state = Combat.GetOrCreateActionCombatEventState and Combat:GetOrCreateActionCombatEventState(castEntry, spell) or nil
-        if type(state) == "table" and type(Combat.RegisterActionCasterEventOutcome) == "function" then
-            Combat:RegisterActionCasterEventOutcome(state, { entry.defenderEventId }, {
-                effectType = "damage",
-                attackType = entry.attackType,
-                hitType = type(damageResult) == "table" and damageResult.hitType or nil,
-                wasCritical = type(damageResult) == "table" and damageResult.wasCritical == true,
-            })
-        end
-        local defenderIsLocalAuthority = isLocalAuthorityForUnit(entry.eventState, entry.defenderUnit)
-        -- The defender owns the final post-absorb result for remote hits.
-        -- The attacker still completes action bookkeeping, but must not emit a preview log.
-        if defenderIsLocalAuthority and type(Combat.RegisterActionDamageCombatLog) == "function" then
-            Combat:RegisterActionDamageCombatLog(entry, damageResult)
-        end
-        finalizeDamageCombatEvents(client, entry, true)
-        if hasAuthoritativeDamageOutcome then
-            Combat:EmitDamageTypeEvent(client, entry, {
-                applied = authoritativeDamageApplied,
-                appliedDelta = authoritativeAppliedDelta or 0,
-                damageSchoolRef = authoritativeDamageSchoolRef,
-            })
-        end
-
-        if type(client.MarkEventUnitInteraction) == "function" then
-            client:MarkEventUnitInteraction(entry.eventState, entry.attackerUnit, entry.defenderUnit, damageResult, entry.spellRef)
-        end
-
-        local spellcasting = Client.Spellcasting or nil
-        if spellcasting and type(spellcasting.ShowLocalResourceDeltaCombatText) == "function" then
-            spellcasting.ShowLocalResourceDeltaCombatText(
-                client,
-                entry.eventState,
-                entry.attackerUnit,
-                entry.defenderUnit,
-                damageResult and damageResult.resourceDeltas or nil,
-                damageResult and damageResult.hitType or nil,
-                damageResult
-            )
-        end
-
-        local auraManager = Client.Spellcasting and Client.Spellcasting.AuraManager or nil
-        -- The player-response path uses the same post-absorb health contract.
-        if auraManager
-            and type(auraManager.HandleDamageTaken) == "function"
-            and (tonumber(damageResult and damageResult.appliedDelta) or 0) < 0
-        then
-            auraManager:HandleDamageTaken(client, entry.eventState, entry.defenderEventId, entry.context)
-        end
-    elseif completed and resultToken == RESULT_FAIL then
-        finalizeDamageCombatEvents(client, entry, false)
-        Combat:ShowMissCombatText(entry)
-    end
-
-    return completed, result
-end
-
-function Combat:HandleCombatDamageResolved(client, arguments, sender)
-    local checkId = normalizeToken(arguments and arguments[1])
-    local eventId = normalizeToken(arguments and arguments[2])
-    local damageSchoolRef = normalizeToken(arguments and arguments[3])
-    local appliedDelta = tonumber(arguments and arguments[4])
-    local appliedToken = tostring(arguments and arguments[5] or "")
-    local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
-    if not checkId
-        or not eventId
-        or appliedDelta == nil
-        or (appliedToken ~= "0" and appliedToken ~= "1")
-    then
-        return false
-    end
-
-    if not entry then
-        local eventState = client.GetEventState and client:GetEventState() or nil
-        if type(eventState) == "table" and eventState.active == true and tostring(eventState.id or "") == eventId then
-            return sendDamageOutcomeAcknowledgement(sender, checkId, eventId)
-        end
-        return false
-    end
-
-    if eventId ~= entry.eventId then
-        return false
-    end
-
-    local expectedSender = resolveSenderForUnit(entry.eventState, entry.defenderUnit)
-    if expectedSender ~= "" and expectedSender ~= getResolvedName(sender) then
-        return false
-    end
-
-    if entry.damageResolutionPending ~= true then
-        -- The outcome can legitimately arrive before the hit-check response.
-        -- Retain it and withhold the ACK until the response makes it usable.
-        entry.pendingDamageOutcome = {
-            sender = sender,
-            arguments = {
-                checkId,
-                eventId,
-                damageSchoolRef or "",
-                tostring(appliedDelta),
-                appliedToken,
-            },
-            receivedAtMs = getNowMilliseconds(),
-        }
-        return true, buildCombatResult(entry, nil, "damage-outcome-buffered")
-    end
-
-    local completed, result = self:HandleDamageHitCheckResponse(client, {
-        checkId,
-        eventId,
-        RESULT_PASS,
-        "",
-        "",
-        damageSchoolRef or "",
-        tostring(appliedDelta),
-        appliedToken,
-    }, sender)
-    if not completed then
-        entry.damageResolutionPending = true
-        entry.pendingDamageResultToken = RESULT_PASS
-    else
-        entry.damageResolutionPending = nil
-        entry.pendingDamageResultToken = nil
-    end
-    if completed then
-        sendDamageOutcomeAcknowledgement(sender, checkId, eventId)
-    end
-    return completed, result
-end
-
-function Combat:HandleCombatDamageResolvedAck(client, arguments, sender)
-    local checkId = normalizeToken(arguments and arguments[1])
-    local eventId = normalizeToken(arguments and arguments[2])
-    local outcomes = getPendingDamageOutcomes(client, false)
-    local outcome = outcomes and checkId and outcomes[checkId] or nil
-    if type(outcome) ~= "table"
-        or not eventId
-        or tostring(outcome.eventId or "") ~= eventId
-        or tostring(outcome.targetName or "") ~= getResolvedName(sender)
-    then
-        return false
-    end
-
-    outcomes[checkId] = nil
-    return true
+    return false
 end
 
 return true

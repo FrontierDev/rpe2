@@ -191,7 +191,12 @@ local function applyClientResourceDeltasToServerState(server, state, clientName,
         return false
     end
 
-    local normalizedResourceDeltas = ResourceSync.CoalesceResourceDeltas and ResourceSync.CoalesceResourceDeltas(resourceDeltas) or {}
+    if type(ResourceSync.CoalesceResourceDeltas) ~= "function"
+        or type(ResourceSync.ApplyResourceDeltasToEventUnitByEventID) ~= "function"
+    then
+        return false
+    end
+    local normalizedResourceDeltas = ResourceSync.CoalesceResourceDeltas(resourceDeltas)
     if type(normalizedResourceDeltas) ~= "table" or #normalizedResourceDeltas == 0 then
         return false
     end
@@ -309,14 +314,14 @@ end
 
 local function normalizeResourceDeltas(resourceDeltas)
     if type(ResourceSync.CoalesceResourceDeltas) ~= "function" then
-        return type(resourceDeltas) == "table" and resourceDeltas or {}
+        return nil
     end
     return ResourceSync.CoalesceResourceDeltas(resourceDeltas)
 end
 
 local function normalizeTargetedResourceDeltas(targetedResourceDeltas)
     if type(ResourceSync.CoalesceTargetedResourceDeltas) ~= "function" then
-        return type(targetedResourceDeltas) == "table" and targetedResourceDeltas or {}
+        return nil
     end
     return ResourceSync.CoalesceTargetedResourceDeltas(targetedResourceDeltas)
 end
@@ -738,7 +743,13 @@ function Server:HandleResource(arguments, sender)
         return false
     end
 
-    local resources = ResourceSync.NormalizeResources and ResourceSync.NormalizeResources(arguments and arguments[3] or "") or {}
+    if type(ResourceSync.NormalizeResources) ~= "function" then
+        if Debug and type(Debug.Error) == "function" then
+            Debug.Error("RESOURCE bootstrap rejected: resource normalization is unavailable.")
+        end
+        return false
+    end
+    local resources = ResourceSync.NormalizeResources(arguments and arguments[3] or "")
     local hadCachedResources = type(clientState.resources) == "table" and #clientState.resources > 0
     local cachedChanged = not hadCachedResources
         or not (ResourceSync.ResourcesEqual and ResourceSync.ResourcesEqual(clientState.resources, resources))
@@ -918,7 +929,7 @@ end
 
 local function handleEventResourceTransaction(envelope, context, operation)
     local state = Server.State
-    local eventState = context and context.eventState or Server.EventState
+    local eventState = Server.GetEventState and Server:GetEventState() or Server.EventState
     local input = type(envelope and envelope.input) == "table" and envelope.input or {}
     local originName = Common.NormalizeName(envelope and envelope.originName)
     if type(state) ~= "table" or state.active ~= true
@@ -927,6 +938,15 @@ local function handleEventResourceTransaction(envelope, context, operation)
         or originName == ""
     then
         return { state = "rejected", outcome = { reason = "inactive-event" } }
+    end
+    if type(ResourceSync.NormalizeResources) ~= "function"
+        or type(ResourceSync.CoalesceResourceDeltas) ~= "function"
+        or type(ResourceSync.CoalesceTargetedResourceDeltas) ~= "function"
+        or type(ResourceSync.ApplyResourcesToEventUnitByEventID) ~= "function"
+        or type(ResourceSync.ApplyResourceDeltasToEventUnitByEventID) ~= "function"
+        or type(Server.BroadcastEventDeltaBatch) ~= "function"
+    then
+        return { state = "rejected", outcome = { reason = "resource-sync-unavailable" } }
     end
 
     local changedByEventId = {}
@@ -939,7 +959,7 @@ local function handleEventResourceTransaction(envelope, context, operation)
     if operation == "event-resource-replace" then
         local targetEventId = tonumber(input.targetEventId or envelope.targetEventIds and envelope.targetEventIds[1]) or 0
         local targetUnit, targetReason = validateResourceTarget(eventState, envelope, targetEventId)
-        local resources = ResourceSync.NormalizeResources and ResourceSync.NormalizeResources(input.resources) or input.resources
+        local resources = ResourceSync.NormalizeResources(input.resources)
         if not targetUnit then
             return { state = "rejected", outcome = { reason = targetReason or "invalid-target" } }
         end
@@ -1059,16 +1079,18 @@ local function handleEventResourceTransaction(envelope, context, operation)
     }
 end
 
-if EventTransactions and type(EventTransactions.Server) == "table"
-    and type(EventTransactions.Server.Register) == "function"
+if type(EventTransactions) ~= "table"
+    or type(EventTransactions.Server) ~= "table"
+    or type(EventTransactions.Server.Register) ~= "function"
 then
-    EventTransactions.Server:Register("event-resource-delta", function(envelope, context)
-        return handleEventResourceTransaction(envelope, context, "event-resource-delta")
-    end)
-    EventTransactions.Server:Register("event-resource-batch", function(envelope, context)
-        return handleEventResourceTransaction(envelope, context, "event-resource-batch")
-    end)
-    EventTransactions.Server:Register("event-resource-replace", function(envelope, context)
-        return handleEventResourceTransaction(envelope, context, "event-resource-replace")
-    end)
+    error("Authoritative EventTransactions server service is unavailable for resource mutations.")
 end
+EventTransactions.Server:Register("event-resource-delta", function(envelope, context)
+    return handleEventResourceTransaction(envelope, context, "event-resource-delta")
+end)
+EventTransactions.Server:Register("event-resource-batch", function(envelope, context)
+    return handleEventResourceTransaction(envelope, context, "event-resource-batch")
+end)
+EventTransactions.Server:Register("event-resource-replace", function(envelope, context)
+    return handleEventResourceTransaction(envelope, context, "event-resource-replace")
+end)

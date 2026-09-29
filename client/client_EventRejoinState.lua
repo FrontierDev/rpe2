@@ -298,9 +298,13 @@ function Client:HandleEventRejoinState(arguments, sender)
         return false
     end
     clearRejoinTransientState()
-    if type(self.HandleEventUnits) == "function"
-        and type(serializedUnits) == "string" and serializedUnits ~= ""
-    then
+    if type(serializedUnits) == "string" and serializedUnits ~= "" then
+        if type(self.HandleEventUnits) ~= "function" then
+            if type(Debug.Error) == "function" then
+                Debug.Error("Event rejoin state cannot install authoritative units: EVENT_UNITS handler unavailable.")
+            end
+            return false
+        end
         local applied = self:HandleEventUnits({
             channelName,
             eventId,

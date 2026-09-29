@@ -53,7 +53,7 @@ jobs:
           lua5.1 tests/IsolationHarnessTest.lua
           lua5.1 tests/EventTransactionFoundationTest.lua
           lua5.1 tests/CombatTransactionIntegrationTest.lua
-          lua5.1 tests/CombatTransportReliabilityTest.lua
+          lua5.1 tests/CombatSyncAcceptanceTest.lua
           lua5.1 tests/EventSnapshotRepairTest.lua
           lua5.1 tests/EventLifecycleConvergenceTest.lua
           lua5.1 tests/ResourceMutationReliabilityTest.lua
