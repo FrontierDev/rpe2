@@ -2408,10 +2408,19 @@ function Server:EndEvent(reason)
     if type(self.PendingEventAdvanceCommit) == "table"
         and tostring(self.PendingEventAdvanceCommit.eventId or "") == tostring(eventState.id or "")
     then
-        if Client and type(Client.CancelPendingTurnCommit) == "function" then
-            Client:CancelPendingTurnCommit("event-ending", eventState.id)
-        end
         self.PendingEventAdvanceCommit = nil
+    end
+
+    if Client and type(Client.CancelPendingTurnCommit) == "function" then
+        Client:CancelPendingTurnCommit("event-ending", eventState.id)
+    end
+    if Client and type(Client.ClearAutopilotBatch) == "function" then
+        Client:ClearAutopilotBatch(eventState.id, reason or "event-ended")
+    end
+    if type(self.LastEventAdvanceCommit) == "table"
+        and tostring(self.LastEventAdvanceCommit.eventId or "") == tostring(eventState.id or "")
+    then
+        self.LastEventAdvanceCommit = nil
     end
 
     if Client and type(Client.ResetEventResourceDeltas) == "function" then

@@ -199,6 +199,11 @@ function Client:IsAutopilotPlanStateStale(state)
     then
         return true
     end
+    if math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
+        ~= math.max(0, math.floor(tonumber(state.liveUnitRevision) or 0))
+    then
+        return true
+    end
 
     local runtime = type(Client.AutopilotRuntimeByEventId) == "table"
         and Client.AutopilotRuntimeByEventId[tostring(state.eventId or "")]
@@ -358,6 +363,7 @@ function Client:StartAutopilotStep(eventStateOverride)
     state.runtimeRef = runtime
     state.planRecord = plan
     state.stepCapacity = stepCapacity
+    state.liveUnitRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
     runtime.planByStepKey[planId] = plan
     runtime.activePlanId = planId
     runtime.plannerStatus = "planning"

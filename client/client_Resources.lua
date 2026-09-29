@@ -22,6 +22,7 @@ Client.ResourceSyncQueued = Client.ResourceSyncQueued or false
 Client.LastResourceSyncSignature = Client.LastResourceSyncSignature or nil
 Client.PendingResourceDeltaFlushQueued = Client.PendingResourceDeltaFlushQueued or false
 Client.PendingResourceDeltaFlushQueuedByScope = Client.PendingResourceDeltaFlushQueuedByScope or {}
+Client.PendingResourceDeltaFlushQueuedEventIdByScope = Client.PendingResourceDeltaFlushQueuedEventIdByScope or {}
 Client.PendingResourceDeltaBatches = Client.PendingResourceDeltaBatches or {}
 Client.LastAppliedTurnRegenKey = Client.LastAppliedTurnRegenKey or nil
 
@@ -797,15 +798,22 @@ local function shouldDeferTurnResourceDeltas(targetClient, state, options)
         and eventState.channelName == state.channelName
 end
 
-local function flushQueuedClientResourceDeltas(targetClient, expectedState, expectedScope)
+local function flushQueuedClientResourceDeltas(targetClient, expectedState, expectedScope, expectedEventId)
     if type(targetClient) ~= "table" then
         return false
     end
 
     local scope = normalizePendingScope(expectedScope)
-    targetClient.PendingResourceDeltaFlushQueued = false
+    local normalizedExpectedEventId = tostring(expectedEventId or "")
     targetClient.PendingResourceDeltaFlushQueuedByScope = targetClient.PendingResourceDeltaFlushQueuedByScope or {}
-    targetClient.PendingResourceDeltaFlushQueuedByScope[scope] = false
+    targetClient.PendingResourceDeltaFlushQueuedEventIdByScope = targetClient.PendingResourceDeltaFlushQueuedEventIdByScope or {}
+    if normalizedExpectedEventId == ""
+        or tostring(targetClient.PendingResourceDeltaFlushQueuedEventIdByScope[scope] or "") == normalizedExpectedEventId
+    then
+        targetClient.PendingResourceDeltaFlushQueued = false
+        targetClient.PendingResourceDeltaFlushQueuedByScope[scope] = false
+        targetClient.PendingResourceDeltaFlushQueuedEventIdByScope[scope] = nil
+    end
 
     local pendingBatches = targetClient.PendingResourceDeltaBatches or {}
     if targetClient.State ~= expectedState or type(expectedState) ~= "table" or expectedState.active ~= true then
@@ -816,6 +824,9 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
         and targetClient:GetEventState()
         or nil
     local currentEventId = type(currentEventState) == "table" and tostring(currentEventState.id or "") or nil
+    if normalizedExpectedEventId ~= "" and currentEventId ~= normalizedExpectedEventId then
+        return false
+    end
     local currentTurnNumber = type(currentEventState) == "table"
         and tonumber(currentEventState.turnNumber)
         or nil
@@ -1069,10 +1080,12 @@ end
 
 function Client:ResetResourceState()
     self.ResourceSyncQueued = false
+    self.ResourceSyncQueuedEventId = nil
     self.LastResourceSyncSignature = nil
     self.PendingResourceDeltaFlushQueued = false
     self.PendingResourceDeltaBatches = {}
     self.PendingResourceDeltaFlushQueuedByScope = {}
+    self.PendingResourceDeltaFlushQueuedEventIdByScope = {}
     self.LastAppliedTurnRegenKey = nil
 end
 
@@ -1091,10 +1104,17 @@ function Client:ResetEventResourceDeltas(eventId)
         end
     end
 
-    if removed then
+    local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
+    if type(currentEventState) ~= "table"
+        or tostring(currentEventState.id or "") == normalizedEventId
+    then
         self.PendingResourceDeltaFlushQueuedByScope = self.PendingResourceDeltaFlushQueuedByScope or {}
         self.PendingResourceDeltaFlushQueuedByScope.turn = false
+        self.PendingResourceDeltaFlushQueuedEventIdByScope = self.PendingResourceDeltaFlushQueuedEventIdByScope or {}
+        self.PendingResourceDeltaFlushQueuedEventIdByScope.turn = nil
         self.PendingResourceDeltaFlushQueued = false
+        self.ResourceSyncQueued = false
+        self.ResourceSyncQueuedEventId = nil
     end
 
     return removed
@@ -1205,28 +1225,49 @@ function Client:QueueClientResourceSync(reason, options)
         return false
     end
 
-    if self.ResourceSyncQueued then
+    local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
+    local queuedEventId = type(currentEventState) == "table" and tostring(currentEventState.id or "") or ""
+    if type(currentEventState) == "table"
+        and math.max(0, math.floor(tonumber(currentEventState.liveUnitRevision) or 0)) > 0
+    then
+        return false
+    end
+    if self.ResourceSyncQueued and tostring(self.ResourceSyncQueuedEventId or "") == queuedEventId then
         return true
     end
 
     self.ResourceSyncQueued = true
+    self.ResourceSyncQueuedEventId = queuedEventId
     local playerName = options.playerName or getPlayerNameForState(state) or "unknown"
     local targetEventId = tonumber(options.targetEventId) or nil
     local capturedResources = nil
     if resources ~= nil then
         capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources
     end
-    local enqueued = enqueueResourceSync(function(targetClient, expectedState, syncReason, queuedPlayerName, queuedResources)
-        targetClient.ResourceSyncQueued = false
+    local enqueued = enqueueResourceSync(function(targetClient, expectedState, expectedEventId, syncReason, queuedPlayerName, queuedResources)
+        if tostring(targetClient.ResourceSyncQueuedEventId or "") == expectedEventId then
+            targetClient.ResourceSyncQueued = false
+            targetClient.ResourceSyncQueuedEventId = nil
+        end
 
         if targetClient.State ~= expectedState or not expectedState or expectedState.active ~= true then
             return
         end
 
+        local targetEventState = targetClient.GetEventState and targetClient:GetEventState() or targetClient.EventState
+        if expectedEventId ~= ""
+            and tostring(type(targetEventState) == "table" and targetEventState.id or "") ~= expectedEventId
+        then
+            return
+        end
+
         targetClient:SendClientResources(expectedState, syncReason, queuedPlayerName, queuedResources, targetEventId)
-    end, self, state, reason, playerName, capturedResources)
+    end, self, state, queuedEventId, reason, playerName, capturedResources)
     if not enqueued then
-        self.ResourceSyncQueued = false
+        if tostring(self.ResourceSyncQueuedEventId or "") == queuedEventId then
+            self.ResourceSyncQueued = false
+            self.ResourceSyncQueuedEventId = nil
+        end
         return false
     end
 
@@ -1326,16 +1367,19 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
     end
 
     self.PendingResourceDeltaFlushQueuedByScope = self.PendingResourceDeltaFlushQueuedByScope or {}
+    self.PendingResourceDeltaFlushQueuedEventIdByScope = self.PendingResourceDeltaFlushQueuedEventIdByScope or {}
     if self.PendingResourceDeltaFlushQueuedByScope[scope] == true then
         return true
     end
 
     self.PendingResourceDeltaFlushQueued = true
     self.PendingResourceDeltaFlushQueuedByScope[scope] = true
-    local enqueued = enqueueResourceSync(flushQueuedClientResourceDeltas, self, state, scope)
+    self.PendingResourceDeltaFlushQueuedEventIdByScope[scope] = tostring(eventId or "")
+    local enqueued = enqueueResourceSync(flushQueuedClientResourceDeltas, self, state, scope, eventId)
     if not enqueued then
         self.PendingResourceDeltaFlushQueued = false
         self.PendingResourceDeltaFlushQueuedByScope[scope] = false
+        self.PendingResourceDeltaFlushQueuedEventIdByScope[scope] = nil
         return false
     end
 

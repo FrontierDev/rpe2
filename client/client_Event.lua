@@ -107,6 +107,30 @@ local function requestAuthoritativeEventSnapshot(client, eventState, expectedRev
     return sent
 end
 
+local function clearEventSnapshotRepair(client, eventId)
+    if type(client) ~= "table" then
+        return false
+    end
+    local normalizedEventId = eventId ~= nil and tostring(eventId or "") or nil
+    local repair = client.EventSnapshotRepair
+    if normalizedEventId ~= nil
+        and type(repair) == "table"
+        and tostring(repair.eventId or "") ~= normalizedEventId
+    then
+        return false
+    end
+    client.EventSnapshotRepair = nil
+    client.EventSnapshotRepairRequestedRevision = nil
+    client.EventSnapshotRepairReason = nil
+    if normalizedEventId == nil
+        or tostring(client.EventSnapshotRepairTimerEventId or "") == normalizedEventId
+    then
+        client.EventSnapshotRepairTimerActive = nil
+        client.EventSnapshotRepairTimerEventId = nil
+    end
+    return true
+end
+
 function Client:RequestAuthoritativeEventSnapshot(eventState, expectedRevision, reason, nowMs)
     return requestAuthoritativeEventSnapshot(self, eventState, expectedRevision, reason, nowMs)
 end
@@ -123,16 +147,32 @@ function Client:ProcessEventSnapshotRepair(nowMs)
 end
 
 scheduleSnapshotRepair = function(client)
-    if type(client) ~= "table" or client.EventSnapshotRepairTimerActive == true or not (C_Timer and C_Timer.After) then
+    if type(client) ~= "table" or not (C_Timer and C_Timer.After) then
+        return false
+    end
+    local repair = client.EventSnapshotRepair
+    local eventId = type(repair) == "table" and tostring(repair.eventId or "") or ""
+    if eventId == "" then
+        return false
+    end
+    if client.EventSnapshotRepairTimerActive == true
+        and tostring(client.EventSnapshotRepairTimerEventId or "") == eventId
+    then
         return false
     end
     client.EventSnapshotRepairTimerActive = true
+    client.EventSnapshotRepairTimerEventId = eventId
     C_Timer.After(SNAPSHOT_REPAIR_RETRY_MS / 1000, function()
-        client.EventSnapshotRepairTimerActive = nil
+        if tostring(client.EventSnapshotRepairTimerEventId or "") == eventId then
+            client.EventSnapshotRepairTimerActive = nil
+            client.EventSnapshotRepairTimerEventId = nil
+        end
         local repair = client.EventSnapshotRepair
         local eventState = client.GetEventState and client:GetEventState() or nil
         if type(repair) == "table" and type(eventState) == "table"
-            and eventState.active == true and tostring(eventState.id or "") == tostring(repair.eventId or "")
+            and eventState.active == true
+            and tostring(eventState.id or "") == eventId
+            and tostring(repair.eventId or "") == eventId
         then
             client:ProcessEventSnapshotRepair()
         end
@@ -1757,6 +1797,11 @@ tryQueueInitialLocalResourceSync = function(client, sessionState, eventState, re
         return false
     end
 
+    if math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) > 0 then
+        sessionState.lastResourceSyncEventId = eventState.id
+        return false
+    end
+
     local profileLogic = Addon.Internal and Addon.Internal.Profile or nil
     if type(profileLogic) == "table" then
         if type(profileLogic.WarmResolvedBootstrapState) == "function" then
@@ -2652,6 +2697,9 @@ local function clearEventStateNow(client, state, reason, options)
     local transition = client.EventTransition
     local eventState = type(state) == "table" and state or (transition and transition.eventState)
     local eventId = eventState and eventState.id or nil
+    if eventId == nil and EventTransactions and type(EventTransactions.Client) == "table" then
+        eventId = EventTransactions.Client.currentEventId
+    end
     if EventTransactions and type(EventTransactions.Client) == "table"
         and eventId ~= nil and type(EventTransactions.Client.EndEvent) == "function"
     then
@@ -2676,6 +2724,25 @@ local function clearEventStateNow(client, state, reason, options)
     end
     if type(client.ResetEventResourceDeltas) == "function" then
         client:ResetEventResourceDeltas(eventId)
+    end
+    clearEventSnapshotRepair(client, eventId)
+    if type(client.PendingEventRejoinStateByEventId) == "table" and eventId ~= nil then
+        client.PendingEventRejoinStateByEventId[tostring(eventId or "")] = nil
+    end
+    if type(client.ClearAutopilotBatch) == "function" then
+        client:ClearAutopilotBatch(eventId, reason or "event-reset")
+    end
+    if eventId ~= nil then
+        local normalizedEventId = tostring(eventId or "")
+        if type(client.EventUnitTauntApplications) == "table" then
+            client.EventUnitTauntApplications[normalizedEventId] = nil
+        end
+        if type(client.AutopilotTurnOutcomesByEventId) == "table" then
+            client.AutopilotTurnOutcomesByEventId[normalizedEventId] = nil
+        end
+        if type(client.AutopilotRuntimeByEventId) == "table" then
+            client.AutopilotRuntimeByEventId[normalizedEventId] = nil
+        end
     end
     if options.skipCancel ~= true then
         cancelEventSliceableWork(client, eventId, options.cancelReason or "event-reset")
@@ -3314,7 +3381,7 @@ function Client:HandleEventUnits(arguments)
     end
 
     local eventId = arguments and arguments[2] or nil
-    if eventState.id and eventState.id ~= "" and eventId and eventId ~= "" and eventState.id ~= eventId then
+    if tostring(eventId or "") == "" or tostring(eventState.id or "") ~= tostring(eventId or "") then
         return false
     end
 
@@ -3353,19 +3420,31 @@ function Client:HandleEventUnits(arguments)
     if receivedRevision > 0 then
         eventState.liveUnitRevision = receivedRevision
     end
-    local requestedRevision = tonumber(self.EventSnapshotRepairRequestedRevision)
+    local repair = self.EventSnapshotRepair
+    local requestedRevision = type(repair) == "table"
+        and tostring(repair.eventId or "") == tostring(eventState.id or "")
+        and tonumber(repair.revision)
+        or nil
     if requestedRevision and receivedRevision >= requestedRevision then
-        self.EventSnapshotRepairRequestedRevision = nil
-        self.EventSnapshotRepairReason = nil
-        self.EventSnapshotRepair = nil
-        if type(self.ClearCombatReactionRuntime) == "function" then
-            self:ClearCombatReactionRuntime(eventState.id, "authoritative-resync")
-        end
+        clearEventSnapshotRepair(self, eventState.id)
     end
     eventState.rosterReady = true
     eventState.unitsChunkReceived = eventState.unitsChunkExpected or eventState.unitsChunkReceived or 0
     if ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(eventState)
+    end
+    if type(self.ClearCombatReactionRuntime) == "function" then
+        self:ClearCombatReactionRuntime(eventState.id, "authoritative-snapshot")
+    end
+    if type(self.PruneCombatReactionTransactions) == "function" then
+        self:PruneCombatReactionTransactions("authoritative-snapshot")
+    end
+    if type(self.ClearAutopilotBatch) == "function" then
+        local isHost = type(self.IsLocalEventHost) == "function" and self:IsLocalEventHost(eventState) == true
+        self:ClearAutopilotBatch(eventState.id, "authoritative-snapshot")
+        if isHost and type(self.StartAutopilotStep) == "function" and type(Addon.Server) == "table" then
+            self:StartAutopilotStep(Addon.Server.EventState or eventState)
+        end
     end
     refreshEventStartupPhase(eventState, startupRuntime)
     appendTimingPart(timingParts, "readiness", readinessStartTime, 10)
@@ -3429,12 +3508,15 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     end
 
     local eventId = arguments and arguments[2] or nil
-    if eventState.id and eventState.id ~= "" and eventId and eventId ~= "" and eventState.id ~= eventId then
+    if tostring(eventId or "") == "" or tostring(eventState.id or "") ~= tostring(eventId or "") then
         return false
     end
 
     local receivedRevision = math.max(0, math.floor(tonumber(arguments and arguments[4]) or 0))
     local localRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
+    if receivedRevision == 0 and localRevision > 0 then
+        return true
+    end
     if receivedRevision > 0 and receivedRevision <= localRevision then
         return true
     end
@@ -3509,6 +3591,13 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     if type(self.PruneCombatReactionTransactions) == "function" then
         self:PruneCombatReactionTransactions("event-unit-delta")
     end
+    if type(self.ClearAutopilotBatch) == "function" then
+        local isHost = type(self.IsLocalEventHost) == "function" and self:IsLocalEventHost(eventState) == true
+        self:ClearAutopilotBatch(eventState.id, "authoritative-unit-delta")
+        if isHost and type(self.StartAutopilotStep) == "function" and type(Addon.Server) == "table" then
+            self:StartAutopilotStep(Addon.Server.EventState or eventState)
+        end
+    end
     return true
 end
 
@@ -3577,11 +3666,15 @@ function Client:HandleEventState(arguments)
     end
 
     local eventId = arguments and arguments[2] or nil
-    if eventState.id and eventState.id ~= "" and eventId and eventId ~= "" and eventState.id ~= eventId then
+    if tostring(eventId or "") == "" or tostring(eventState.id or "") ~= tostring(eventId or "") then
         return false
     end
 
     local expectedRevision, stateArgumentCount = getLiveUnitRevisionFromStateArguments(arguments)
+    local localRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
+    if (expectedRevision == 0 and localRevision > 0) or (expectedRevision > 0 and expectedRevision < localRevision) then
+        return true
+    end
     if expectedRevision > math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) then
         requestAuthoritativeEventSnapshot(self, eventState, expectedRevision, "state-revision-mismatch")
     end

@@ -874,11 +874,34 @@ end
 function Server:StopServer(reason)
     local state = self.State
     if not state then
+        local serverTransactions = self.EventTransactions
+        local remainingEventId = type(serverTransactions) == "table"
+            and tostring(serverTransactions.currentEventId or "")
+            or ""
+        if remainingEventId ~= "" and type(serverTransactions.EndEvent) == "function" then
+            if Debug and type(Debug.Error) == "function" then
+                Debug.Error("Clearing server transaction scope without session state: eventId=%s.", remainingEventId)
+            end
+            serverTransactions:EndEvent(remainingEventId, reason or "server-stopped-safety")
+        end
         return false
     end
 
     if self:IsEventActive() then
         self:EndEvent(reason or "server-stopped")
+    end
+
+    local serverTransactions = self.EventTransactions
+    local remainingEventId = type(serverTransactions) == "table"
+        and tostring(serverTransactions.currentEventId or "")
+        or ""
+    if remainingEventId ~= "" then
+        if Debug and type(Debug.Error) == "function" then
+            Debug.Error("Clearing server transaction scope after StopServer: eventId=%s.", remainingEventId)
+        end
+        if type(serverTransactions.EndEvent) == "function" then
+            serverTransactions:EndEvent(remainingEventId, reason or "server-stopped-safety")
+        end
     end
 
     local distribution, target = buildServerRoute(Common.GetGroupType() or state.distribution)
