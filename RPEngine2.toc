@@ -58,6 +58,7 @@ core/internal/comms/EventUnitTaunt.lua
 core/internal/comms/EventUnitTauntApplied.lua
 core/internal/comms/EventTurnComplete.lua
 core/internal/comms/Serialization.lua
+core/internal/comms/EventTransactions.lua
 core/internal/comms/ThreatUpdates.lua
 core/internal/comms/EventRejoinState.lua
 core/internal/comms/Core.lua

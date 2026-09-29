@@ -10,6 +10,7 @@ local Debug = Addon.Debug
 local Common = Addon.Utils.Common
 local Commands = Addon.Commands
 local Comms = Addon.Internal.Comms
+local EventTransactions = Comms.EventTransactions
 local Event = Addon.Internal.Database.Classes.Event
 local ResourceSync = Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local EventUnit = Addon.Internal.Database.Classes.EventUnit
@@ -2651,6 +2652,11 @@ local function clearEventStateNow(client, state, reason, options)
     local transition = client.EventTransition
     local eventState = type(state) == "table" and state or (transition and transition.eventState)
     local eventId = eventState and eventState.id or nil
+    if EventTransactions and type(EventTransactions.Client) == "table"
+        and eventId ~= nil and type(EventTransactions.Client.EndEvent) == "function"
+    then
+        EventTransactions.Client:EndEvent(eventId, reason or "event-reset")
+    end
     local eventMeters = client.EventMeters
     if type(eventMeters) == "table" and type(eventMeters.ResetEvent) == "function" and eventId ~= nil then
         eventMeters:ResetEvent(eventId)
@@ -3124,6 +3130,11 @@ function Client:HandleEventStart(arguments, sender)
     appendTimingPart(timingParts, "hydrate-resources", hydrateStartTime, 10)
 
     self.EventState = nextState
+    if EventTransactions and type(EventTransactions.Client) == "table"
+        and type(EventTransactions.Client.StartEvent) == "function"
+    then
+        EventTransactions.Client:StartEvent(nextState.id)
+    end
     local transition = self:BeginEventTransition("starting", nextState.id)
     transition.eventState = nextState
     local startupRuntime = getEventStartupRuntime(self, nextState.id, true)

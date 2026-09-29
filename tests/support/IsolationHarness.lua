@@ -434,6 +434,7 @@ local function makeRuntime(world, name, isHost)
     node:LoadFile("utils/Common.lua")
     node:LoadFile("core/internal/comms/Serialization.lua")
     node:LoadFile("core/internal/comms/Operations.lua")
+    node:LoadFile("core/internal/comms/EventTransactions.lua")
     return node
 end
 
@@ -572,6 +573,7 @@ function World:StartEvent(fixture)
         state.active = state.active ~= false
         state.channelName = channelName
         state.channelId = channelId
+        state.hostName = state.hostName or (self.host and self.host.Name or "")
         node:StartEventState(state, node.IsHost and clone(fixture) or nil)
         node.SessionState.active = true
         node.SessionState.channelName = channelName
@@ -583,6 +585,35 @@ function World:StartEvent(fixture)
         self.host.ServerEventState.active = self.host.ServerEventState.active ~= false
         self.host.ServerEventState.channelName = channelName
         self.host.ServerEventState.channelId = channelId
+        self.host.ServerEventState.hostName = self.host.ServerEventState.hostName
+            or (self.host and self.host.Name or "")
+    end
+    for _, node in ipairs(self.nodes) do
+        local transactions = node.Addon.Client and node.Addon.Client.EventTransactions
+        if transactions then
+            transactions:StartEvent(node.EventState and node.EventState.id)
+        end
+        if node.IsHost and node.Addon.Server and node.Addon.Server.EventTransactions then
+            node.Addon.Server.EventTransactions:StartEvent(node.ServerEventState and node.ServerEventState.id)
+        end
+    end
+end
+
+function World:EndEvent(reason)
+    local eventId = self.host and self.host.EventState and self.host.EventState.id or nil
+    for _, node in ipairs(self.nodes) do
+        if node.Addon.Client and node.Addon.Client.EventTransactions and eventId then
+            node.Addon.Client.EventTransactions:EndEvent(eventId, reason or "ended")
+        end
+        if node.IsHost and node.Addon.Server and node.Addon.Server.EventTransactions and eventId then
+            node.Addon.Server.EventTransactions:EndEvent(eventId, reason or "ended")
+        end
+        if node.EventState then
+            node.EventState.active = false
+        end
+        if node.ServerEventState then
+            node.ServerEventState.active = false
+        end
     end
 end
 

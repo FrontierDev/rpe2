@@ -9,6 +9,7 @@ local Server = Addon.Server
 local Client = Addon.Client
 local Common = Addon.Utils.Common
 local Comms = Addon.Internal.Comms
+local EventTransactions = Comms.EventTransactions
 local Operations = Comms.Operations
 local ResourceSync = Comms.ResourceSync or {}
 local Ruleset = Addon.Internal.Ruleset or {}
@@ -2343,6 +2344,11 @@ function Server:StartEvent(data)
     stopTiming(buildStateTimer)
 
     self.EventState = eventState
+    if EventTransactions and type(EventTransactions.Server) == "table"
+        and type(EventTransactions.Server.StartEvent) == "function"
+    then
+        EventTransactions.Server:StartEvent(eventState.id)
+    end
     if type(Client.EventMeters) == "table" and type(Client.EventMeters.ResetEvent) == "function" then
         Client.EventMeters:ResetEvent(eventState.id)
     end
@@ -2392,6 +2398,11 @@ function Server:EndEvent(reason)
     local eventState = self.EventState
     if not eventState then
         return false
+    end
+    if EventTransactions and type(EventTransactions.Server) == "table"
+        and type(EventTransactions.Server.EndEvent) == "function"
+    then
+        EventTransactions.Server:EndEvent(eventState.id, reason or "ended")
     end
 
     if type(self.PendingEventAdvanceCommit) == "table"

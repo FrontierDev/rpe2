@@ -8,6 +8,7 @@ local Client = Addon.Client
 local Debug = Addon.Debug
 local Common = Addon.Utils.Common
 local Comms = Addon.Internal.Comms
+local EventTransactions = Comms.EventTransactions
 local Operations = Comms.Operations
 local Registry = Addon.Internal.Registry or {}
 local NativeJoinChannel = Comms and Comms.JoinChannel or nil
@@ -1143,6 +1144,14 @@ end
 -- to control whether to send disconnect messages or leave the channel.
 function Client:Reset(reason, options)
     local state = self.State
+    local transactionEventId = type(self.EventState) == "table" and self.EventState.id
+        or (EventTransactions and EventTransactions.Client and EventTransactions.Client.currentEventId)
+    if EventTransactions and type(EventTransactions.Client) == "table"
+        and type(EventTransactions.Client.EndEvent) == "function"
+        and transactionEventId ~= nil
+    then
+        EventTransactions.Client:EndEvent(transactionEventId, reason or "session-reset")
+    end
     self.LastStopReason = reason
     self.ServerQueryQueued = false
     self.ClientConnectRefreshQueued = false
