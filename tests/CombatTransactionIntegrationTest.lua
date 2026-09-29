@@ -222,9 +222,31 @@ local function setup(options)
     server.BroadcastEventDeltaBatch = function(_, entries)
         stats.broadcasts = stats.broadcasts + 1
         server.EventState.liveUnitRevision = (tonumber(server.EventState.liveUnitRevision) or 0) + 1
-        return true
+        local eventClass = host.Addon.Internal.Database
+            and host.Addon.Internal.Database.Classes
+            and host.Addon.Internal.Database.Classes.Event
+        local serialized = eventClass
+            and eventClass.SerializeUnitDeltaBatchForNetwork
+            and eventClass.SerializeUnitDeltaBatchForNetwork(entries)
+            or ""
+        local opcode = host.Addon.Internal.Comms.Operations:GetOpcode("EVENT_UNIT_DELTA_BATCH")
+        assertTrue(type(opcode) == "number", "EVENT_UNIT_DELTA_BATCH opcode unavailable")
+        assertTrue(serialized ~= "", "authoritative delta serialization failed")
+        return host.Comms:SendToChannel(
+            server.EventState.channelId,
+            opcode,
+            {
+                server.EventState.channelName,
+                server.EventState.id,
+                serialized,
+                server.EventState.liveUnitRevision,
+            },
+            { opcode = opcode, scope = "server" }
+        )
     end
     host:LoadFile("server/server_CombatTransactions.lua")
+    assertTrue(type(host.Addon.Server.EventTransactions.handlers["combat-hit"]) == "function",
+        "combat-hit transaction handler was not registered")
     return world, host, playerA, playerB, stats
 end
 
