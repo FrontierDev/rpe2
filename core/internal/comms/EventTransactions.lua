@@ -1074,6 +1074,7 @@ function ServerService:BeginAwaitingInput(options)
         id = envelope.transactionId,
         eventId = eventId,
         envelope = envelope,
+        initialInput = clone(envelope.input),
         identityDigest = identityDigestFor(envelope),
         requestDigest = identityDigestFor(envelope),
         state = "created",
