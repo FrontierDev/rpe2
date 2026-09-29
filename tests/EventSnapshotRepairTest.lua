@@ -47,6 +47,7 @@ local eventState = {
         { eventID = 1, isPlayer = true, ownerID = "Local", resources = { { resourceRef = "health", currentValue = 10, maxValue = 10 } } },
     },
 }
+Client.EventState = eventState
 Client.GetEventState = function() return eventState end
 local sessionState = {
     active = true,
