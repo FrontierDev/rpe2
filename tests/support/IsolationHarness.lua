@@ -535,16 +535,43 @@ function World:_runDueWork()
     end
 end
 
-function World:SetTime(milliseconds)
-    self.nowMs = tonumber(milliseconds) or 0
+function World:_advanceTo(targetMs)
+    local target = tonumber(targetMs) or self.nowMs
+    assert(target >= self.nowMs, "fake time cannot move backwards")
+
+    while true do
+        local nextDue
+        for _, timer in ipairs(self.timers) do
+            if not timer.cancelled and timer.dueMs <= target
+                and (nextDue == nil or timer.dueMs < nextDue)
+            then
+                nextDue = timer.dueMs
+            end
+        end
+        if nextDue == nil then
+            break
+        end
+        self.nowMs = nextDue
+        self:_runDueWork()
+    end
+
+    self.nowMs = target
     self:_runDueWork()
+end
+
+function World:SetTime(milliseconds)
+    local target = tonumber(milliseconds) or 0
+    if target < self.nowMs then
+        self.nowMs = target
+        return
+    end
+    self:_advanceTo(target)
 end
 
 function World:AdvanceTime(milliseconds)
     local delta = tonumber(milliseconds) or 0
     assert(delta >= 0, "fake time cannot move backwards")
-    self.nowMs = self.nowMs + delta
-    self:_runDueWork()
+    self:_advanceTo(self.nowMs + delta)
 end
 
 function World:GetScheduledWork()
