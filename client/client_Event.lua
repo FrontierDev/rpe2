@@ -1772,7 +1772,7 @@ tryQueueInitialLocalResourceSync = function(client, sessionState, eventState, re
     return client:QueueClientResourceSync(reason or "event-start") or false
 end
 
-local function applyLocalProfileResourcesToEventUnits(sessionState, units)
+local function applyLocalProfileResourcesToEventUnits(sessionState, units, options)
     if type(units) ~= "table" then
         return false
     end
@@ -1780,6 +1780,26 @@ local function applyLocalProfileResourcesToEventUnits(sessionState, units)
     local localPlayerName = Common.NormalizeName and Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or nil) or ""
     if localPlayerName == "" then
         return false
+    end
+
+    if type(options) == "table" and options.preserveInboundResources == true then
+        for index = 1, #units do
+            local unit = units[index]
+            local ownerName = unit and unit.isPlayer == true
+                and (Common.NormalizeName and Common.NormalizeName(unit.ownerID or unit.controllerID or unit.name) or "") or ""
+            if ownerName == localPlayerName and type(unit.resources) == "table" and #unit.resources > 0 then
+                local sessionMember = type(sessionState) == "table"
+                    and type(sessionState.membersByName) == "table"
+                    and sessionState.membersByName[localPlayerName] or nil
+                if sessionMember then
+                    sessionMember.resources = ResourceSync.CloneResources and ResourceSync.CloneResources(unit.resources) or unit.resources
+                end
+                return true
+            end
+        end
+        if options.skipProfileFallback == true then
+            return false
+        end
     end
 
     local resources = ResourceSync.BuildProfileResourceSnapshot and ResourceSync.BuildProfileResourceSnapshot() or nil
@@ -3294,6 +3314,12 @@ function Client:HandleEventUnits(arguments)
     local deserializeStartTime = timingParts and getTimingNowMilliseconds() or nil
     local serializedUnits = arguments and arguments[3] or ""
     local receivedRevision = math.max(0, math.floor(tonumber(arguments and arguments[4]) or 0))
+    local localRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
+    if (receivedRevision == 0 and localRevision > 0)
+        or (receivedRevision > 0 and receivedRevision < localRevision)
+    then
+        return true
+    end
     local units = Event.DeserializeUnitsFromNetwork(serializedUnits, {
         level = eventState.level,
         difficulty = eventState.difficulty,
@@ -3302,10 +3328,13 @@ function Client:HandleEventUnits(arguments)
     appendTimingPart(timingParts, "deserialize-units", deserializeStartTime, 15)
 
     local resourcesStartTime = timingParts and getTimingNowMilliseconds() or nil
-    if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
+    if receivedRevision <= 0 and ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
         ResourceSync.ApplyTrackedPlayerResourcesToEventUnits(sessionState.membersByName, units)
     end
-    applyLocalProfileResourcesToEventUnits(sessionState, units)
+    applyLocalProfileResourcesToEventUnits(sessionState, units, {
+        preserveInboundResources = receivedRevision > 0,
+        skipProfileFallback = receivedRevision > 0,
+    })
     appendTimingPart(timingParts, "apply-resources", resourcesStartTime, 10)
 
     local readinessStartTime = timingParts and getTimingNowMilliseconds() or nil
@@ -3313,7 +3342,8 @@ function Client:HandleEventUnits(arguments)
     if receivedRevision > 0 then
         eventState.liveUnitRevision = receivedRevision
     end
-    if self.EventSnapshotRepairRequestedRevision then
+    local requestedRevision = tonumber(self.EventSnapshotRepairRequestedRevision)
+    if requestedRevision and receivedRevision >= requestedRevision then
         self.EventSnapshotRepairRequestedRevision = nil
         self.EventSnapshotRepairReason = nil
         self.EventSnapshotRepair = nil

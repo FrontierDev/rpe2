@@ -608,6 +608,10 @@ function Server:HandleResource(arguments, sender)
         return true
     end
 
+    if eventUpdated and type(self.AdvanceLiveUnitRevision) == "function" then
+        self:AdvanceLiveUnitRevision("resource-sync")
+    end
+
     return true
 end
 

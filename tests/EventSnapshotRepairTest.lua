@@ -26,6 +26,7 @@ local Addon = {
     Utils = {
         Common = {
             NormalizeName = function(value) return tostring(value or "") end,
+            GetPlayerName = function() return "Local" end,
         },
     },
 }
@@ -39,14 +40,70 @@ end
 loadAddonFile("client/client_Event.lua")
 
 local Client = Addon.Client
-local eventState = { id = "event", channelName = "channel", hostName = "Host", active = true, liveUnitRevision = 1 }
+local Event = Addon.Internal.Database.Classes.Event
+local eventState = {
+    id = "event", channelName = "channel", hostName = "Host", active = true, liveUnitRevision = 1,
+    level = 1, difficulty = "normal", units = {
+        { eventID = 1, isPlayer = true, ownerID = "Local", resources = { { resourceRef = "health", currentValue = 10, maxValue = 10 } } },
+    },
+}
 Client.GetEventState = function() return eventState end
+local sessionState = {
+    active = true,
+    channelName = "channel",
+    membersByName = {
+        Local = { resources = { { resourceRef = "health", currentValue = 10, maxValue = 10 } } },
+    },
+}
+Client.GetState = function() return sessionState end
+Client.IsLocalTurnActive = function() return false end
+Client.PruneCooldownState = function() return false end
+Client.InvalidatePendingSpellTargetingDisplayState = function() return false end
+Client.QueueEventWidgetRefresh = function() return true end
+Client.QueueTargetingWidgetRefresh = function() return true end
+Client.QueueActionBarRefresh = function() return true end
+Event.CountPlayerUnitsInNetwork = function() return 1 end
+Event.DeserializeUnitsFromNetwork = function()
+    return {
+        { eventID = 1, isPlayer = true, ownerID = "Local", resources = { { resourceRef = "health", currentValue = 6, maxValue = 10 } } },
+    }
+end
+Addon.Internal.Comms.ResourceSync.BuildProfileResourceSnapshot = function()
+    return { { resourceRef = "health", currentValue = 10, maxValue = 10 } }
+end
+Addon.Internal.Comms.ResourceSync.CloneResources = function(resources)
+    local copy = {}
+    for index = 1, #(resources or {}) do
+        local entry = resources[index]
+        copy[index] = { resourceRef = entry.resourceRef, currentValue = entry.currentValue, maxValue = entry.maxValue }
+    end
+    return copy
+end
+Event.ApplyStateArguments = function(state, arguments)
+    state.turnNumber = tonumber(arguments[3]) or 0
+    state.tickNumber = tonumber(arguments[4]) or 0
+    state.totalTicks = tonumber(arguments[5]) or 0
+    return state
+end
 
-assertEqual(Client:RequestAuthoritativeEventSnapshot(eventState, 4, "revision-mismatch", 0), true, "first repair request is sent")
+assertEqual(Client:HandleEventState({ "channel", "event", 1, 0, 1, "rpe-live-unit-revision", 4 }), true, "revision mismatch state is accepted")
 assertEqual(#sent, 1, "one repair request is emitted")
 assertEqual(Client:ProcessEventSnapshotRepair(1500), true, "lost repair request retries after deadline")
 assertEqual(#sent, 2, "repair retry is emitted")
 assertEqual(sent[2].opcode, 91, "retry uses snapshot repair opcode")
 assertEqual(sent[2].arguments[3], 4, "retry preserves requested revision")
+
+assertEqual(Client:HandleEventUnits({ "channel", "event", "snapshot", 4 }), true, "authoritative full snapshot applies")
+assertEqual(eventState.units[1].resources[1].currentValue, 6, "authoritative snapshot repairs stale local HP")
+assertEqual(sessionState.membersByName.Local.resources[1].currentValue, 6, "authoritative snapshot also repairs local resource cache")
+assertEqual(Client.EventSnapshotRepair, nil, "satisfying snapshot clears repair state")
+
+eventState.liveUnitRevision = 5
+eventState.units[1].resources[1].currentValue = 5
+assertEqual(Client:RequestAuthoritativeEventSnapshot(eventState, 6, "newer-repair", 0), true, "newer repair is tracked")
+assertEqual(Client:HandleEventUnits({ "channel", "event", "stale-snapshot", 4 }), true, "stale snapshot is ignored safely")
+assertEqual(eventState.liveUnitRevision, 5, "stale snapshot cannot roll back revision")
+assertEqual(eventState.units[1].resources[1].currentValue, 5, "stale snapshot cannot roll back HP")
+assertEqual(Client.EventSnapshotRepairRequestedRevision, 6, "stale snapshot cannot cancel newer repair")
 
 return true

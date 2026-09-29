@@ -173,6 +173,18 @@ assertTrue(Server:HandleResourceDelta({ "channel", "PlayerA", "resource", 3 }, "
 assertEqual(resourceTarget.resources.health.currentValue, 6, "authoritative event HP is committed")
 assertEqual(Server.EventState.liveUnitRevision, 8, "authoritative resource commit advances live-unit revision")
 
+Addon.Internal.Comms.ResourceSync.NormalizeResources = function()
+    return { { resourceRef = "health", currentValue = 4, maxValue = 10 } }
+end
+Addon.Internal.Comms.ResourceSync.ApplyResourcesToEventUnitByEventID = function(units, eventId, resources)
+    local unit = units and units[1] or nil
+    if not unit or tonumber(unit.eventID) ~= tonumber(eventId) then return false end
+    unit.resources = resources
+    return true
+end
+assertTrue(Server:HandleResource({ "channel", "PlayerA", "resources", 3 }, "PlayerA"), "server accepts full resource sync")
+assertEqual(Server.EventState.liveUnitRevision, 9, "full authoritative resource sync advances live-unit revision")
+
 -- Exercise the real Event Unit delta codec and client application path with a
 -- separate remote client runtime. The remote meter must only see the table
 -- materialized from the authoritative network delta.
