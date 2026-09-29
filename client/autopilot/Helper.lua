@@ -1162,20 +1162,6 @@ local function installOutcomeHooks()
         return true
     end
 
-    local baseCompleteHitCheck = Combat.CompleteHitCheck
-    if type(baseCompleteHitCheck) == "function" then
-        function Combat:CompleteHitCheck(entry, resultToken, reason, ...)
-            local results = pack(baseCompleteHitCheck(self, entry, resultToken, reason, ...))
-            if results[1] == true then
-                local result = results[2]
-                local landed = type(result) == "table" and result.landed == true
-                    or tostring(resultToken or "") == "pass"
-                Helper.RecordHitCheckOutcome(entry, landed)
-            end
-            return unpack(results, 1, results.n)
-        end
-    end
-
     local baseFinalizeLocalDamageResult = Combat.FinalizeLocalDamageResult
     if type(baseFinalizeLocalDamageResult) == "function" then
         function Combat:FinalizeLocalDamageResult(entry, damageResult, ...)

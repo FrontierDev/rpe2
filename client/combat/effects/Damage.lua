@@ -1802,6 +1802,12 @@ local function submitImmediateCombatTransaction(entry, request, reaction)
         end
         return nil, "transaction-service-unavailable"
     end
+    if type(Client.HandleCombatTransactionTerminal) ~= "function" then
+        if type(Debug) == "table" and type(Debug.Error) == "function" then
+            Debug.Error("Authoritative combat terminal presenter unavailable for event=%s.", tostring(entry.eventId or ""))
+        end
+        return nil, "combat-terminal-presenter-unavailable"
+    end
 
     local record, reason = transactions:Create({
         operation = "combat-hit",
@@ -1830,6 +1836,10 @@ local function submitImmediateCombatTransaction(entry, request, reaction)
     entry.checkId = record.id
     entry.sharedTransaction = record
     record.combatEntry = entry
+    record.options = record.options or {}
+    record.options.onTerminal = function(envelope)
+        Client:HandleCombatTransactionTerminal(entry, envelope)
+    end
     return record
 end
 
@@ -1920,9 +1930,6 @@ function Combat:BeginHitCheck(context, effect, component)
 
         local resultToken, resolution = self:ResolveHitCheckOutcome(entry, action)
         entry.lastResolution = resolution
-        if type(Combat.LogDefenceAttempt) == "function" then
-            Combat:LogDefenceAttempt(entry, resultToken, resolution)
-        end
         if timingEnabled then
             appendTimingPart(timingParts, "resolve-outcome", getNowMilliseconds() - resolveOutcomeStartTime)
         end

@@ -1,4 +1,5 @@
 local Harness = dofile("tests/support/IsolationHarness.lua")
+local fixtureOnly = (...) == "fixture-only"
 
 local function assertEqual(expected, actual, message)
     assert(expected == actual, (message or "values differ")
@@ -392,6 +393,15 @@ local function setup(options)
     return world, host, playerA, playerB, stats
 end
 
+if fixtureOnly then
+    return {
+        setup = setup,
+        resources = resources,
+        health = health,
+        findUnit = findUnit,
+    }
+end
+
 local function sendDelta(player, reason, targetEventId, delta, options)
     return player.Addon.Client:SendClientResourceDeltas(
         player.SessionState,
@@ -401,6 +411,33 @@ local function sendDelta(player, reason, targetEventId, delta, options)
         targetEventId,
         options
     )
+end
+
+-- Legacy RESOURCE remains an active session/bootstrap path, but cannot mutate
+-- an active revision-zero EventUnit.  Live state enters EventTransactions.
+do
+    local world, host, _, playerB = setup()
+    local beforeServer = health(findUnit(host.ServerEventState, 3))
+    local serverAccepted = host.Addon.Server:HandleResource(
+        { "RPE-RESOURCE", "PlayerA", resources(80) },
+        "PlayerA"
+    )
+    assertTrue(serverAccepted, "revision-zero bootstrap RESOURCE was rejected")
+    assertEqual(beforeServer, health(findUnit(host.ServerEventState, 3)),
+        "revision-zero legacy RESOURCE mutated server EventUnit")
+    assertEqual(80, health({ resources = host.Addon.Server.State.clientsByName.PlayerA.resources }),
+        "revision-zero bootstrap RESOURCE did not update server session cache")
+
+    local beforeClient = health(findUnit(playerB.EventState, 3))
+    local clientAccepted = playerB.Addon.Client:HandleResource(
+        { "RPE-RESOURCE", "PlayerB", resources(80) },
+        "Host"
+    )
+    assertTrue(clientAccepted, "revision-zero bootstrap RESOURCE was rejected by client")
+    assertEqual(beforeClient, health(findUnit(playerB.EventState, 3)),
+        "revision-zero legacy RESOURCE mutated client EventUnit")
+    assertEqual(80, health({ resources = playerB.SessionState.membersByName.PlayerB.resources }),
+        "revision-zero bootstrap RESOURCE did not update client session cache")
 end
 
 -- Normal resource mutation: one shared transaction and one revisioned broadcast.

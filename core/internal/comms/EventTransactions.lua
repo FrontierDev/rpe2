@@ -1607,17 +1607,21 @@ end
 function ServerService:GetDiagnosticsSnapshot()
     local processedCount = 0
     local terminalCount = 0
+    local pendingCount = 0
     for _, records in pairs(self.recordsByEvent) do
         for _, record in pairs(records) do
             processedCount = processedCount + 1
             if record.terminal then
                 terminalCount = terminalCount + 1
+            else
+                pendingCount = pendingCount + 1
             end
         end
     end
     return {
         processedCount = processedCount,
         terminalCount = terminalCount,
+        pendingCount = pendingCount,
         currentEventId = self.currentEventId,
         diagnostics = self.diagnostics,
     }

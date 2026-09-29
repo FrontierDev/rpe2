@@ -1697,23 +1697,6 @@ function Client:ClearCombatReactionRuntime(eventId, reason)
     return true
 end
 
-function Combat:CompleteHitCheck(entry, resultToken, reason)
-    local normalizedResult = normalizeResultToken(resultToken)
-    if not entry or not normalizedResult then
-        return false, buildCombatResult(entry, nil, "invalid")
-    end
-
-    self:LogAttackAttempt(entry, normalizedResult, entry.lastResolution)
-    self:PrintHitCheckResult(normalizedResult)
-    if normalizedResult == RESULT_PASS
-        and type(Client.SkillProgression) == "table"
-        and type(Client.SkillProgression.TryGainWeaponSkillsForHit) == "function"
-    then
-        Client.SkillProgression:TryGainWeaponSkillsForHit(entry)
-    end
-    return true, buildCombatResult(entry, normalizedResult, reason or normalizedResult)
-end
-
 local function isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
     if normalizeResultToken(resultToken) ~= RESULT_FAIL or type(action) ~= "table" or action.enabled == false then
         return false

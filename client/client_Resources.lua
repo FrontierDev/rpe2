@@ -1227,9 +1227,8 @@ function Client:QueueClientResourceSync(reason, options)
 
     local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
     local queuedEventId = type(currentEventState) == "table" and tostring(currentEventState.id or "") or ""
-    if type(currentEventState) == "table"
-        and math.max(0, math.floor(tonumber(currentEventState.liveUnitRevision) or 0)) > 0
-    then
+    local targetEventId = tonumber(options.targetEventId) or 0
+    if targetEventId > 0 and (type(currentEventState) ~= "table" or currentEventState.active ~= true) then
         return false
     end
     if self.ResourceSyncQueued and tostring(self.ResourceSyncQueuedEventId or "") == queuedEventId then
@@ -1239,7 +1238,6 @@ function Client:QueueClientResourceSync(reason, options)
     self.ResourceSyncQueued = true
     self.ResourceSyncQueuedEventId = queuedEventId
     local playerName = options.playerName or getPlayerNameForState(state) or "unknown"
-    local targetEventId = tonumber(options.targetEventId) or nil
     local capturedResources = nil
     if resources ~= nil then
         capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources
@@ -1483,6 +1481,11 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
         )
     end
 
+    -- A zero-target RESOURCE packet is profile/session bootstrap only.  It is
+    -- intentionally still allowed while an Event is active, but its handlers
+    -- must never project it into a live EventUnit.  When a live local unit is
+    -- available above, authoritativeTargetEventId selects event-resource-replace
+    -- instead.
     local payload = ResourceSync.SerializeResources and ResourceSync.SerializeResources(resources) or ""
     if payload == "" then
         if Debug and Debug.Error then
@@ -1521,7 +1524,6 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
         return false
     end
 
-    local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
     if type(currentEventState) == "table"
         and currentEventState.active == true
         and currentEventState.channelName == state.channelName
@@ -1788,11 +1790,11 @@ function Client:HandleResource(arguments, sender)
 
     local eventState = self:GetEventState()
     local targetEventId = tonumber(arguments and arguments[4]) or 0
-    if targetEventId > 0
-        or (eventState and math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) > 0)
-    then
-        -- A targeted live replace is projected only from EVENT_TX_COMMIT.
-        return true
+    if targetEventId > 0 then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE receive rejected: targeted live replacement requires event-resource transaction.")
+        end
+        return false
     end
     local resourcePayload = arguments and arguments[3] or ""
     local resourceSignature = table.concat({
@@ -1853,12 +1855,18 @@ function Client:HandleResource(arguments, sender)
             or not (ResourceSync.ResourcesEqual and ResourceSync.ResourcesEqual(member.resources, resources))
         )
 
+    -- RESOURCE is a session/profile bootstrap transport.  Once an Event is
+    -- active, only EventTransactions may mutate its EventUnits.  Inactive
+    -- drafts retain the pre-event bootstrap behavior.
     local eventUpdated = false
-    if eventState and targetEventId > 0 and ResourceSync.ApplyResourcesToEventUnitByEventID then
-        eventUpdated = ResourceSync.ApplyResourcesToEventUnitByEventID(eventState.units, targetEventId, resources) or false
-    elseif eventState and ResourceSync.ApplyResourcesToEventUnits then
-        eventUpdated = ResourceSync.ApplyResourcesToEventUnits(eventState.units, playerName, resources) or false
-        targetUnitIsPlayer = true
+    local eventIsActive = type(eventState) == "table" and eventState.active == true
+    if eventIsActive ~= true then
+        if eventState and targetEventId > 0 and ResourceSync.ApplyResourcesToEventUnitByEventID then
+            eventUpdated = ResourceSync.ApplyResourcesToEventUnitByEventID(eventState.units, targetEventId, resources) or false
+        elseif eventState and ResourceSync.ApplyResourcesToEventUnits then
+            eventUpdated = ResourceSync.ApplyResourcesToEventUnits(eventState.units, playerName, resources) or false
+            targetUnitIsPlayer = true
+        end
     end
 
     if member and cachedChanged and (targetEventId <= 0 or targetUnitIsPlayer == true) then

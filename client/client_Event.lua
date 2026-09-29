@@ -507,9 +507,14 @@ function Client:SetEventTransitionPhase(phase, eventState)
     if eventState ~= nil and transition.eventState ~= eventState then
         return false
     end
-    transition.phase = tostring(phase or transition.phase or "starting")
+    local nextPhase = tostring(phase or transition.phase or "starting")
+    local changed = transition.phase ~= nextPhase
+    transition.phase = nextPhase
     if type(eventState) == "table" then
         eventState.transitionPhase = transition.phase
+    end
+    if changed and type(self.QueueEventWidgetRefresh) == "function" then
+        self:QueueEventWidgetRefresh("event-transition-" .. nextPhase)
     end
     return true
 end

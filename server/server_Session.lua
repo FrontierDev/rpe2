@@ -734,10 +734,6 @@ function Server:HandleResource(arguments, sender)
     if targetEventId > 0 then
         return false
     end
-    if self.EventState and math.max(0, math.floor(tonumber(self.EventState.liveUnitRevision) or 0)) > 0 then
-        return false
-    end
-
     local clientState = state.clientsByName and state.clientsByName[clientName] or nil
     if not clientState then
         return false
@@ -754,12 +750,21 @@ function Server:HandleResource(arguments, sender)
     local cachedChanged = not hadCachedResources
         or not (ResourceSync.ResourcesEqual and ResourceSync.ResourcesEqual(clientState.resources, resources))
 
-    local draftUpdated = ResourceSync.ApplyResourcesToEventUnits
-        and ResourceSync.ApplyResourcesToEventUnits(self.EventDraftState and self.EventDraftState.units or nil, clientName, resources)
-        or false
-    local eventUpdated = ResourceSync.ApplyResourcesToEventUnits
-        and ResourceSync.ApplyResourcesToEventUnits(self.EventState and self.EventState.units or nil, clientName, resources)
-        or false
+    -- RESOURCE is retained for session/profile bootstrap.  It must not mutate
+    -- a live EventUnit, including before the first revisioned delta.  Live
+    -- resource ownership belongs to event-resource-replace/delta transactions.
+    local eventState = self.GetEventState and self:GetEventState() or self.EventState
+    local eventIsActive = type(eventState) == "table" and eventState.active == true
+    local draftUpdated = false
+    local eventUpdated = false
+    if eventIsActive ~= true then
+        draftUpdated = ResourceSync.ApplyResourcesToEventUnits
+            and ResourceSync.ApplyResourcesToEventUnits(self.EventDraftState and self.EventDraftState.units or nil, clientName, resources)
+            or false
+        eventUpdated = ResourceSync.ApplyResourcesToEventUnits
+            and ResourceSync.ApplyResourcesToEventUnits(self.EventState and self.EventState.units or nil, clientName, resources)
+            or false
+    end
 
     if cachedChanged then
         if targetEventId > 0 and ResourceSync.MergeResourcesByRef then

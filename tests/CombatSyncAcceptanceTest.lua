@@ -9,6 +9,8 @@
 dofile("tests/CombatTransactionIntegrationTest.lua")
 
 local Harness = dofile("tests/support/IsolationHarness.lua")
+local resourceFixtureChunk = assert(loadfile("tests/ResourceMutationReliabilityTest.lua"))
+local ProductionResourceFixture = resourceFixtureChunk("fixture-only")
 
 local function assertEqual(expected, actual, message)
     assert(expected == actual, (message or "values differ")
@@ -48,6 +50,43 @@ local function threat(unit)
         total = total + (tonumber(amount) or 0)
     end
     return total
+end
+
+local function resourcesSignature(unit)
+    local rows = {}
+    for index = 1, #((unit and unit.resources) or {}) do
+        local resource = unit.resources[index]
+        rows[#rows + 1] = table.concat({
+            tostring(resource and resource.resourceRef or ""),
+            tostring(resource and resource.currentValue or 0),
+            tostring(resource and resource.maxValue or 0),
+        }, "=")
+    end
+    table.sort(rows)
+    return table.concat(rows, ";")
+end
+
+local function threatSignature(unit)
+    local rows = {}
+    for sourceEventId, amount in pairs((unit and unit.threatTable) or {}) do
+        local normalizedAmount = tonumber(amount) or 0
+        if normalizedAmount ~= 0 then
+            rows[#rows + 1] = table.concat({ tostring(sourceEventId), tostring(normalizedAmount) }, "=")
+        end
+    end
+    table.sort(rows)
+    return table.concat(rows, ";")
+end
+
+local function unitSignature(unit)
+    return {
+        health = health(unit),
+        resources = resourcesSignature(unit),
+        active = unit and unit.active ~= false or false,
+        hidden = unit and unit.hidden == true or false,
+        threat = threat(unit),
+        threatState = threatSignature(unit),
+    }
 end
 
 local function serializeUnits(entries)
@@ -125,16 +164,30 @@ local function installProjection(node)
     end
 end
 
-local function assertConverged(world, expectedHealth, expectedRevision)
+local function assertConverged(world, expectedHealth, expectedRevision, expected)
+    expected = expected or {}
     local host = world.host
-    local hostUnit = findUnit(host.EventState, 1)
-    assertEqual(expectedHealth, health(hostUnit), "host health")
-    assertEqual(expectedRevision, host.EventState.liveUnitRevision, "host revision")
-    assertEqual(expectedHealth, health(findUnit(host.ServerEventState, 1)), "server health")
+    local authoritative = unitSignature(findUnit(host.ServerEventState, 1))
+    assertEqual(expectedHealth, authoritative.health, "server health")
+    assertEqual(expectedRevision, host.ServerEventState.liveUnitRevision, "server revision")
+    assertEqual(expected.active == nil and true or expected.active, authoritative.active, "server active")
+    assertEqual(expected.hidden == true, authoritative.hidden, "server hidden")
+    assertEqual(expected.threat or 0, authoritative.threat, "server threat")
     for _, node in ipairs(world.nodes) do
-        assertEqual(expectedHealth, health(findUnit(node.EventState, 1)), node.Name .. " health")
+        local actual = unitSignature(findUnit(node.EventState, 1))
+        assertEqual(authoritative.health, actual.health, node.Name .. " health convergence")
+        assertEqual(authoritative.resources, actual.resources, node.Name .. " resource convergence")
+        assertEqual(authoritative.active, actual.active, node.Name .. " active convergence")
+        assertEqual(authoritative.hidden, actual.hidden, node.Name .. " hidden convergence")
+        assertEqual(authoritative.threatState, actual.threatState, node.Name .. " threat convergence")
+        assertEqual(expectedHealth, actual.health, node.Name .. " health")
         assertEqual(expectedRevision, node.EventState.liveUnitRevision, node.Name .. " revision")
     end
+    local hostUnit = unitSignature(findUnit(host.EventState, 1))
+    assertEqual(authoritative.resources, hostUnit.resources, "host resource convergence")
+    assertEqual(authoritative.active, hostUnit.active, "host active convergence")
+    assertEqual(authoritative.hidden, hostUnit.hidden, "host hidden convergence")
+    assertEqual(authoritative.threatState, hostUnit.threatState, "host threat convergence")
 end
 
 local function assertNoPending(world)
@@ -142,6 +195,36 @@ local function assertNoPending(world)
         local transactions = node.Addon.Client.EventTransactions
         local snapshot = transactions:GetDiagnosticsSnapshot()
         assertEqual(0, snapshot.pendingCount, node.Name .. " pending transactions")
+    end
+    local server = world.host.Addon.Server and world.host.Addon.Server.EventTransactions
+    if server and type(server.GetDiagnosticsSnapshot) == "function" then
+        local snapshot = server:GetDiagnosticsSnapshot()
+        assertEqual(0, snapshot.pendingCount, "server pending transactions")
+    end
+end
+
+local function installProductionTargeting(node)
+    node.Addon.Internal.Ruleset = {
+        GetActiveRuleset = function() return {} end,
+        GetRulesetRuleDefinition = function() return {} end,
+        GetRulesetRuleValue = function() return "health" end,
+    }
+    node:LoadFile("client/client_Targeting.lua")
+end
+
+local function assertResourceConverged(world, targetEventId, expectedHealth, expectedRevision)
+    local host = world.host
+    local authoritative = unitSignature(findUnit(host.ServerEventState, targetEventId))
+    assertEqual(expectedHealth, authoritative.health, "resource server health")
+    assertEqual(expectedRevision, host.ServerEventState.liveUnitRevision, "resource server revision")
+    for _, node in ipairs(world.nodes) do
+        local actual = unitSignature(findUnit(node.EventState, targetEventId))
+        assertEqual(authoritative.health, actual.health, node.Name .. " resource health convergence")
+        assertEqual(authoritative.resources, actual.resources, node.Name .. " resource value convergence")
+        assertEqual(authoritative.active, actual.active, node.Name .. " resource active convergence")
+        assertEqual(authoritative.hidden, actual.hidden, node.Name .. " resource hidden convergence")
+        assertEqual(authoritative.threatState, actual.threatState, node.Name .. " resource threat convergence")
+        assertEqual(expectedRevision, node.EventState.liveUnitRevision, node.Name .. " resource revision")
     end
 end
 
@@ -167,7 +250,19 @@ local function newWorld(eventId, startingHealth)
                 hidden = false,
                 isPlayer = true,
                 ownerID = "PlayerB",
+                team = 2,
                 resources = { { resourceRef = "health", currentValue = startingHealth or 100, maxValue = 100 } },
+                threatTable = {},
+            },
+            {
+                eventID = 2,
+                name = "Attacker",
+                active = true,
+                hidden = false,
+                isPlayer = true,
+                ownerID = "PlayerA",
+                team = 1,
+                resources = { { resourceRef = "health", currentValue = 100, maxValue = 100 } },
                 threatTable = {},
             },
         },
@@ -269,7 +364,7 @@ do
     world:DeliverAll()
     assertEqual(100, health(findUnit(playerB.EventState, 1)), "missed client remains stale before repair")
     repairFromHost(host, playerB)
-    assertConverged(world, 85, 1)
+    assertConverged(world, 85, 1, { threat = 15 })
     assertNoPending(world)
 end
 
@@ -293,6 +388,20 @@ do
     for _, node in ipairs(world.nodes) do
         assertTrue(health(findUnit(node.EventState, 1)) <= 0, node.Name .. " lethal state")
     end
+    installProductionTargeting(playerA)
+    local candidates = playerA.Addon.Client:BuildSpellActivationTargetCandidates({
+        eventState = playerA.EventState,
+        casterUnit = findUnit(playerA.EventState, 2),
+        policy = {
+            type = "single",
+            targetDisposition = "enemy",
+            allowDeadTargets = false,
+            allowHiddenTargets = false,
+            maxTargets = 1,
+        },
+        targetGroups = {},
+    })
+    assertEqual(0, #candidates, "production targeting retained the lethal target")
     assertNoPending(world)
 end
 
@@ -302,6 +411,7 @@ do
     local plan = { eventId = playerA.EventState.id, revision = playerA.EventState.liveUnitRevision }
     submit(playerA, { amount = 0, active = false, hidden = true })
     world:DeliverAll()
+    assertConverged(world, 100, 1, { active = false, hidden = true })
     assertTrue(plan.revision ~= playerA.EventState.liveUnitRevision, "stale plan revision detected")
     plan = { eventId = playerA.EventState.id, revision = playerA.EventState.liveUnitRevision }
     assertEqual(playerA.EventState.liveUnitRevision, plan.revision, "replacement plan uses authoritative revision")
@@ -350,13 +460,28 @@ end
 
 -- 12. Resurrection/full replacement retries once after the first request drops.
 do
-    local world, host, playerA = newWorld("resurrection", 0)
-    world:DropNext("PlayerA", "Host", host.Addon.Internal.Comms.EventTransactions.Opcodes.EVENT_TX_REQUEST)
-    submit(playerA, { health = 100, threat = 0 })
+    local world, host, playerA = ProductionResourceFixture.setup({
+        eventId = "acceptance-resurrection",
+        playerAHealth = 0,
+    })
+    local requestOpcode = host.Addon.Internal.Comms.EventTransactions.Opcodes.EVENT_TX_REQUEST
+    world:DropNext("PlayerA", "Host", requestOpcode)
+    local sent, transactionId = playerA.Addon.Client:SendClientResources(
+        playerA.SessionState,
+        "acceptance-resurrect",
+        playerA.Name,
+        ProductionResourceFixture.resources(100),
+        2
+    )
+    assertTrue(sent and transactionId ~= nil, "production resource replacement submitted")
     world:DeliverAll()
+    assertEqual(0, host.Addon.Server.EventTransactions:GetDiagnosticsSnapshot().terminalCount,
+        "dropped replacement did not terminalize early")
     world:AdvanceTime(1500)
     world:DeliverAll()
-    assertConverged(world, 100, 1)
+    assertResourceConverged(world, 2, 100, 1)
+    local terminal = playerA.Addon.Client.EventTransactions.TerminalTransactions["acceptance-resurrection"][transactionId]
+    assertEqual("committed", terminal and terminal.state, "production replacement terminal")
     assertNoPending(world)
 end
 
@@ -385,7 +510,7 @@ do
     playerB.EventState.liveUnitRevision = 0
     playerB.Addon.Client.EventTransactions:StartEvent("rejoin")
     repairFromHost(host, playerB)
-    assertConverged(world, 70, 1)
+    assertConverged(world, 70, 1, { threat = 30 })
     assertNoPending(world)
 end
 
