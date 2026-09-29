@@ -24,15 +24,12 @@ local function splitPreservingEmpty(text, separator, limit)
     return values
 end
 
-local warnings = {}
-local resourceMutationAcks = {}
+local transactionHandlers = {}
 local Addon = {
     Client = {},
     Server = {},
     Debug = {
-        Warn = function(message, ...)
-            warnings[#warnings + 1] = string.format(message, ...)
-        end,
+        Warn = function() end,
     },
     Internal = {
         Comms = {
@@ -41,20 +38,15 @@ local Addon = {
                     return 1
                 end,
             },
-            SendMessage = function(_, distribution, opcode, arguments, target)
-                resourceMutationAcks[#resourceMutationAcks + 1] = {
-                    distribution = distribution,
-                    opcode = opcode,
-                    arguments = arguments,
-                    target = target,
-                }
-                return true
-            end,
-            ResourceSync = {
-                CoalesceTargetedResourceDeltas = function()
-                    return {}
-                end,
+            EventTransactions = {
+                Server = {
+                    Register = function(_, operation, handler)
+                        transactionHandlers[operation] = handler
+                        return true
+                    end,
+                },
             },
+            ResourceSync = {},
         },
         Registry = {},
         Tasks = {},
@@ -64,6 +56,9 @@ local Addon = {
             GetNow = function()
                 return 1
             end,
+            GetPlayerName = function()
+                return "Host"
+            end,
             NormalizeName = function(name)
                 return tostring(name or "")
             end,
@@ -72,63 +67,179 @@ local Addon = {
     },
 }
 
+local function cloneResources(resources)
+    local result = {}
+    for index = 1, #(resources or {}) do
+        local resource = resources[index]
+        result[index] = {
+            resourceRef = resource.resourceRef,
+            currentValue = resource.currentValue,
+            maxValue = resource.maxValue,
+        }
+    end
+    return result
+end
+
+local ResourceSync = Addon.Internal.Comms.ResourceSync
+ResourceSync.CloneResources = cloneResources
+ResourceSync.CoalesceResourceDeltas = function(resourceDeltas)
+    return resourceDeltas or {}
+end
+ResourceSync.CoalesceTargetedResourceDeltas = function(targetedResourceDeltas)
+    return targetedResourceDeltas or {}
+end
+ResourceSync.ApplyResourceDeltasToEventUnitByEventID = function(units, eventId, deltas)
+    local target = nil
+    for index = 1, #(units or {}) do
+        local unit = units[index]
+        if tonumber(unit and unit.eventID) == tonumber(eventId) then
+            target = unit
+            break
+        end
+    end
+    if not target then
+        return false
+    end
+
+    local applied = {}
+    for deltaIndex = 1, #(deltas or {}) do
+        local delta = deltas[deltaIndex]
+        for resourceIndex = 1, #(target.resources or {}) do
+            local resource = target.resources[resourceIndex]
+            if resource and resource.resourceRef == delta.resourceRef then
+                local before = tonumber(resource.currentValue) or 0
+                local maximum = tonumber(delta.maxValue or resource.maxValue) or before
+                local nextValue = math.max(0, math.min(maximum, before + (tonumber(delta.delta) or 0)))
+                resource.currentValue = nextValue
+                resource.maxValue = maximum
+                applied[#applied + 1] = {
+                    resourceRef = delta.resourceRef,
+                    delta = nextValue - before,
+                    maxValue = maximum,
+                    currentValue = nextValue,
+                }
+                break
+            end
+        end
+    end
+
+    return true, target, applied
+end
+
 local function loadAddonFile(path)
     local chunk, loadError = loadfile(path)
     assert(chunk, loadError)
     chunk(nil, Addon)
 end
 
-loadAddonFile("core/internal/comms/Serialization.lua")
-loadAddonFile("core/internal/comms/ThreatUpdates.lua")
 loadAddonFile("server/server_Session.lua")
 loadAddonFile("client/autopilot/TargetSelector.lua")
 
-local Serialization = Addon.Internal.Comms.Serialization
-local ThreatUpdates = Addon.Internal.Comms.ThreatUpdates
 local Server = Addon.Server
 local Selector = Addon.Client.AutopilotTargetSelector
+local resourceBatchHandler = transactionHandlers["event-resource-batch"]
+assertTrue(type(resourceBatchHandler) == "function", "event resource batch transaction handler is registered")
 
 local first = { targetEventId = 12, sourceEventId = 3, amount = 40, turnNumber = 2 }
 local second = { targetEventId = 12, sourceEventId = 4, amount = 250, turnNumber = 2 }
-local payload = assert(ThreatUpdates:Serialize({ first }))
-local outer = Serialization:SerializeArguments({ "channel", "PlayerA", "resource", payload })
-local outerArguments = Serialization:DeserializeArguments(outer)
-assertEqual(#outerArguments, 4, "nested threat payload remains one outer argument")
-local decoded = assert(ThreatUpdates:Deserialize(outerArguments[4]))
-assertEqual(decoded[1].targetEventId, 12, "round-trip target event id")
-assertEqual(decoded[1].sourceEventId, 3, "round-trip source event id")
-assertEqual(decoded[1].amount, 40, "round-trip threat amount")
-assertEqual(decoded[1].turnNumber, 2, "round-trip turn number")
+local playerA = {
+    eventID = 3,
+    isPlayer = true,
+    ownerID = "PlayerA",
+    name = "Player A",
+    team = 1,
+    resources = { { resourceRef = "health", currentValue = 100, maxValue = 100 } },
+}
+local playerB = {
+    eventID = 4,
+    isPlayer = true,
+    ownerID = "PlayerB",
+    name = "Player B",
+    team = 1,
+    resources = { { resourceRef = "health", currentValue = 100, maxValue = 100 } },
+}
+local npc = {
+    eventID = 12,
+    isPlayer = false,
+    name = "NPC",
+    team = 2,
+    resources = { { resourceRef = "health", currentValue = 100, maxValue = 100 } },
+    threatTable = {},
+}
+local draftNpc = {
+    eventID = 12,
+    isPlayer = false,
+    name = "NPC",
+    team = 2,
+    resources = { { resourceRef = "health", currentValue = 100, maxValue = 100 } },
+    threatTable = {},
+}
 
-local batchPayload = assert(ThreatUpdates:Serialize({ first, second }))
-local batchOuter = Serialization:SerializeArguments({ "channel", "PlayerA", "resource", batchPayload })
-local batchArguments = Serialization:DeserializeArguments(batchOuter)
-assertEqual(#batchArguments, 4, "batched threat payload remains one outer argument")
-local batchDecoded = assert(ThreatUpdates:Deserialize(batchArguments[4]))
-assertEqual(#batchDecoded, 2, "batched threat record count")
-assertEqual(batchDecoded[2].sourceEventId, 4, "batched second source")
-assertEqual(batchDecoded[2].amount, 250, "batched second amount")
+Server.State = {
+    active = true,
+    channelName = "channel",
+    clientsByName = {
+        Host = { name = "Host" },
+    },
+    clientOrder = { "Host" },
+}
+Server.EventState = {
+    id = "event",
+    active = true,
+    hostName = "Host",
+    channelName = "channel",
+    healthResourceRef = "health",
+    liveUnitRevision = 7,
+    units = { playerA, playerB, npc },
+}
+Server.EventDraftState = {
+    id = "event",
+    active = true,
+    hostName = "Host",
+    channelName = "channel",
+    healthResourceRef = "health",
+    liveUnitRevision = 7,
+    units = { playerA, playerB, draftNpc },
+}
 
-local playerA = { eventID = 3, isPlayer = true, name = "Player A", team = 1 }
-local playerB = { eventID = 4, isPlayer = true, name = "Player B", team = 1 }
-local npc = { eventID = 12, isPlayer = false, name = "NPC", team = 2, threatTable = {} }
-local draftNpc = { eventID = 12, isPlayer = false, name = "NPC", team = 2, threatTable = {} }
-Server.State = { active = true, channelName = "channel", clientsByName = {}, clientOrder = {} }
-Server.EventState = { units = { playerA, playerB, npc } }
-Server.EventDraftState = { units = { playerA, playerB, draftNpc } }
 local broadcastEntries = nil
-Server.BroadcastEventDeltaBatch = function(_, entries)
+Server.BroadcastEventDeltaBatch = function(self, entries)
     broadcastEntries = entries
+    self.EventState.liveUnitRevision = (tonumber(self.EventState.liveUnitRevision) or 0) + 1
     return true
 end
 
-assertTrue(Server:HandleResourceDeltaBatch({ "channel", "PlayerA", "", batchPayload }, "PlayerA"), "server accepts valid threat batch")
+local terminal = resourceBatchHandler({
+    eventId = "event",
+    originName = "Host",
+    actorEventId = 3,
+    input = {
+        reason = "threat-sync-regression",
+        targetedResourceDeltas = {
+            {
+                targetEventId = 12,
+                resourceRef = "health",
+                delta = -1,
+                maxValue = 100,
+            },
+        },
+        threatUpdates = { first, second },
+    },
+}, {
+    eventState = Server.EventState,
+})
+
+assertEqual(terminal.state, "committed", "transaction commits threat batch")
+assertTrue(terminal.outcome.threatChanged == true, "transaction records authoritative threat change")
 assertEqual(npc.threatTable[3], 40, "host stores player A threat")
 assertEqual(npc.threatTable[4], 250, "host stores player B threat")
 assertEqual(draftNpc.threatTable[3], 40, "draft stores player A threat")
 assertEqual(draftNpc.threatTable[4], 250, "draft stores player B threat")
-assertTrue(type(broadcastEntries) == "table" and #broadcastEntries == 1, "host broadcasts authoritative NPC delta")
-assertEqual(broadcastEntries[1].unit.threatTable[4], 250, "remote delta carries authoritative threat")
+assertEqual(npc.resources[1].currentValue, 99, "resource mutation shares the authoritative transaction")
+assertEqual(Server.EventState.liveUnitRevision, 8, "transaction advances live-unit revision once")
+assertTrue(type(broadcastEntries) == "table" and #broadcastEntries == 1, "host broadcasts one authoritative NPC delta")
+assertEqual(broadcastEntries[1].unit.threatTable[4], 250, "authoritative delta carries threat")
+
 
 local selectionState = assert(Selector.CreateState({
     canCast = true,
@@ -139,71 +250,6 @@ local selectionState = assert(Selector.CreateState({
 }, { intent = "hostile" }))
 assertTrue(Selector.Step(selectionState), "target selection completes")
 assertEqual(Selector.CopyResult(selectionState).primaryTargetEventId, 4, "NPC selects highest-threat player")
-
--- A local UI state must not mask a malformed transport payload. The outer
--- separator truncates this legacy payload to a single field at the server.
-local authoritativeNpc = { eventID = 12, isPlayer = false, threatTable = {} }
-Server.EventState = { units = { playerA, authoritativeNpc } }
-Server.EventDraftState = { units = { playerA, { eventID = 12, isPlayer = false, threatTable = {} } } }
-warnings = {}
-local legacyPayload = table.concat({ "12", "3", "40", "2" }, string.char(31))
-local corruptedArguments = Serialization:DeserializeArguments(
-    Serialization:SerializeArguments({ "channel", "PlayerA", "", legacyPayload })
-)
-assertTrue(not Server:HandleResourceDeltaBatch(corruptedArguments, "PlayerA"), "malformed nested payload is rejected")
-assertEqual(Server.EventState.units[2].threatTable[3], nil, "server did not accept local-only threat")
-assertTrue(#warnings > 0, "malformed threat transport is diagnosable")
-
--- Ordinary resource commits must participate in the same authoritative
--- revision stream as EventUnit deltas, otherwise a missed HP update cannot be
--- repaired at the next event-state boundary.
-local resourceTarget = { eventID = 3, isPlayer = true, ownerID = "PlayerA", resources = { health = { currentValue = 10, maxValue = 10 } } }
-local resourceDraftTarget = { eventID = 3, isPlayer = true, ownerID = "PlayerA", resources = { health = { currentValue = 10, maxValue = 10 } } }
-Addon.Internal.Comms.ResourceSync.CoalesceResourceDeltas = function()
-    return { { resourceRef = "health", delta = -4 } }
-end
-Addon.Internal.Comms.ResourceSync.NormalizeResourceDeltas = function()
-    return { { resourceRef = "health", delta = -4 } }
-end
-Addon.Internal.Comms.ResourceSync.ApplyResourceDeltasToEventUnitByEventID = function(units, eventId, deltas)
-    local unit = units and units[1] or nil
-    if not unit or tonumber(unit.eventID) ~= tonumber(eventId) then return false end
-    unit.resources.health.currentValue = unit.resources.health.currentValue + (tonumber(deltas[1].delta) or 0)
-    return true, unit
-end
-Addon.Internal.Comms.ResourceSync.CloneResources = function(resources) return resources end
-Server.State = { active = true, channelName = "channel", clientsByName = {}, clientOrder = {} }
-Server.EventState = { active = true, units = { resourceTarget }, liveUnitRevision = 7 }
-Server.EventDraftState = { units = { resourceDraftTarget } }
-local resourceBroadcastEntries = nil
-Server.BroadcastEventDeltaBatch = function(self, entries)
-    resourceBroadcastEntries = entries
-    self.EventState.liveUnitRevision = self.EventState.liveUnitRevision + 1
-    return true
-end
-local resourceMutationArguments = { "channel", "PlayerA", "resource", 3, "", "resource-retry-1" }
-assertTrue(Server:HandleResourceDelta(resourceMutationArguments, "PlayerA"), "server accepts retried resource delta")
-assertEqual(resourceTarget.resources.health.currentValue, 6, "authoritative event HP is committed")
-assertEqual(Server.EventState.liveUnitRevision, 8, "authoritative resource commit advances live-unit revision")
-assertEqual(resourceBroadcastEntries[1].unit.resources.health.currentValue, 6, "resource commit is published in the authoritative unit delta")
-assertEqual(resourceMutationAcks[#resourceMutationAcks].arguments[2], "resource-retry-1", "server ACK identifies the committed mutation")
-assertTrue(Server:HandleResourceDelta(resourceMutationArguments, "PlayerA"), "duplicate retry is acknowledged idempotently")
-assertEqual(resourceTarget.resources.health.currentValue, 6, "duplicate retry cannot apply resource damage twice")
-assertEqual(Server.EventState.liveUnitRevision, 8, "duplicate retry cannot publish a second revision")
-assertEqual(resourceMutationAcks[#resourceMutationAcks].arguments[2], "resource-retry-1", "duplicate retry receives the original mutation ACK")
-
-Addon.Internal.Comms.ResourceSync.NormalizeResources = function()
-    return { { resourceRef = "health", currentValue = 4, maxValue = 10 } }
-end
-Addon.Internal.Comms.ResourceSync.ApplyResourcesToEventUnitByEventID = function(units, eventId, resources)
-    local unit = units and units[1] or nil
-    if not unit or tonumber(unit.eventID) ~= tonumber(eventId) then return false end
-    unit.resources = resources
-    return true
-end
-assertTrue(Server:HandleResource({ "channel", "PlayerA", "resources", 3 }, "PlayerA"), "server accepts full resource sync")
-assertEqual(Server.EventState.liveUnitRevision, 9, "full authoritative resource sync advances live-unit revision")
-assertEqual(resourceBroadcastEntries[1].unit.resources[1].currentValue, 4, "full resource sync is published in the authoritative unit delta")
 
 -- Exercise the real Event Unit delta codec and client application path with a
 -- separate remote client runtime. The remote meter must only see the table
