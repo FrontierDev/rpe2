@@ -248,6 +248,7 @@ local function normalizeEnvelope(input)
         authoritativeDelta = clone(source.authoritativeDelta),
         deltaRef = source.deltaRef,
         presentationKey = source.presentationKey,
+        inputRecipient = normalizeName(source.inputRecipient),
         requestDigest = source.requestDigest,
         createdAt = source.createdAt,
         submittedAt = source.submittedAt,
@@ -267,10 +268,28 @@ local function digestFor(envelope)
         originName = envelope.originName,
         actorEventId = envelope.actorEventId,
         targetEventIds = envelope.targetEventIds,
+        inputRecipient = envelope.inputRecipient,
         turnNumber = envelope.turnNumber,
         tickNumber = envelope.tickNumber,
         baseRevision = envelope.baseRevision,
         input = envelope.input,
+    })
+end
+
+local function identityDigestFor(envelope)
+    return encode({
+        protocolVersion = envelope.protocolVersion,
+        transactionId = envelope.transactionId,
+        eventId = envelope.eventId,
+        operation = envelope.operation,
+        originName = envelope.originName,
+        actorEventId = envelope.actorEventId,
+        targetEventIds = envelope.targetEventIds,
+        inputRecipient = envelope.inputRecipient,
+        turnNumber = envelope.turnNumber,
+        tickNumber = envelope.tickNumber,
+        baseRevision = envelope.baseRevision,
+        stepSensitive = envelope.stepSensitive,
     })
 end
 
@@ -652,6 +671,68 @@ function ClientService:_settle(record, envelope)
     end
 end
 
+function ClientService:ReceiveRequest(payload, sender)
+    local envelope = normalizeEnvelope(decodeEnvelope(payload) or payload)
+    local eventState = currentClientEvent()
+    local eventId = tostring(envelope.eventId or "")
+    local localName = normalizeName(Common.GetPlayerName and Common.GetPlayerName())
+    if envelope.protocolVersion ~= Transactions.ProtocolVersion
+        or envelope.state ~= "awaiting-input"
+        or eventId == ""
+        or eventId ~= eventIdOf(eventState)
+        or normalizeName(sender) ~= currentHostName(eventState)
+        or envelope.inputRecipient ~= localName
+    then
+        recordDiagnostic(self, eventId, {
+            transactionId = envelope.transactionId,
+            state = "invalid-awaiting-input-request",
+            sender = sender,
+        })
+        return false
+    end
+
+    local pending = self:_pending(eventId)
+    local existing = pending[envelope.transactionId]
+    if existing then
+        if existing.envelope and identityDigestFor(existing.envelope) ~= identityDigestFor(envelope) then
+            recordDiagnostic(self, eventId, {
+                transactionId = envelope.transactionId,
+                state = "transaction-id-conflict",
+            })
+            return false
+        end
+        return true
+    end
+
+    local record = {
+        envelope = envelope,
+        id = envelope.transactionId,
+        eventId = eventId,
+        state = "created",
+        createdAt = envelope.createdAt or now(),
+        attempts = 0,
+        nextRetryAt = nil,
+        deadlineAt = (tonumber(envelope.createdAt) or now())
+            + (tonumber(envelope.deadlineMs) or Transactions.DefaultDeadlineMs) / 1000,
+        lastSendFailure = nil,
+        statusRequested = false,
+        terminal = nil,
+        presentationSettled = false,
+        messageKey = "EVENT_TX_INPUT",
+        serverCreated = true,
+        options = { serverCreated = true },
+    }
+    pending[record.id] = record
+    transition(record, "awaiting-input", "server-awaiting-input")
+    recordDiagnostic(self, eventId, {
+        transactionId = record.id,
+        operation = envelope.operation,
+        state = record.state,
+        serverCreated = true,
+    })
+    return true
+end
+
 function ClientService:ReceiveTerminal(payload, sender)
     local envelope = decodeEnvelope(payload)
     if not envelope or envelope.protocolVersion ~= Transactions.ProtocolVersion
@@ -742,10 +823,31 @@ function ClientService:Replay(transactionId, eventId)
     })
 end
 
+function ClientService:ReplayInput(transactionId, eventId)
+    local id = tostring(transactionId or "")
+    local selectedEvent = tostring(eventId or self.currentEventId or "")
+    local envelope = self:_terminal(selectedEvent)[id]
+    if not envelope then
+        local record = self:GetPending(id, selectedEvent)
+        envelope = record and record.envelope or nil
+    end
+    if not envelope then
+        return false
+    end
+    return sendPayload("EVENT_TX_INPUT", envelope, "WHISPER", currentHostName(currentClientEvent()), {
+        opcode = operationCode("EVENT_TX_INPUT"), scope = "transaction", transactionId = id,
+    })
+end
+
 function ClientService:Cancel(transactionId, reason)
     local record = self:GetPending(transactionId)
     if not record then
         return false
+    end
+    if record.serverCreated and record.state == "awaiting-input" then
+        return sendPayload("EVENT_TX_CANCEL", record.envelope, "WHISPER", currentHostName(currentClientEvent()), {
+            opcode = operationCode("EVENT_TX_CANCEL"), scope = "transaction", transactionId = record.id,
+        })
     end
     if record.state == "created" or record.state == "awaiting-input" then
         local envelope = clone(record.envelope)
@@ -822,6 +924,9 @@ function ServerService.new()
         terminalOrder = {},
         diagnostics = {},
         enabled = false,
+        counter = 0,
+        sessionNonce = tostring(math.random(100000, 999999)),
+        MaxTerminalRecords = nil,
     }, ServerService)
     service.ProcessedTransactions = service.recordsByEvent
     service.TerminalTransactions = service.recordsByEvent
@@ -854,6 +959,79 @@ function ServerService:Register(operation, handler)
     self.handlers[operation] = handler
     return true
 end
+
+function ServerService:BeginAwaitingInput(options)
+    options = type(options) == "table" and options or {}
+    local eventState = currentServerEvent()
+    local eventId = tostring(options.eventId or eventIdOf(eventState))
+    local inputRecipient = normalizeName(options.inputRecipient or options.defenderName
+        or options.targetName or options.recipient or options.awaitingInputFor)
+    local originName = normalizeName(options.originName or inputRecipient)
+    if not self:IsAuthoritative() or eventId == "" or eventId ~= eventIdOf(eventState) then
+        return nil, "stale-event"
+    end
+    if originName == "" or inputRecipient == "" or tostring(options.operation or "") == "" then
+        return nil, "missing-awaiting-input-fields"
+    end
+
+    local envelope = normalizeEnvelope({
+        protocolVersion = Transactions.ProtocolVersion,
+        transactionId = options.transactionId or makeTransactionId(self, originName),
+        eventId = eventId,
+        operation = options.operation,
+        originName = originName,
+        actorEventId = options.actorEventId,
+        targetEventIds = options.targetEventIds,
+        turnNumber = options.turnNumber or eventState.turnNumber,
+        tickNumber = options.tickNumber or eventState.tickNumber,
+        baseRevision = options.baseRevision or eventState.liveUnitRevision,
+        input = options.input ~= nil and options.input or {},
+        inputRecipient = inputRecipient,
+        state = "awaiting-input",
+        deadlineMs = options.deadlineMs or Transactions.DefaultDeadlineMs,
+        createdAt = now(),
+        stepSensitive = options.stepSensitive == true,
+    })
+    if envelope.transactionId == "" or #envelope.transactionId > Transactions.MaxIdLength then
+        return nil, "invalid-transaction-id"
+    end
+
+    local records = self:_records(eventId)
+    if records[envelope.transactionId] then
+        return nil, "duplicate-transaction-id"
+    end
+    local record = {
+        id = envelope.transactionId,
+        eventId = eventId,
+        envelope = envelope,
+        identityDigest = identityDigestFor(envelope),
+        requestDigest = identityDigestFor(envelope),
+        state = "created",
+        createdAt = envelope.createdAt,
+        submittedAt = envelope.createdAt,
+        serverCreated = true,
+        inputRecipient = inputRecipient,
+    }
+    records[record.id] = record
+    transition(record, "awaiting-input", "server-awaiting-input")
+    self:_scheduleTimeout(record)
+    recordDiagnostic(self, eventId, {
+        transactionId = record.id,
+        operation = envelope.operation,
+        state = record.state,
+        serverCreated = true,
+    })
+    sendPayload("EVENT_TX_REQUEST", envelope, "WHISPER", inputRecipient, {
+        opcode = operationCode("EVENT_TX_REQUEST"),
+        scope = "transaction",
+        transactionId = record.id,
+        eventId = eventId,
+    })
+    return record
+end
+
+ServerService.Create = ServerService.BeginAwaitingInput
+ServerService.CreateAwaitingInput = ServerService.BeginAwaitingInput
 
 function ServerService:_records(eventId)
     self.recordsByEvent[eventId] = self.recordsByEvent[eventId] or {}
@@ -916,15 +1094,27 @@ function ServerService:_terminalize(record, state, outcome, result)
     record.timeoutTimer = nil
     local terminal = self:_terminalEnvelope(record.envelope, state, record.outcome, record)
     record.terminal = terminal
-    self.terminalOrderByEvent[record.eventId] = self.terminalOrderByEvent[record.eventId] or {}
-    addBounded(self.recordsByEvent[record.eventId], self.terminalOrderByEvent[record.eventId], record.id, record, Transactions.MaxTerminalRecords)
+    local records = self.recordsByEvent[record.eventId]
+    local order = self.terminalOrderByEvent[record.eventId] or {}
+    self.terminalOrderByEvent[record.eventId] = order
+    if not record.terminalTracked then
+        order[#order + 1] = record.id
+        record.terminalTracked = true
+    end
+    local maximum = math.max(1, tonumber(self.MaxTerminalRecords or Transactions.MaxTerminalRecords) or Transactions.MaxTerminalRecords)
+    while #order > maximum do
+        local oldest = table.remove(order, 1)
+        if oldest ~= record.id then
+            records[oldest] = nil
+        end
+    end
     recordDiagnostic(self, record.eventId, {
         transactionId = record.id,
         operation = record.envelope.operation,
         state = state,
         reason = record.outcome.reason,
     })
-    self:_publish(terminal, record.envelope.originName)
+    self:_publish(terminal, record.serverCreated and record.inputRecipient or record.envelope.originName)
     return true
 end
 
@@ -943,7 +1133,9 @@ function ServerService:ProcessTimeouts()
     local current = now()
     for _, records in pairs(self.recordsByEvent) do
         for _, record in pairs(records) do
-            if record.state == "submitted" and record.deadlineAt and current >= record.deadlineAt then
+            if (record.state == "submitted" or record.state == "awaiting-input")
+                and record.deadlineAt and current >= record.deadlineAt
+            then
                 if self:_terminalize(record, "timed-out", { reason = "server-deadline" }) then
                     timedOut = timedOut + 1
                 end
@@ -966,6 +1158,59 @@ function ServerService:_reject(envelope, reason, sender)
     })
     self:_publish(normalized, sender or normalized.originName)
     return false, normalized.outcome.reason
+end
+
+function ServerService:_resolve(record)
+    local handler = self.handlers[record.envelope.operation]
+    if type(handler) ~= "function" then
+        self:_terminalize(record, "rejected", { reason = "unknown-operation" })
+        return false, "unknown-operation"
+    end
+    local ok, result = pcall(handler, clone(record.envelope), {
+        server = self,
+        record = record,
+        eventState = currentServerEvent(),
+    })
+    if not ok then
+        self:_terminalize(record, "rejected", { reason = "handler-error", detail = tostring(result) })
+        return false, "handler-error"
+    end
+    if type(result) ~= "table" or not TERMINAL_STATES[result.state] then
+        self:_terminalize(record, "rejected", { reason = "invalid-handler-result" })
+        return false, "invalid-handler-result"
+    end
+    self:_terminalize(record, result.state,
+        result.outcome or result.reason and { reason = result.reason } or {}, result)
+    return result.state == "committed", result.state
+end
+
+function ServerService:_validateServerCreated(envelope, record, sender)
+    if envelope.protocolVersion ~= Transactions.ProtocolVersion then
+        return false, "unsupported-protocol-version"
+    end
+    if envelope.transactionId == "" or #envelope.transactionId > Transactions.MaxIdLength then
+        return false, "invalid-transaction-id"
+    end
+    if envelope.eventId == "" or envelope.eventId ~= eventIdOf(currentServerEvent())
+        or not self:IsAuthoritative()
+    then
+        return false, "stale-event"
+    end
+    if normalizeName(sender) ~= normalizeName(record.inputRecipient) then
+        return false, "invalid-input-recipient"
+    end
+    if identityDigestFor(envelope) ~= record.identityDigest then
+        return false, "transaction-id-conflict"
+    end
+    if envelope.stepSensitive then
+        local eventState = currentServerEvent()
+        if envelope.turnNumber ~= tonumber(eventState.turnNumber)
+            or envelope.tickNumber ~= tonumber(eventState.tickNumber)
+        then
+            return false, "stale-step"
+        end
+    end
+    return true
 end
 
 function ServerService:_validate(envelope, sender)
@@ -1060,43 +1305,83 @@ function ServerService:ReceiveRequest(payload, sender)
         state = "submitted",
     })
 
-    local handler = self.handlers[envelope.operation]
-    if type(handler) ~= "function" then
-        self:_terminalize(record, "rejected", { reason = "unknown-operation" })
-        return false, "unknown-operation"
-    end
-    local ok, result = pcall(handler, clone(envelope), {
-        server = self,
-        record = record,
-        eventState = currentServerEvent(),
-    })
-    if not ok then
-        self:_terminalize(record, "rejected", { reason = "handler-error", detail = tostring(result) })
-        return false, "handler-error"
-    end
-    if type(result) ~= "table" or not TERMINAL_STATES[result.state] then
-        self:_terminalize(record, "rejected", { reason = "invalid-handler-result" })
-        return false, "invalid-handler-result"
-    end
-    self:_terminalize(record, result.state, result.outcome or result.reason and { reason = result.reason } or {}, result)
-    return result.state == "committed", result.state
+    return self:_resolve(record)
 end
 
 function ServerService:ReceiveInput(payload, sender)
-    -- Input is still the same transaction identity. If the server has not
-    -- observed the client-local record yet, the input is its first submission;
-    -- otherwise the normal digest/idempotency path decides whether it is a
-    -- replay or an ID conflict.
-    return self:ReceiveRequest(payload, sender)
+    self:Prune()
+    local envelope = normalizeEnvelope(decodeEnvelope(payload) or payload)
+    local records = self.recordsByEvent[envelope.eventId] or {}
+    local record = records[envelope.transactionId]
+    if not record or not record.serverCreated then
+        return self:ReceiveRequest(envelope, sender)
+    end
+
+    local valid, reason = self:_validateServerCreated(envelope, record, sender)
+    if not valid then
+        return self:_reject(envelope, reason, sender)
+    end
+    if record.terminal then
+        self:_publish(record.terminal, sender)
+        recordDiagnostic(self, envelope.eventId, {
+            transactionId = envelope.transactionId,
+            state = record.state,
+            duplicate = true,
+            replay = true,
+        })
+        return true
+    end
+
+    local inputDigest = encode(envelope.input)
+    if record.state == "submitted" then
+        if record.inputDigest == inputDigest then
+            return true
+        end
+        return self:_reject(envelope, "transaction-input-conflict", sender)
+    end
+    if record.state ~= "awaiting-input" then
+        return self:_reject(envelope, "invalid-input-state", sender)
+    end
+
+    record.envelope.input = clone(envelope.input)
+    record.envelope.submittedAt = now()
+    record.envelope.state = "submitted"
+    record.inputDigest = inputDigest
+    record.submittedAt = now()
+    transition(record, "submitted", "client-input")
+    recordDiagnostic(self, record.eventId, {
+        transactionId = record.id,
+        operation = record.envelope.operation,
+        state = record.state,
+        inputRecipient = sender,
+    })
+    return self:_resolve(record)
 end
 
 function ServerService:ReceiveCancel(payload, sender)
     local envelope = normalizeEnvelope(decodeEnvelope(payload) or payload)
+    local records = self.recordsByEvent[envelope.eventId] or {}
+    local existing = records[envelope.transactionId]
+    if existing and existing.serverCreated then
+        local valid, reason = self:_validateServerCreated(envelope, existing, sender)
+        if not valid then
+            return self:_reject(envelope, reason, sender)
+        end
+        if existing.terminal then
+            self:_publish(existing.terminal, sender)
+            return true
+        end
+        if existing.state == "awaiting-input" or existing.state == "submitted" then
+            self:_terminalize(existing, "cancelled", { reason = "client-cancelled" })
+            return true
+        end
+        return self:_reject(envelope, "invalid-cancel-state", sender)
+    end
     local valid, reason = self:_validate(envelope, sender)
     if not valid then
         return self:_reject(envelope, reason, sender)
     end
-    local records = self:_records(envelope.eventId)
+    records = self:_records(envelope.eventId)
     local record = records[envelope.transactionId]
     if record and record.terminal then
         self:_publish(record.terminal, sender)
@@ -1214,7 +1499,9 @@ local function allocateOperations()
                     if server and server:IsAuthoritative() then
                         return server:ReceiveRequest(payload, sender)
                     end
-                    recordDiagnostic(client, "", { state = "peer-request-ignored", sender = sender })
+                    if client and type(client.ReceiveRequest) == "function" then
+                        return client:ReceiveRequest(payload, sender)
+                    end
                     return false
                 elseif operationKey == "EVENT_TX_INPUT" then
                     if server and server:IsAuthoritative() then
@@ -1251,6 +1538,7 @@ Transactions.Encode = encode
 Transactions.Decode = decodeEnvelope
 Transactions.NormalizeEnvelope = normalizeEnvelope
 Transactions.Digest = digestFor
+Transactions.IdentityDigest = identityDigestFor
 Transactions.IsTerminal = function(state) return TERMINAL_STATES[state] == true end
 Transactions.Transition = transition
 Transactions.ClientService = ClientService

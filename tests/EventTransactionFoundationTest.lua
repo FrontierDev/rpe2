@@ -15,8 +15,8 @@ local function setup(options)
     local host = world:AddHost("Host")
     local playerA = world:AddClient("PlayerA")
     local playerB = world:AddClient("PlayerB")
-    local executions = 0
-    local presentations = 0
+    local executions = { value = 0 }
+    local presentations = { value = 0 }
 
     world:StartEvent({
         id = options.eventId or "event-a",
@@ -29,7 +29,7 @@ local function setup(options)
     })
 
     host.Addon.Server.EventTransactions:Register("synthetic", function(envelope)
-        executions = executions + 1
+        executions.value = executions.value + 1
         if envelope.input and envelope.input.reject then
             return { state = "rejected", outcome = { reason = "synthetic-rejection" } }
         end
@@ -47,7 +47,7 @@ local function setup(options)
             operation = "synthetic",
             input = input or { value = 1 },
             onTerminal = function()
-                presentations = presentations + 1
+                presentations.value = presentations.value + 1
             end,
         })
         assertTrue(record ~= nil, "transaction was created")
@@ -62,9 +62,9 @@ do
     local record = create()
     assertTrue(playerA.Addon.Client.EventTransactions:Submit(record), "submit accepted")
     world:DeliverAll()
-    assertEqual(1, executions, "successful transaction executed once")
+    assertEqual(1, executions.value, "successful transaction executed once")
     assertEqual("committed", record.state, "successful terminal state")
-    assertEqual(1, presentations, "successful presentation settled once")
+    assertEqual(1, presentations.value, "successful presentation settled once")
     assertTrue(playerB.Addon.Client.EventTransactions.terminalByEventId["event-a"][record.id] ~= nil,
         "broadcast commit reached the second client")
 end
@@ -76,10 +76,10 @@ do
     local record = create()
     playerA.Addon.Client.EventTransactions:Submit(record)
     world:DeliverAll()
-    assertEqual(0, executions, "dropped request executed early")
+    assertEqual(0, executions.value, "dropped request executed early")
     world:AdvanceTime(1500)
     world:DeliverAll()
-    assertEqual(1, executions, "retry executed once")
+    assertEqual(1, executions.value, "retry executed once")
     assertEqual(2, record.attempts, "retry reused the transaction")
 end
 
@@ -90,8 +90,8 @@ do
     world:DeliverAll()
     playerA.Addon.Client.EventTransactions:Replay(record.id)
     world:DeliverAll()
-    assertEqual(1, executions, "duplicate command re-executed")
-    assertEqual(1, presentations, "duplicate terminal presented twice")
+    assertEqual(1, executions.value, "duplicate command re-executed")
+    assertEqual(1, presentations.value, "duplicate terminal presented twice")
 end
 
 do
@@ -101,10 +101,10 @@ do
     local record = create()
     playerA.Addon.Client.EventTransactions:Submit(record)
     world:DeliverAll()
-    assertEqual(1, executions, "commit-drop executed more than once before retry")
+    assertEqual(1, executions.value, "commit-drop executed more than once before retry")
     world:AdvanceTime(1500)
     world:DeliverAll()
-    assertEqual(1, executions, "commit retry re-executed mutation")
+    assertEqual(1, executions.value, "commit retry re-executed mutation")
     assertEqual("committed", record.state, "commit replay settled client")
 end
 
@@ -115,7 +115,7 @@ do
     world:DeliverAll()
     playerA.Addon.Client.EventTransactions:Replay(record.id)
     world:DeliverAll()
-    assertEqual(1, executions, "rejected duplicate executed")
+    assertEqual(1, executions.value, "rejected duplicate executed")
     assertEqual("rejected", record.state, "rejection was terminal")
     assertEqual("synthetic-rejection", record.terminal.outcome.reason, "rejection reason")
 end
@@ -128,7 +128,7 @@ do
     playerA.Addon.Client.EventTransactions:Submit(record)
     world:AdvanceTime(15000)
     assertTrue(record.transportStalled == true, "transport timeout was not diagnosed")
-    assertTrue(executions == 0, "lost transaction reached the server")
+    assertTrue(executions.value == 0, "lost transaction reached the server")
     local diagnostics = playerA.Addon.Client.EventTransactions:GetDiagnostics()
     assertTrue(#diagnostics > 0, "timeout diagnostics were not recorded")
 end
@@ -147,7 +147,7 @@ do
         tickNumber = 1,
     })
     host.Addon.Server.EventTransactions:ReceiveRequest(stale, "PlayerA")
-    assertEqual(0, executions, "stale event reached the adapter")
+    assertEqual(0, executions.value, "stale event reached the adapter")
     assertEqual("event-b", host.Addon.Server.EventTransactions.currentEventId, "server event scope")
 end
 
@@ -188,6 +188,62 @@ do
     assertTrue(aTransactions.pendingByEventId["event-a"] ~= bTransactions.pendingByEventId["event-a"],
         "client pending ledgers share state")
     assertTrue(record.eventId == "event-a", "transaction event scope")
+end
+
+do
+    local world, host, playerA, _, executions, _, create = setup()
+    local hostTransactions = host.Addon.Server.EventTransactions
+    hostTransactions.MaxTerminalRecords = 2
+    local first = create({ value = 1 })
+    local second = create({ value = 2 })
+    local third = create({ value = 3 })
+    playerA.Addon.Client.EventTransactions:Submit(first)
+    world:DeliverAll()
+    playerA.Addon.Client.EventTransactions:Submit(second)
+    world:DeliverAll()
+    playerA.Addon.Client.EventTransactions:Submit(third)
+    world:DeliverAll()
+
+    local records = hostTransactions.recordsByEvent["event-a"]
+    local order = hostTransactions.terminalOrderByEvent["event-a"]
+    assertTrue(records[first.id] == nil, "oldest terminal record was not evicted")
+    assertTrue(records[second.id] ~= nil and records[third.id] ~= nil,
+        "recent terminal records were not retained")
+    assertEqual(2, #order, "terminal order exceeded the configured bound")
+    playerA.Addon.Client.EventTransactions:Replay(third.id)
+    world:DeliverAll()
+    assertEqual(3, executions.value, "recent terminal replay re-executed the handler")
+end
+
+do
+    local world, host, playerA, playerB, executions = setup()
+    local hostTransactions = host.Addon.Server.EventTransactions
+    local serverRecord = hostTransactions:BeginAwaitingInput({
+        operation = "synthetic",
+        originName = "PlayerA",
+        inputRecipient = "PlayerB",
+        actorEventId = "actor-1",
+        input = { prompt = "choose" },
+    })
+    assertTrue(serverRecord ~= nil, "server-created transaction was created")
+    world:DeliverAll()
+
+    local defender = playerB.Addon.Client.EventTransactions
+    local defenderRecord = defender:GetPending(serverRecord.id, "event-a")
+    assertTrue(defenderRecord ~= nil, "defender received the awaiting-input request")
+    assertEqual("awaiting-input", defenderRecord.state, "defender awaiting-input state")
+    assertEqual(serverRecord.id, defenderRecord.id, "server and defender transaction IDs differ")
+
+    assertTrue(defender:SubmitInput(defenderRecord, { choice = "defend" }),
+        "defender input was submitted")
+    world:DeliverAll()
+    assertEqual(1, executions.value, "server-created transaction executed once")
+    assertEqual("committed", serverRecord.state, "server-created transaction committed")
+    assertEqual("committed", defenderRecord.state, "defender received the commit")
+
+    assertTrue(defender:ReplayInput(serverRecord.id, "event-a"), "duplicate input was sent")
+    world:DeliverAll()
+    assertEqual(1, executions.value, "duplicate defender input re-executed the handler")
 end
 
 print("EventTransactionFoundationTest passed")
