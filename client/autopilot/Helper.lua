@@ -907,6 +907,27 @@ function Helper.UpdateDamageOutcome(entry, damageResult)
     return outcome
 end
 
+function Helper.RecordCombatTransactionOutcome(entry, envelope)
+    if type(entry) ~= "table" or type(envelope) ~= "table" then
+        return false
+    end
+    local outcome = type(envelope.outcome) == "table" and envelope.outcome or {}
+    local resultToken = tostring(outcome.resultToken or ""):lower()
+    if envelope.state == "committed" and (resultToken == "pass" or resultToken == "fail") then
+        Helper.RecordHitCheckOutcome(entry, resultToken == "pass")
+        if resultToken == "pass" then
+            Helper.UpdateDamageOutcome(entry, outcome.damageResult)
+        end
+    elseif envelope.state == "rejected"
+        or envelope.state == "cancelled"
+        or envelope.state == "timed-out"
+    then
+        -- A terminal failure releases the action without claiming damage.
+        Helper.RecordHitCheckOutcome(entry, false)
+    end
+    return true
+end
+
 function Helper.GetTurnOutcomes(eventState)
     local bucket = getOutcomeBucket(eventState, false)
     if type(bucket) ~= "table" then
@@ -1177,6 +1198,15 @@ local function installOutcomeHooks()
             if results[1] == true and type(entry) == "table" and type(entry.lastDamageResult) == "table" then
                 Helper.UpdateDamageOutcome(entry, entry.lastDamageResult)
             end
+            return unpack(results, 1, results.n)
+        end
+    end
+
+    local baseHandleCombatTransactionTerminal = Client.HandleCombatTransactionTerminal
+    if type(baseHandleCombatTransactionTerminal) == "function" then
+        function Client:HandleCombatTransactionTerminal(entry, envelope, ...)
+            local results = pack(baseHandleCombatTransactionTerminal(self, entry, envelope, ...))
+            Helper.RecordCombatTransactionOutcome(entry, envelope)
             return unpack(results, 1, results.n)
         end
     end

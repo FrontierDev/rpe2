@@ -11,6 +11,7 @@ local Client = Addon.Client
 local Combat = Addon.Client.Combat
 local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
+local EventTransactions = Comms.EventTransactions
 local Ruleset = Addon.Internal.Ruleset or {}
 local Registry = Addon.Internal.Registry or {}
 local Database = Addon.Internal.Database or {}
@@ -1606,6 +1607,16 @@ local function hasQueuedCombatReaction(client, checkId)
     return false
 end
 
+local function cancelSharedCombatReaction(entry, reason)
+    if type(entry) ~= "table" or not entry.sharedTransaction
+        or not EventTransactions or type(EventTransactions.Client) ~= "table"
+        or type(EventTransactions.Client.Cancel) ~= "function"
+    then
+        return false
+    end
+    return EventTransactions.Client:Cancel(entry.sharedTransaction.id, reason or "reaction-stale")
+end
+
 function Client:EnqueueCombatReaction(entry)
     if type(entry) ~= "table" or tostring(entry.checkId or "") == "" then
         return false
@@ -1649,6 +1660,202 @@ function Client:ShowNextQueuedCombatReaction()
 
     self:SetActiveCombatReaction(nextEntry)
     enqueueReactionPresentationWork(refreshReactionWidgetDeferred, self, "combat-hit-check-queue")
+    return true
+end
+
+local function buildSharedCombatReactionEntry(client, record)
+    local envelope = record and record.envelope or nil
+    local eventState = client.GetEventState and client:GetEventState() or client.EventState
+    local request = type(envelope and envelope.input) == "table" and envelope.input.request or nil
+    if type(envelope) ~= "table" or type(request) ~= "table"
+        or tostring(envelope.operation or "") ~= "combat-hit"
+        or type(eventState) ~= "table"
+        or eventState.active ~= true
+        or tostring(eventState.id or "") ~= tostring(envelope.eventId or "")
+    then
+        return nil
+    end
+
+    local attackerEventId = tonumber(envelope.actorEventId) or 0
+    local defenderEventId = tonumber(envelope.targetEventIds and envelope.targetEventIds[1]) or 0
+    if attackerEventId <= 0 or defenderEventId <= 0 or #(envelope.targetEventIds or {}) ~= 1 then
+        return nil
+    end
+    local attackerUnit = findEventUnitById(eventState.units, attackerEventId)
+    local defenderUnit = findEventUnitById(eventState.units, defenderEventId)
+    if type(attackerUnit) ~= "table" or type(defenderUnit) ~= "table"
+        or attackerUnit.active == false or defenderUnit.active == false
+        or defenderUnit.isPlayer ~= true
+    then
+        return nil
+    end
+    if type(Combat.IsUnitDead) == "function"
+        and (Combat:IsUnitDead(attackerUnit, { eventState = eventState })
+            or Combat:IsUnitDead(defenderUnit, { eventState = eventState }))
+    then
+        return nil
+    end
+
+    local _, _, component = Combat:ResolveSpellComponent(request.spellRef, request.componentKey)
+    if type(component) ~= "table" or type(component.effect) ~= "table" then
+        return nil
+    end
+    local sessionState = client.GetState and client:GetState() or client.State
+    local context = {
+        attackerUnit = attackerUnit,
+        casterUnit = attackerUnit,
+        defenderUnit = defenderUnit,
+        targetUnit = defenderUnit,
+        eventState = eventState,
+        sessionState = sessionState,
+        spellRef = request.spellRef,
+        componentKey = request.componentKey,
+        combatLookupSnapshot = Combat:CloneValue(request.combatLookupSnapshot),
+        healthResourceRef = request.healthResourceRef or eventState.healthResourceRef,
+    }
+    local entry = {
+        checkId = record.id,
+        transactionId = record.id,
+        eventId = envelope.eventId,
+        spellRef = request.spellRef,
+        componentKey = request.componentKey,
+        attackType = request.attackType,
+        defenceSystem = request.defenceSystem,
+        attackerUnit = attackerUnit,
+        defenderUnit = defenderUnit,
+        attackerEventId = attackerEventId,
+        defenderEventId = defenderEventId,
+        turnNumber = envelope.turnNumber,
+        tickNumber = envelope.tickNumber,
+        attackerTotal = tonumber(request.attackerTotal) or 0,
+        rawDamage = tonumber(request.rawDamage) or 0,
+        resultType = request.resultType,
+        effect = component.effect,
+        component = component,
+        weaponSkillContext = Combat:CloneValue(request.weaponSkillContext),
+        attackerRollContext = Combat:CloneValue(request.attackerRollContext),
+        attackModifierContext = Combat:CloneValue(request.attackModifierContext),
+        combatLookupSnapshot = Combat:CloneValue(request.combatLookupSnapshot),
+        targetEvents = Combat:CloneValue(request.targetEvents or {}),
+        context = context,
+        sessionState = sessionState,
+        eventState = eventState,
+        sharedTransaction = record,
+    }
+    return entry
+end
+
+function Client:HandleEventTransactionRequest(record)
+    if type(record) ~= "table"
+        or not record.serverCreated
+        or not record.envelope
+        or tostring(record.envelope.operation or "") ~= "combat-hit"
+    then
+        return true
+    end
+
+    local entry = buildSharedCombatReactionEntry(self, record)
+    if not entry then
+        return false
+    end
+    record.combatEntry = entry
+    record.options = record.options or {}
+    record.options.onTerminal = function(envelope)
+        self:HandleCombatTransactionTerminal(entry, envelope)
+    end
+    return self:ShowCombatReaction(entry)
+end
+
+function Client:HandleEventTransactionProjection(envelope)
+    if type(envelope) ~= "table" or tostring(envelope.operation or "") ~= "combat-hit" then
+        return false
+    end
+    local record = {
+        id = envelope.transactionId,
+        envelope = envelope,
+        serverCreated = true,
+    }
+    local entry = buildSharedCombatReactionEntry(self, record)
+    if not entry then
+        return false
+    end
+    return self:HandleCombatTransactionTerminal(entry, envelope)
+end
+
+function Combat:PresentCommittedDamageResult(entry, damageResult)
+    if type(entry) ~= "table" or type(damageResult) ~= "table" then
+        return false
+    end
+    entry.lastDamageResult = damageResult
+    if type(self.RegisterActionDamageCombatLog) == "function" then
+        self:RegisterActionDamageCombatLog(entry, damageResult)
+    end
+    finalizeDamageCombatEvents(Client, entry, true)
+    self:EmitDamageTypeEvent(Client, entry, damageResult)
+    if type(Client.MarkEventUnitInteraction) == "function" then
+        Client:MarkEventUnitInteraction(entry.eventState, entry.attackerUnit, entry.defenderUnit, damageResult, entry.spellRef)
+    end
+    local spellcasting = Client.Spellcasting
+    if spellcasting and type(spellcasting.ShowLocalResourceDeltaCombatText) == "function" then
+        spellcasting.ShowLocalResourceDeltaCombatText(
+            Client,
+            entry.eventState,
+            entry.attackerUnit,
+            entry.defenderUnit,
+            damageResult.resourceDeltas,
+            damageResult.hitType,
+            damageResult
+        )
+    end
+    return true
+end
+
+function Client:HandleCombatTransactionTerminal(entry, envelope)
+    if type(entry) ~= "table" or type(envelope) ~= "table" or entry.terminalApplied == true then
+        return false
+    end
+    entry.terminalApplied = true
+    entry.terminal = envelope
+    local active = self.ActiveCombatReactionEntry
+    if type(active) == "table" and tostring(active.checkId or "") == tostring(entry.checkId or "") then
+        self:HideCombatReaction()
+    else
+        local queue = ensureCombatReactionQueue(self)
+        for index = #queue, 1, -1 do
+            if tostring(queue[index].checkId or "") == tostring(entry.checkId or "") then
+                table.remove(queue, index)
+            end
+        end
+    end
+
+    local outcome = type(envelope.outcome) == "table" and envelope.outcome or {}
+    local resultToken = normalizeResultToken(outcome.resultToken)
+    local action = entry.reactionAction
+    local resolution = entry.lastResolution
+    if envelope.state == "committed" and resultToken then
+        entry.lastResolution = resolution
+        if type(Combat.LogAttackAttempt) == "function" then
+            Combat:LogAttackAttempt(entry, resultToken, resolution)
+        end
+        if type(Combat.PrintHitCheckResult) == "function" then
+            Combat:PrintHitCheckResult(resultToken)
+        end
+        if resultToken == RESULT_PASS then
+            if type(Client.SkillProgression) == "table"
+                and type(Client.SkillProgression.TryGainWeaponSkillsForHit) == "function"
+            then
+                Client.SkillProgression:TryGainWeaponSkillsForHit(entry)
+            end
+            Combat:PresentCommittedDamageResult(entry, outcome.damageResult)
+        elseif resultToken == RESULT_FAIL then
+            Combat:EmitSuccessfulDefenceEvent(Client, entry, action, resultToken, resolution)
+            finalizeDamageCombatEvents(Client, entry, false)
+            Combat:ShowDefenceCombatText(entry, resolution)
+        end
+    end
+    if type(self.ActiveCombatReactionEntry) ~= "table" then
+        self:ShowNextQueuedCombatReaction()
+    end
     return true
 end
 
@@ -1730,12 +1937,14 @@ function Client:PruneCombatReactionTransactions(reason, nowMs)
     local active = self.ActiveCombatReactionEntry
     local activeWasRemoved = type(active) == "table" and stale(active)
     if activeWasRemoved then
+        cancelSharedCombatReaction(active, reason or "stale")
         self:HideCombatReaction()
         logCombatTransactionFailure("reaction", active, reason or "stale")
     end
     local queue = ensureCombatReactionQueue(self)
     for index = #queue, 1, -1 do
         if stale(queue[index]) then
+            cancelSharedCombatReaction(queue[index], reason or "stale")
             logCombatTransactionFailure("reaction", queue[index], reason or "stale")
             table.remove(queue, index)
         end
@@ -2020,6 +2229,33 @@ function Client:ResolveCombatReactionAction(actionId)
         end
         self:ShowNextQueuedCombatReaction()
         return completed, result
+    end
+
+    if entry.sharedTransaction and EventTransactions and type(EventTransactions.Client) == "table"
+        and type(EventTransactions.Client.SubmitInput) == "function"
+    then
+        local record = entry.sharedTransaction
+        local originalInput = record.envelope and record.envelope.input or {}
+        entry.reactionAction = action
+        local successfullyDefended = isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
+        local submitted = EventTransactions.Client:SubmitInput(record, {
+            request = Combat:CloneValue(originalInput.request),
+            reaction = {
+                resultToken = resultToken,
+                successfullyDefended = successfullyDefended,
+                defenceStatRef = successfullyDefended and normalizeDefenceStatRef(resolution and resolution.defenceStatRef) or nil,
+                resolution = Combat:CloneValue(resolution),
+            },
+        })
+        if not submitted then
+            self:HideCombatReaction()
+            logCombatTransactionFailure("reaction", entry, "transaction-submit-failed")
+            self:ShowNextQueuedCombatReaction()
+            return false
+        end
+        Combat:LogDefenceAttempt(entry, resultToken, resolution)
+        self:HideCombatReaction()
+        return true
     end
 
     local attackerName = resolveSenderForUnit(entry.eventState, entry.attackerUnit)

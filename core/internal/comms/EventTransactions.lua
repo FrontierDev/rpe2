@@ -318,6 +318,50 @@ local function currentClientEvent()
     return client.EventState
 end
 
+local function applyAuthoritativeDelta(envelope)
+    if type(envelope) ~= "table"
+        or envelope.state ~= "committed"
+        or type(envelope.authoritativeDelta) ~= "table"
+        or #envelope.authoritativeDelta == 0
+    then
+        return false
+    end
+
+    local client = Addon.Client
+    local eventState = currentClientEvent()
+    local eventClass = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.Event
+        or nil
+    if type(client) ~= "table"
+        or type(client.HandleEventUnitDeltaBatch) ~= "function"
+        or type(eventState) ~= "table"
+        or type(eventClass) ~= "table"
+        or type(eventClass.SerializeUnitDeltaBatchForNetwork) ~= "function"
+    then
+        return false
+    end
+
+    local sessionState = type(client.GetState) == "function" and client:GetState() or client.State
+    local channelName = eventState.channelName or (sessionState and sessionState.channelName) or ""
+    local serialized = eventClass.SerializeUnitDeltaBatchForNetwork(envelope.authoritativeDelta, {
+        level = eventState.level,
+        difficulty = eventState.difficulty,
+        playerCount = 0,
+    })
+    if type(serialized) ~= "string" or serialized == "" then
+        return false
+    end
+
+    return client:HandleEventUnitDeltaBatch({
+        channelName,
+        envelope.eventId,
+        serialized,
+        envelope.newRevision,
+    }) == true
+end
+
 local function currentServerEvent()
     local server = Addon.Server
     if type(server.GetEventState) == "function" then
@@ -654,6 +698,7 @@ function ClientService:_settle(record, envelope)
     record.presentationSettled = true
     record.terminal = clone(envelope)
     record.state = envelope.state
+    applyAuthoritativeDelta(envelope)
     local pending = self.pendingByEventId[eventId] or {}
     pending[record.id] = nil
     if record.retryTimer and type(record.retryTimer.Cancel) == "function" then
@@ -738,6 +783,13 @@ function ClientService:ReceiveRequest(payload, sender)
         state = record.state,
         serverCreated = true,
     })
+    local requestHook = Addon.Client and Addon.Client.HandleEventTransactionRequest
+    if type(requestHook) == "function" then
+        local accepted = requestHook(Addon.Client, record)
+        if accepted == false then
+            self:Cancel(record.id, "invalid-request")
+        end
+    end
     return true
 end
 
@@ -770,6 +822,16 @@ function ClientService:ReceiveTerminal(payload, sender)
         self._terminalOrder[eventId] = self._terminalOrder[eventId] or {}
         addBounded(terminal, self._terminalOrder[eventId], envelope.transactionId,
             clone(envelope), Transactions.MaxTerminalRecords)
+        applyAuthoritativeDelta(envelope)
+        local presentation = self:_presentation(eventId)
+        local presentationKey = tostring(envelope.presentationKey or (eventId .. ":" .. envelope.transactionId))
+        if not presentation[presentationKey] then
+            presentation[presentationKey] = true
+            local projectionHook = Addon.Client and Addon.Client.HandleEventTransactionProjection
+            if type(projectionHook) == "function" then
+                projectionHook(Addon.Client, clone(envelope))
+            end
+        end
         recordDiagnostic(self, eventId, {
             transactionId = envelope.transactionId,
             state = envelope.state,
@@ -1019,6 +1081,8 @@ function ServerService:BeginAwaitingInput(options)
         submittedAt = envelope.createdAt,
         serverCreated = true,
         inputRecipient = inputRecipient,
+        initialInput = clone(envelope.input),
+        onTerminal = type(options.onTerminal) == "function" and options.onTerminal or nil,
     }
     records[record.id] = record
     transition(record, "awaiting-input", "server-awaiting-input")
@@ -1195,6 +1259,10 @@ function ServerService:_terminalize(record, state, outcome, result)
         reason = record.outcome.reason,
     })
     self:_publish(terminal, record.serverCreated and record.inputRecipient or record.envelope.originName)
+    if not record.terminalCallbackFired and type(record.onTerminal) == "function" then
+        record.terminalCallbackFired = true
+        record.onTerminal(clone(terminal), record)
+    end
     return true
 end
 
