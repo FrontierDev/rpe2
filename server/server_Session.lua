@@ -427,6 +427,10 @@ end
 local function commitResourceTransaction(server, changedByEventId)
     local entries = buildAuthoritativeEntries(changedByEventId)
     if #entries == 0 then
+        if type(ResourceSync.UpdateEventReadiness) ~= "function" then
+            return false, "resource-readiness-unavailable"
+        end
+        ResourceSync.UpdateEventReadiness(server.EventState)
         return true, nil
     end
     if type(server.BroadcastEventDeltaBatch) ~= "function" then
@@ -435,6 +439,10 @@ local function commitResourceTransaction(server, changedByEventId)
     if server:BroadcastEventDeltaBatch(entries, false) ~= true then
         return false, "authoritative-broadcast-failed"
     end
+    if type(ResourceSync.UpdateEventReadiness) ~= "function" then
+        return false, "resource-readiness-unavailable"
+    end
+    ResourceSync.UpdateEventReadiness(server.EventState)
     return true, entries
 end
 
@@ -949,6 +957,7 @@ local function handleEventResourceTransaction(envelope, context, operation)
         or type(ResourceSync.CoalesceTargetedResourceDeltas) ~= "function"
         or type(ResourceSync.ApplyResourcesToEventUnitByEventID) ~= "function"
         or type(ResourceSync.ApplyResourceDeltasToEventUnitByEventID) ~= "function"
+        or type(ResourceSync.UpdateEventReadiness) ~= "function"
         or type(Server.BroadcastEventDeltaBatch) ~= "function"
     then
         return { state = "rejected", outcome = { reason = "resource-sync-unavailable" } }

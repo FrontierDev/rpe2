@@ -1802,11 +1802,6 @@ tryQueueInitialLocalResourceSync = function(client, sessionState, eventState, re
         return false
     end
 
-    if math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) > 0 then
-        sessionState.lastResourceSyncEventId = eventState.id
-        return false
-    end
-
     local profileLogic = Addon.Internal and Addon.Internal.Profile or nil
     if type(profileLogic) == "table" then
         if type(profileLogic.WarmResolvedBootstrapState) == "function" then

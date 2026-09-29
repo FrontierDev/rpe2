@@ -1411,6 +1411,7 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
     end
 
     bindStateSessionRuntime(state)
+    local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
     local channelId = resolveChannelId(state)
     if not channelId then
         if Debug and Debug.Error then
@@ -1464,7 +1465,7 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
             end
             return false, "missing-live-resource-target"
         end
-        return submitEventResourceTransaction(
+        local sent, transactionId = submitEventResourceTransaction(
             self,
             state,
             "event-resource-replace",
@@ -1479,6 +1480,14 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
                 stepSensitive = false,
             }
         )
+        if sent == true
+            and type(currentEventState) == "table"
+            and currentEventState.active == true
+            and currentEventState.channelName == state.channelName
+        then
+            state.lastResourceSyncEventId = currentEventState.id
+        end
+        return sent, transactionId
     end
 
     -- A zero-target RESOURCE packet is profile/session bootstrap only.  It is

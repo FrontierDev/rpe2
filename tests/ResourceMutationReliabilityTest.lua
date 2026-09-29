@@ -223,7 +223,44 @@ local function installResourceSync(node)
         end
         return changed
     end
-    sync.UpdateEventReadiness = function() return true end
+    sync.GetEventReadinessState = function(eventState)
+        local healthResourceRef = tostring(eventState and eventState.healthResourceRef or "health")
+        local playerCount = 0
+        local healthResourcesReceived = 0
+        for index = 1, #((eventState and eventState.units) or {}) do
+            local unit = eventState.units[index]
+            if unit and unit.isPlayer == true then
+                playerCount = playerCount + 1
+                if resourceByRef(unit.resources, healthResourceRef) then
+                    healthResourcesReceived = healthResourcesReceived + 1
+                end
+            end
+        end
+        local resourcesReady = playerCount == 0 or healthResourcesReceived >= playerCount
+        local rosterReady = eventState and eventState.rosterReady == true
+        return {
+            healthResourceRef = healthResourceRef,
+            unitsChunkExpected = tonumber(eventState and eventState.unitsChunkExpected) or 0,
+            unitsChunkReceived = tonumber(eventState and eventState.unitsChunkReceived) or 0,
+            healthResourcesExpected = playerCount,
+            healthResourcesReceived = healthResourcesReceived,
+            readyProgressExpected = playerCount,
+            readyProgressReceived = healthResourcesReceived,
+            rosterReady = rosterReady,
+            rosterComplete = rosterReady,
+            resourcesReady = resourcesReady,
+            unitsReady = rosterReady and resourcesReady,
+        }
+    end
+    sync.UpdateEventReadiness = function(eventState)
+        local readiness = sync.GetEventReadinessState(eventState)
+        if type(eventState) == "table" then
+            for key, value in pairs(readiness) do
+                eventState[key] = value
+            end
+        end
+        return readiness
+    end
     sync.BuildPlayerTurnRegenResourceDeltas = function()
         return { { resourceRef = "health", delta = 4, maxValue = 100 } }
     end
@@ -270,12 +307,20 @@ local function installProjection(node)
                 local resource = resourceByRef(unit.resources, "health")
                 if resource then
                     resource.currentValue = tonumber(nextHealth) or resource.currentValue
+                else
+                    unit.resources = unit.resources or {}
+                    unit.resources[#unit.resources + 1] = {
+                        resourceRef = "health",
+                        currentValue = tonumber(nextHealth) or 0,
+                        maxValue = 100,
+                    }
                 end
                 unit.threatTable = unit.threatTable or {}
                 unit.threatTable[2] = tonumber(nextThreat) or 0
             end
         end
         node.EventState.liveUnitRevision = tonumber(arguments and arguments[4]) or node.EventState.liveUnitRevision
+        node.Addon.Internal.Comms.ResourceSync.UpdateEventReadiness(node.EventState)
         return true
     end
     node.Addon.Client.HandleEventTransactionProjection = function(_, envelope)
@@ -301,6 +346,7 @@ local function setup(options)
     local fixture = {
         id = options.eventId or "event-a",
         active = true,
+        rosterReady = true,
         hostName = "Host",
         channelName = options.channelName or "RPE-RESOURCE",
         channelId = options.channelId or 19,
@@ -310,8 +356,8 @@ local function setup(options)
         healthResourceRef = "health",
         units = {
             { eventID = 1, name = "Boss", active = true, isPlayer = false, boss = true, resources = resources(options.bossHealth or 100), threatTable = {} },
-            { eventID = 2, name = "PlayerA", active = true, isPlayer = true, ownerID = "PlayerA", resources = resources(options.playerAHealth or 100), threatTable = {} },
-            { eventID = 3, name = "PlayerB", active = true, isPlayer = true, ownerID = "PlayerB", resources = resources(options.playerBHealth or 100), threatTable = {} },
+            { eventID = 2, name = "PlayerA", active = true, isPlayer = true, ownerID = "PlayerA", resources = options.playerAResources ~= nil and options.playerAResources or resources(options.playerAHealth ~= nil and options.playerAHealth or 100), threatTable = {} },
+            { eventID = 3, name = "PlayerB", active = true, isPlayer = true, ownerID = "PlayerB", resources = options.playerBResources ~= nil and options.playerBResources or resources(options.playerBHealth ~= nil and options.playerBHealth or 100), threatTable = {} },
         },
     }
 
@@ -400,6 +446,65 @@ if fixtureOnly then
         health = health,
         findUnit = findUnit,
     }
+end
+
+-- Each player must publish its own initial live resources even after another
+-- player's replacement has advanced the shared EventUnit revision.
+do
+    local world, host, playerA, playerB, stats = setup({
+        eventId = "startup-resource-revision",
+        playerAResources = {},
+        playerBResources = {},
+    })
+    local eventId = host.EventState.id
+    local serverState = host.Addon.Server.EventState
+
+    assertEqual(0, serverState.liveUnitRevision, "startup regression begins at revision zero")
+    assertTrue(resourceByRef(findUnit(serverState, 2).resources, "health") == nil,
+        "PlayerA initially lacks health")
+    assertTrue(resourceByRef(findUnit(serverState, 3).resources, "health") == nil,
+        "PlayerB initially lacks health")
+    assertTrue(playerA.SessionState.lastResourceSyncEventId == nil,
+        "PlayerA has no startup completion before queuing")
+
+    assertTrue(playerA.Addon.Client:QueueClientResourceSync("startup-player-a"),
+        "PlayerA startup resource sync queued")
+    assertTrue(playerA.SessionState.lastResourceSyncEventId == nil,
+        "queued startup sync is not marked complete before submission")
+    world:AdvanceTime(0)
+    assertEqual(eventId, playerA.SessionState.lastResourceSyncEventId,
+        "PlayerA startup completion recorded after transaction submission")
+    world:DeliverAll()
+
+    assertEqual(1, serverState.liveUnitRevision, "PlayerA replacement advanced revision once")
+    assertTrue(resourceByRef(findUnit(playerB.EventState, 3).resources, "health") == nil,
+        "PlayerB remains unpublished after receiving PlayerA delta")
+    assertTrue(playerB.SessionState.lastResourceSyncEventId == nil,
+        "global revision did not mark PlayerB startup complete")
+
+    assertTrue(playerB.Addon.Client:QueueClientResourceSync("startup-player-b"),
+        "PlayerB startup resource sync queued after revision advanced")
+    world:AdvanceTime(0)
+    assertEqual(eventId, playerB.SessionState.lastResourceSyncEventId,
+        "PlayerB startup completion recorded after its own submission")
+    world:DeliverAll()
+
+    assertEqual(2, stats.broadcasts, "each player replacement committed exactly once")
+    for _, node in ipairs(world.nodes) do
+        assertEqual(100, health(findUnit(node.EventState, 2)), node.Name .. " PlayerA health")
+        assertEqual(100, health(findUnit(node.EventState, 3)), node.Name .. " PlayerB health")
+        assertTrue(node.EventState.resourcesReady == true, node.Name .. " resources ready")
+        assertTrue(node.EventState.unitsReady == true, node.Name .. " units ready")
+    end
+    assertTrue(serverState.resourcesReady == true, "server resources ready")
+    assertTrue(serverState.unitsReady == true, "server units ready")
+    assertEqual(2, serverState.liveUnitRevision, "both startup replacements advanced revision")
+    for _, node in ipairs(world.nodes) do
+        assertEqual(0, node.Addon.Client.EventTransactions:GetDiagnosticsSnapshot().pendingCount,
+            node.Name .. " startup pending transactions")
+    end
+    assertEqual(0, host.Addon.Server.EventTransactions:GetDiagnosticsSnapshot().pendingCount,
+        "server startup pending transactions")
 end
 
 local function sendDelta(player, reason, targetEventId, delta, options)
