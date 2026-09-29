@@ -116,7 +116,7 @@ assertEqual(sendsBeforeDuplicate + 1, world.Router.logicalSendCount, "duplicate 
 assertEqual(7, #received.PlayerB, "duplicate delivery count")
 
 local timerCalls = 0
-playerA.env.C_Timer.After(1500, function() timerCalls = timerCalls + 1 end)
+playerA.env.C_Timer.After(1.5, function() timerCalls = timerCalls + 1 end)
 world:AdvanceTime(1499)
 assertEqual(0, timerCalls, "timer ran early")
 world:AdvanceTime(1)
