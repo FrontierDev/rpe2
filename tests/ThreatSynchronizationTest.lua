@@ -25,6 +25,7 @@ local function splitPreservingEmpty(text, separator, limit)
 end
 
 local warnings = {}
+local resourceMutationAcks = {}
 local Addon = {
     Client = {},
     Server = {},
@@ -40,6 +41,15 @@ local Addon = {
                     return 1
                 end,
             },
+            SendMessage = function(_, distribution, opcode, arguments, target)
+                resourceMutationAcks[#resourceMutationAcks + 1] = {
+                    distribution = distribution,
+                    opcode = opcode,
+                    arguments = arguments,
+                    target = target,
+                }
+                return true
+            end,
             ResourceSync = {
                 CoalesceTargetedResourceDeltas = function()
                     return {}
@@ -171,10 +181,16 @@ Server.BroadcastEventDeltaBatch = function(self, entries)
     self.EventState.liveUnitRevision = self.EventState.liveUnitRevision + 1
     return true
 end
-assertTrue(Server:HandleResourceDelta({ "channel", "PlayerA", "resource", 3 }, "PlayerA"), "server accepts resource delta")
+local resourceMutationArguments = { "channel", "PlayerA", "resource", 3, "", "resource-retry-1" }
+assertTrue(Server:HandleResourceDelta(resourceMutationArguments, "PlayerA"), "server accepts retried resource delta")
 assertEqual(resourceTarget.resources.health.currentValue, 6, "authoritative event HP is committed")
 assertEqual(Server.EventState.liveUnitRevision, 8, "authoritative resource commit advances live-unit revision")
 assertEqual(resourceBroadcastEntries[1].unit.resources.health.currentValue, 6, "resource commit is published in the authoritative unit delta")
+assertEqual(resourceMutationAcks[#resourceMutationAcks].arguments[2], "resource-retry-1", "server ACK identifies the committed mutation")
+assertTrue(Server:HandleResourceDelta(resourceMutationArguments, "PlayerA"), "duplicate retry is acknowledged idempotently")
+assertEqual(resourceTarget.resources.health.currentValue, 6, "duplicate retry cannot apply resource damage twice")
+assertEqual(Server.EventState.liveUnitRevision, 8, "duplicate retry cannot publish a second revision")
+assertEqual(resourceMutationAcks[#resourceMutationAcks].arguments[2], "resource-retry-1", "duplicate retry receives the original mutation ACK")
 
 Addon.Internal.Comms.ResourceSync.NormalizeResources = function()
     return { { resourceRef = "health", currentValue = 4, maxValue = 10 } }

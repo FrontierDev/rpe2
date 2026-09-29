@@ -636,6 +636,30 @@ Operations.Opcodes = Operations.Opcodes or {
             return client:HandleAuraRuntimeUpdateBatch(arguments, sender, distribution, target, message)
         end,
     },
+    [41] = {
+        key = "RESOURCE_MUTATION_ACK",
+        name = "resource-mutation-ack",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleResourceMutationAck) ~= "function" then
+                return false
+            end
+
+            return client:HandleResourceMutationAck(arguments, sender, distribution, target, message)
+        end,
+    },
+    [42] = {
+        key = "RESOURCE_MUTATION_COMMIT",
+        name = "resource-mutation-commit",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleAuthoritativeResourceMutationCommit) ~= "function" then
+                return false
+            end
+
+            return client:HandleAuthoritativeResourceMutationCommit(arguments, sender, distribution, target, message)
+        end,
+    },
 }
 
 Operations:ResetRegistry()

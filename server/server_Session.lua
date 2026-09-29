@@ -22,6 +22,8 @@ local SERVER_START_OPCODE = Operations:GetOpcode("SERVER_START")
 local SERVER_STOP_OPCODE = Operations:GetOpcode("SERVER_STOP")
 local SERVER_QUERY_OPCODE = Operations:GetOpcode("SERVER_QUERY")
 local RESOURCE_DELTA_OPCODE = Operations:GetOpcode("RESOURCE_DELTA")
+local RESOURCE_MUTATION_ACK_OPCODE = Operations:GetOpcode("RESOURCE_MUTATION_ACK")
+local RESOURCE_MUTATION_COMMIT_OPCODE = Operations:GetOpcode("RESOURCE_MUTATION_COMMIT")
 local SKILL_ROLL_RESULT_OPCODE = Operations:GetOpcode("SKILL_ROLL_RESULT")
 local MAX_START_ATTEMPTS = 5
 local START_RETRY_DELAY = 1.5
@@ -38,6 +40,73 @@ local function buildSendMetadata(opcode)
         opcode = opcode,
         scope = "server",
     }
+end
+
+local function normalizeResourceMutationId(value)
+    local mutationId = tostring(value or "")
+    if mutationId == "" or #mutationId > 128 then
+        return nil
+    end
+    return mutationId
+end
+
+local function getProcessedResourceMutation(state, clientName, mutationId)
+    local ledger = type(state) == "table" and state.processedResourceMutations or nil
+    return type(ledger) == "table" and ledger[tostring(clientName) .. "\31" .. tostring(mutationId)] or nil
+end
+
+local function rememberResourceMutation(state, clientName, mutationId, revision)
+    if type(state) ~= "table" or not mutationId then
+        return false
+    end
+    state.processedResourceMutations = state.processedResourceMutations or {}
+    state.processedResourceMutationOrder = state.processedResourceMutationOrder or {}
+    local key = tostring(clientName) .. "\31" .. tostring(mutationId)
+    if state.processedResourceMutations[key] then
+        return true
+    end
+    state.processedResourceMutations[key] = { revision = math.max(0, math.floor(tonumber(revision) or 0)) }
+    local order = state.processedResourceMutationOrder
+    order[#order + 1] = key
+    while #order > 256 do
+        local expiredKey = table.remove(order, 1)
+        state.processedResourceMutations[expiredKey] = nil
+    end
+    return true
+end
+
+local function acknowledgeResourceMutation(state, clientName, mutationId, revision)
+    if not RESOURCE_MUTATION_ACK_OPCODE or type(Comms.SendMessage) ~= "function" then
+        return false
+    end
+    return Comms:SendMessage("WHISPER", RESOURCE_MUTATION_ACK_OPCODE, {
+        state and state.channelName or "",
+        mutationId,
+        math.max(0, math.floor(tonumber(revision) or 0)),
+    }, clientName, buildSendMetadata(RESOURCE_MUTATION_ACK_OPCODE)) == true
+end
+
+local function broadcastResourceMutationCommit(state, clientName, mutationId, targetedResourceDeltas, revision)
+    if not RESOURCE_MUTATION_COMMIT_OPCODE
+        or type(state) ~= "table"
+        or not state.channelId
+        or type(targetedResourceDeltas) ~= "table"
+        or #targetedResourceDeltas == 0
+        or type(ResourceSync.SerializeTargetedResourceDeltas) ~= "function"
+    then
+        return false
+    end
+    local payload = ResourceSync.SerializeTargetedResourceDeltas(targetedResourceDeltas)
+    if payload == "" then
+        return false
+    end
+    return Comms:SendToChannel(state.channelId, RESOURCE_MUTATION_COMMIT_OPCODE, {
+        state.channelName,
+        clientName,
+        payload,
+        mutationId,
+        math.max(0, math.floor(tonumber(revision) or 0)),
+    }, buildSendMetadata(RESOURCE_MUTATION_COMMIT_OPCODE)) == true
 end
 
 local function buildServerRoute(distribution)
@@ -584,8 +653,8 @@ function Server:HandleResource(arguments, sender)
         return false
     end
 
-    local clientName = Common.NormalizeName(arguments and arguments[2] or sender)
-    if clientName == "" then
+    local clientName = Common.NormalizeName(sender)
+    if clientName == "" or clientName ~= Common.NormalizeName(arguments and arguments[2]) then
         return false
     end
 
@@ -657,16 +726,29 @@ function Server:HandleResourceDelta(arguments, sender)
         return false
     end
 
-    local clientName = Common.NormalizeName(arguments and arguments[2] or sender)
-    if clientName == "" then
+    local clientName = Common.NormalizeName(sender)
+    if clientName == "" or clientName ~= Common.NormalizeName(arguments and arguments[2]) then
         return false
     end
 
     addClient(state, clientName)
     local targetEventId = tonumber(arguments and arguments[4]) or 0
+    local mutationId = normalizeResourceMutationId(arguments and arguments[6])
 
     local resourceDeltas = ResourceSync.NormalizeResourceDeltas and ResourceSync.NormalizeResourceDeltas(arguments and arguments[3] or "") or {}
+    if type(resourceDeltas) == "table" and #resourceDeltas > 0 and not mutationId then
+        if Debug and Debug.Warn then
+            Debug.Warn("RESOURCE_DELTA rejected from %s: mutation id is missing.", tostring(clientName))
+        end
+        return false
+    end
+    local duplicate = mutationId and getProcessedResourceMutation(state, clientName, mutationId) or nil
+    if duplicate then
+        acknowledgeResourceMutation(state, clientName, mutationId, duplicate.revision)
+        return true
+    end
     local handled = false
+    local committedResourceDeltas = {}
     if type(resourceDeltas) == "table" and #resourceDeltas > 0 then
         local applied, eventUpdated = applyClientResourceDeltasToServerState(
             self,
@@ -677,12 +759,28 @@ function Server:HandleResourceDelta(arguments, sender)
         )
         if eventUpdated then
             publishAuthoritativeResourceMutation(self, targetEventId, clientName)
+            for index = 1, #resourceDeltas do
+                local delta = resourceDeltas[index]
+                committedResourceDeltas[#committedResourceDeltas + 1] = {
+                    targetEventId = targetEventId,
+                    resourceRef = delta.resourceRef,
+                    delta = delta.delta,
+                    maxValue = delta.maxValue,
+                    currentValue = delta.currentValue,
+                }
+            end
         end
         handled = applied or handled
     end
     local threatUpdates = deserializeThreatUpdates(arguments and arguments[5] or "", "RESOURCE_DELTA", sender)
     if type(threatUpdates) == "table" and #threatUpdates > 0 then
         handled = applyThreatUpdatesToServerState(self, threatUpdates) or handled
+    end
+    if mutationId and handled then
+        local revision = self.EventState and self.EventState.liveUnitRevision or 0
+        rememberResourceMutation(state, clientName, mutationId, revision)
+        broadcastResourceMutationCommit(state, clientName, mutationId, committedResourceDeltas, revision)
+        acknowledgeResourceMutation(state, clientName, mutationId, revision)
     end
     return handled
 end
@@ -698,8 +796,8 @@ function Server:HandleResourceDeltaBatch(arguments, sender)
         return false
     end
 
-    local clientName = Common.NormalizeName(arguments and arguments[2] or sender)
-    if clientName == "" then
+    local clientName = Common.NormalizeName(sender)
+    if clientName == "" or clientName ~= Common.NormalizeName(arguments and arguments[2]) then
         return false
     end
 
@@ -710,6 +808,18 @@ function Server:HandleResourceDeltaBatch(arguments, sender)
         or {}
     if type(targetedResourceDeltas) ~= "table" then
         targetedResourceDeltas = {}
+    end
+    local mutationId = normalizeResourceMutationId(arguments and arguments[5])
+    if #targetedResourceDeltas > 0 and not mutationId then
+        if Debug and Debug.Warn then
+            Debug.Warn("RESOURCE_DELTA_BATCH rejected from %s: mutation id is missing.", tostring(clientName))
+        end
+        return false
+    end
+    local duplicate = mutationId and getProcessedResourceMutation(state, clientName, mutationId) or nil
+    if duplicate then
+        acknowledgeResourceMutation(state, clientName, mutationId, duplicate.revision)
+        return true
     end
     local deltaOrder = {}
     local deltasByTargetEventId = {}
@@ -733,6 +843,7 @@ function Server:HandleResourceDeltaBatch(arguments, sender)
     end
 
     local handled = false
+    local committedResourceDeltas = {}
     for index = 1, #deltaOrder do
         local applied, eventUpdated = applyClientResourceDeltasToServerState(
             self,
@@ -743,6 +854,17 @@ function Server:HandleResourceDeltaBatch(arguments, sender)
         )
         if eventUpdated then
             publishAuthoritativeResourceMutation(self, deltaOrder[index], clientName)
+            local deltas = deltasByTargetEventId[deltaOrder[index]]
+            for deltaIndex = 1, #deltas do
+                local delta = deltas[deltaIndex]
+                committedResourceDeltas[#committedResourceDeltas + 1] = {
+                    targetEventId = deltaOrder[index],
+                    resourceRef = delta.resourceRef,
+                    delta = delta.delta,
+                    maxValue = delta.maxValue,
+                    currentValue = delta.currentValue,
+                }
+            end
         end
         handled = applied or handled
     end
@@ -750,6 +872,13 @@ function Server:HandleResourceDeltaBatch(arguments, sender)
     local threatUpdates = deserializeThreatUpdates(arguments and arguments[4] or "", "RESOURCE_DELTA_BATCH", sender)
     if type(threatUpdates) == "table" and #threatUpdates > 0 then
         handled = applyThreatUpdatesToServerState(self, threatUpdates) or handled
+    end
+
+    if mutationId and handled then
+        local revision = self.EventState and self.EventState.liveUnitRevision or 0
+        rememberResourceMutation(state, clientName, mutationId, revision)
+        broadcastResourceMutationCommit(state, clientName, mutationId, committedResourceDeltas, revision)
+        acknowledgeResourceMutation(state, clientName, mutationId, revision)
     end
 
     return handled

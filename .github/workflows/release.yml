@@ -52,6 +52,8 @@ jobs:
           lua5.1 tests/CommsMultipartIdentityTest.lua
           lua5.1 tests/CombatTransportReliabilityTest.lua
           lua5.1 tests/EventSnapshotRepairTest.lua
+          lua5.1 tests/ResourceMutationReliabilityTest.lua
+          lua5.1 tests/AutopilotStaleReplanTest.lua
           lua5.1 tests/GuildSettingLootTableTest.lua
 
   release-package:

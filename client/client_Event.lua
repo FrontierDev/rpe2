@@ -3460,10 +3460,16 @@ function Client:HandleEventUnitDeltaBatch(arguments)
         if receivedRevision > 0 then
             eventState.liveUnitRevision = receivedRevision
         end
+        if type(self.FlushAuthoritativeResourceMutationCommits) == "function" then
+            self:FlushAuthoritativeResourceMutationCommits(eventState)
+        end
         return false
     end
     if receivedRevision > 0 then
         eventState.liveUnitRevision = receivedRevision
+    end
+    if type(self.FlushAuthoritativeResourceMutationCommits) == "function" then
+        self:FlushAuthoritativeResourceMutationCommits(eventState)
     end
 
     -- Revisioned unit deltas are the authoritative resource transport.  Do not
