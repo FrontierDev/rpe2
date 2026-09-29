@@ -166,7 +166,8 @@ local function applyDeltas(resourceList, deltaList)
 end
 
 local function installResourceSync(node)
-    local sync = node.Addon.Internal.Comms.ResourceSync
+    local sync = node.Addon.Internal.Comms.ResourceSync or {}
+    node.Addon.Internal.Comms.ResourceSync = sync
     sync.CloneResources = cloneResources
     sync.NormalizeResources = function(value)
         return type(value) == "table" and cloneResources(value) or {}
