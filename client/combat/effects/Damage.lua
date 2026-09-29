@@ -1605,7 +1605,7 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
         end
 
         -- Damage results are always previewed locally and become authoritative only once
-        -- the corresponding RESOURCE_DELTA message is handled back through the client.
+        -- the corresponding Event transaction is handled by the shared client service.
         local applied, resourceEntry, appliedDelta = self:PreviewResourceDelta(resourceUnit, healthResourceRef, -finalDamage)
         result.applied = applied
         result.resourceEntry = resourceEntry
@@ -1627,7 +1627,7 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
         end
     else
         -- A fully absorbed hit is still a landed hit, but it must not invent a
-        -- zero-valued health RESOURCE_DELTA.
+        -- zero-valued health resource transaction.
         result.applied = true
         result.appliedDelta = 0
     end

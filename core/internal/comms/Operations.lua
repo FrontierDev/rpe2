@@ -390,25 +390,6 @@ Operations.Opcodes = Operations.Opcodes or {
             return client:HandleCombatHitCheckResponse(arguments, sender, distribution, target, message)
         end,
     },
-    [16] = {
-        key = "RESOURCE_DELTA",
-        name = "resource-delta",
-        ["function"] = function(arguments, sender, distribution, target, message)
-            local server = Addon.Server
-            local client = Addon.Client
-            local handled = false
-
-            if server and type(server.HandleResourceDelta) == "function" then
-                handled = server:HandleResourceDelta(arguments, sender, distribution, target, message) or handled
-            end
-
-            if client and type(client.HandleResourceDelta) == "function" then
-                handled = client:HandleResourceDelta(arguments, sender, distribution, target, message) or handled
-            end
-
-            return handled
-        end,
-    },
     [17] = {
         key = "AURA_APPLY",
         name = "aura-apply",
@@ -431,25 +412,6 @@ Operations.Opcodes = Operations.Opcodes or {
             end
 
             return client:HandleAuraDispel(arguments, sender, distribution, target, message)
-        end,
-    },
-    [19] = {
-        key = "RESOURCE_DELTA_BATCH",
-        name = "resource-delta-batch",
-        ["function"] = function(arguments, sender, distribution, target, message)
-            local server = Addon.Server
-            local client = Addon.Client
-            local handled = false
-
-            if server and type(server.HandleResourceDeltaBatch) == "function" then
-                handled = server:HandleResourceDeltaBatch(arguments, sender, distribution, target, message) or handled
-            end
-
-            if client and type(client.HandleResourceDeltaBatch) == "function" then
-                handled = client:HandleResourceDeltaBatch(arguments, sender, distribution, target, message) or handled
-            end
-
-            return handled
         end,
     },
     [20] = {
@@ -634,30 +596,6 @@ Operations.Opcodes = Operations.Opcodes or {
             end
 
             return client:HandleAuraRuntimeUpdateBatch(arguments, sender, distribution, target, message)
-        end,
-    },
-    [41] = {
-        key = "RESOURCE_MUTATION_ACK",
-        name = "resource-mutation-ack",
-        ["function"] = function(arguments, sender, distribution, target, message)
-            local client = Addon.Client
-            if not client or type(client.HandleResourceMutationAck) ~= "function" then
-                return false
-            end
-
-            return client:HandleResourceMutationAck(arguments, sender, distribution, target, message)
-        end,
-    },
-    [42] = {
-        key = "RESOURCE_MUTATION_COMMIT",
-        name = "resource-mutation-commit",
-        ["function"] = function(arguments, sender, distribution, target, message)
-            local client = Addon.Client
-            if not client or type(client.HandleAuthoritativeResourceMutationCommit) ~= "function" then
-                return false
-            end
-
-            return client:HandleAuthoritativeResourceMutationCommit(arguments, sender, distribution, target, message)
         end,
     },
 }

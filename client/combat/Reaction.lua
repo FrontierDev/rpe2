@@ -1248,7 +1248,6 @@ function Combat:FinalizeLocalDamageResult(entry, damageResult)
         resourceDeltas,
         entry.defenderEventId,
         {
-            allowLocalEchoApply = true,
             immediate = immediate,
             scope = immediate and (entry.context.pendingScope or "reaction") or "turn",
             threatUpdates = threatUpdate and { threatUpdate } or nil,
@@ -1689,13 +1688,6 @@ local function buildSharedCombatReactionEntry(client, record)
     then
         return nil
     end
-    if type(Combat.IsUnitDead) == "function"
-        and (Combat:IsUnitDead(attackerUnit, { eventState = eventState })
-            or Combat:IsUnitDead(defenderUnit, { eventState = eventState }))
-    then
-        return nil
-    end
-
     local _, _, component = Combat:ResolveSpellComponent(request.spellRef, request.componentKey)
     if type(component) ~= "table" or type(component.effect) ~= "table" then
         return nil
@@ -1742,6 +1734,13 @@ local function buildSharedCombatReactionEntry(client, record)
         eventState = eventState,
         sharedTransaction = record,
     }
+    local reaction = type(envelope.input) == "table" and envelope.input.reaction or nil
+    if type(reaction) == "table" then
+        entry.lastResolution = Combat:CloneValue(reaction.resolution)
+        if reaction.actionId and type(Combat.FindReactionAction) == "function" then
+            entry.reactionAction = Combat:FindReactionAction(entry, reaction.actionId)
+        end
+    end
     return entry
 end
 
@@ -1758,6 +1757,12 @@ function Client:HandleEventTransactionRequest(record)
     if not entry then
         return false
     end
+    if type(Combat.IsUnitDead) == "function"
+        and (Combat:IsUnitDead(entry.attackerUnit, { eventState = entry.eventState })
+            or Combat:IsUnitDead(entry.defenderUnit, { eventState = entry.eventState }))
+    then
+        return false
+    end
     record.combatEntry = entry
     record.options = record.options or {}
     record.options.onTerminal = function(envelope)
@@ -1768,6 +1773,10 @@ end
 
 function Client:HandleEventTransactionProjection(envelope)
     if type(envelope) ~= "table" or tostring(envelope.operation or "") ~= "combat-hit" then
+        local resourceProjection = self.HandleEventResourceTransactionProjection
+        if type(resourceProjection) == "function" then
+            return resourceProjection(self, envelope)
+        end
         return false
     end
     local record = {
@@ -2241,6 +2250,7 @@ function Client:ResolveCombatReactionAction(actionId)
         local submitted = EventTransactions.Client:SubmitInput(record, {
             request = Combat:CloneValue(originalInput.request),
             reaction = {
+                actionId = action.id,
                 resultToken = resultToken,
                 successfullyDefended = successfullyDefended,
                 defenceStatRef = successfullyDefended and normalizeDefenceStatRef(resolution and resolution.defenceStatRef) or nil,

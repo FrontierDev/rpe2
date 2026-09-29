@@ -3471,18 +3471,11 @@ function Client:HandleEventUnitDeltaBatch(arguments)
         if receivedRevision > 0 then
             eventState.liveUnitRevision = receivedRevision
         end
-        if type(self.FlushAuthoritativeResourceMutationCommits) == "function" then
-            self:FlushAuthoritativeResourceMutationCommits(eventState)
-        end
         return false
     end
     if receivedRevision > 0 then
         eventState.liveUnitRevision = receivedRevision
     end
-    if type(self.FlushAuthoritativeResourceMutationCommits) == "function" then
-        self:FlushAuthoritativeResourceMutationCommits(eventState)
-    end
-
     -- Revisioned unit deltas are the authoritative resource transport.  Do not
     -- merge a local profile/cache over them after accepting the delta.
     if receivedRevision <= 0 and ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
