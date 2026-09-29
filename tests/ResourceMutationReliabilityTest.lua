@@ -12,7 +12,8 @@ end
 
 local acknowledgements = 0
 local deltasEmitted = 0
-local Addon = {
+local Addon
+Addon = {
     Client = {},
     Server = {},
     Internal = {
