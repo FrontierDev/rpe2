@@ -541,6 +541,7 @@ do
         2,
         { scope = "reaction", immediate = true }
     ), "queued spell cost accepted")
+    world:AdvanceTime(0)
     world:DeliverAll()
     assertEqual(1, stats.broadcasts, "queued spell cost uses one transaction")
     assertEqual(87, health(findUnit(host.EventState, 2)), "queued spell cost committed authoritatively")
@@ -554,6 +555,7 @@ do
         playerA.SessionState,
         playerA.EventState
     ), "turn regeneration queued")
+    world:AdvanceTime(0)
     world:DeliverAll()
     assertEqual(2, stats.broadcasts, "turn regeneration uses one shared transaction")
     assertEqual(91, health(activeUnit), "turn regeneration committed authoritatively")
