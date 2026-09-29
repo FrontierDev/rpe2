@@ -128,8 +128,18 @@ assertEqual(sent[#sent].opcode, opcodes.COMBAT_DAMAGE_RESOLVED, "missing outcome
 assertTrue(Combat:HandleCombatDamageResolvedAck(Client, { "damage-1", "event" }, "Attacker"), "outcome ACK is accepted")
 assertEqual(Client.PendingCombatDamageOutcomes["damage-1"], nil, "outcome ACK clears retry state")
 
-Client.ActiveCombatReactionEntry = { checkId = "stale", eventId = "event", eventState = eventState, turnNumber = 1, tickNumber = 0, createdAtMs = 0 }
-Client.CombatReactionQueue = { { checkId = "next", eventId = "event", eventState = eventState, turnNumber = 1, tickNumber = 0, createdAtMs = 15999 } }
+Client.ActiveCombatReactionEntry = {
+    checkId = "stale", eventId = "event", eventState = eventState,
+    attackerEventId = 10, defenderEventId = 20,
+    turnNumber = 1, tickNumber = 0, createdAtMs = 0,
+}
+Client.CombatReactionQueue = {
+    {
+        checkId = "next", eventId = "event", eventState = eventState,
+        attackerEventId = 10, defenderEventId = 20,
+        turnNumber = 1, tickNumber = 0, createdAtMs = 15999,
+    },
+}
 Client:PruneCombatReactionTransactions("test", 16000)
 assertEqual(Client.ActiveCombatReactionEntry.checkId, "next", "stale active reaction promotes the next valid queued reaction")
 assertEqual(#Client.CombatReactionQueue, 0, "promoted reaction is removed from the queue")
