@@ -251,7 +251,7 @@ local function installProjection(node)
     node.Addon.Client.GetState = function() return node.SessionState end
     node.Addon.Client.QueueEventWidgetRefresh = function() return true end
     node.Addon.Client.QueueTargetingWidgetRefresh = function() return true end
-    node.Addon.Client.ResolveLocalEventUnit = function(eventState)
+    node.Addon.Client.ResolveLocalEventUnit = function(_, eventState)
         for index = 1, #((eventState and eventState.units) or {}) do
             local unit = eventState.units[index]
             if unit and unit.isPlayer == true and tostring(unit.ownerID or "") == node.Name then
