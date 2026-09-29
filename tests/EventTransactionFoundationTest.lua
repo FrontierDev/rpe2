@@ -190,7 +190,7 @@ do
 end
 
 do
-    local world, host, playerA, _, executions, _, create = setup()
+    local world, host, playerA, _, counters, create = setup()
     local hostTransactions = host.Addon.Server.EventTransactions
     hostTransactions.MaxTerminalRecords = 2
     local first = create({ value = 1 })
@@ -211,11 +211,11 @@ do
     assertEqual(2, #order, "terminal order exceeded the configured bound")
     playerA.Addon.Client.EventTransactions:Replay(third.id)
     world:DeliverAll()
-    assertEqual(3, executions.value, "recent terminal replay re-executed the handler")
+    assertEqual(3, counters.executions, "recent terminal replay re-executed the handler")
 end
 
 do
-    local world, host, playerA, playerB, executions = setup()
+    local world, host, playerA, playerB, counters = setup()
     local hostTransactions = host.Addon.Server.EventTransactions
     local serverRecord = hostTransactions:BeginAwaitingInput({
         operation = "synthetic",
@@ -236,13 +236,13 @@ do
     assertTrue(defender:SubmitInput(defenderRecord, { choice = "defend" }),
         "defender input was submitted")
     world:DeliverAll()
-    assertEqual(1, executions.value, "server-created transaction executed once")
+    assertEqual(1, counters.executions, "server-created transaction executed once")
     assertEqual("committed", serverRecord.state, "server-created transaction committed")
     assertEqual("committed", defenderRecord.state, "defender received the commit")
 
     assertTrue(defender:ReplayInput(serverRecord.id, "event-a"), "duplicate input was sent")
     world:DeliverAll()
-    assertEqual(1, executions.value, "duplicate defender input re-executed the handler")
+    assertEqual(1, counters.executions, "duplicate defender input re-executed the handler")
 end
 
 print("EventTransactionFoundationTest passed")
