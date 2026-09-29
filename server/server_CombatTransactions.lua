@@ -5,7 +5,8 @@ Addon.Internal = Addon.Internal or {}
 Addon.Internal.Comms = Addon.Internal.Comms or {}
 
 local Server = Addon.Server
-local Transactions = Addon.Server.EventTransactions
+local EventTransactions = Addon.Internal.Comms.EventTransactions or {}
+local ServerTransactions = Addon.Server.EventTransactions
 local ResourceSync = Addon.Internal.Comms.ResourceSync or {}
 
 local function clone(value, seen)
@@ -144,8 +145,8 @@ local function handleCombatHit(envelope, transactionContext)
     local initialInput = transactionContext and transactionContext.record and transactionContext.record.initialInput or nil
     local initialRequest = type(initialInput) == "table" and initialInput.request or nil
     if not request or not reaction or not initialRequest
-        or type(Transactions.Encode) ~= "function"
-        or Transactions.Encode(initialRequest) ~= Transactions.Encode(request)
+        or type(EventTransactions.Encode) ~= "function"
+        or EventTransactions.Encode(initialRequest) ~= EventTransactions.Encode(request)
     then
         return reject("combat-request-conflict")
     end
@@ -236,8 +237,6 @@ local function handleCombatHit(envelope, transactionContext)
     }
 end
 
-if Transactions and type(Transactions.Server) == "table"
-    and type(Transactions.Server.Register) == "function"
-then
-    Transactions.Server:Register("combat-hit", handleCombatHit)
+if ServerTransactions and type(ServerTransactions.Register) == "function" then
+    ServerTransactions:Register("combat-hit", handleCombatHit)
 end
