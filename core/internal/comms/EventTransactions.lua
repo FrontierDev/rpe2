@@ -692,6 +692,14 @@ function ClientService:ReceiveRequest(payload, sender)
     end
 
     local pending = self:_pending(eventId)
+    if self:_terminal(eventId)[envelope.transactionId] then
+        recordDiagnostic(self, eventId, {
+            transactionId = envelope.transactionId,
+            state = "terminal-request-ignored",
+            duplicate = true,
+        })
+        return true
+    end
     local existing = pending[envelope.transactionId]
     if existing then
         if existing.envelope and identityDigestFor(existing.envelope) ~= identityDigestFor(envelope) then
@@ -1021,12 +1029,8 @@ function ServerService:BeginAwaitingInput(options)
         state = record.state,
         serverCreated = true,
     })
-    sendPayload("EVENT_TX_REQUEST", envelope, "WHISPER", inputRecipient, {
-        opcode = operationCode("EVENT_TX_REQUEST"),
-        scope = "transaction",
-        transactionId = record.id,
-        eventId = eventId,
-    })
+    self:_sendAwaitingInput(record, false)
+    self:_scheduleAwaitingInputRetry(record)
     return record
 end
 
@@ -1079,6 +1083,77 @@ function ServerService:_publish(envelope, recipient)
     return sendPayload(key, envelope, "WHISPER", recipient or envelope.originName, metadata)
 end
 
+function ServerService:_sendAwaitingInput(record, isRetry)
+    local eventState = currentServerEvent()
+    if not record or record.state ~= "awaiting-input"
+        or record.eventId ~= self.currentEventId
+        or record.eventId ~= eventIdOf(eventState)
+        or eventState.active == false
+    then
+        return false
+    end
+    local sent = sendPayload("EVENT_TX_REQUEST", record.envelope, "WHISPER", record.inputRecipient, {
+        opcode = operationCode("EVENT_TX_REQUEST"),
+        scope = "transaction",
+        transactionId = record.id,
+        eventId = record.eventId,
+    })
+    record.requestAttempts = (record.requestAttempts or 0) + 1
+    record.lastRequestAt = now()
+    record.lastRequestRetry = isRetry == true
+    recordDiagnostic(self, record.eventId, {
+        transactionId = record.id,
+        operation = record.envelope.operation,
+        state = record.state,
+        requestAttempts = record.requestAttempts,
+        retry = isRetry == true,
+        transport = sent and "accepted" or "failed",
+    })
+    return sent
+end
+
+function ServerService:_scheduleAwaitingInputRetry(record)
+    if not record or record.requestRetryTimer or record.state ~= "awaiting-input"
+        or (record.requestAttempts or 0) >= #Transactions.RetryDelaysMs + 1
+    then
+        return
+    end
+    local delay = Transactions.RetryDelaysMs[record.requestAttempts]
+    if not delay then
+        return
+    end
+    local remaining = record.deadlineAt and math.max(0, (record.deadlineAt - now()) * 1000) or delay
+    delay = math.min(delay, remaining)
+    record.nextRequestRetryAt = now() + delay / 1000
+    if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+        record.requestRetryTimer = C_Timer.After(delay / 1000, function()
+            record.requestRetryTimer = nil
+            self:ProcessAwaitingInputRetry(record.eventId, record.id)
+        end)
+    end
+end
+
+function ServerService:ProcessAwaitingInputRetry(eventId, transactionId)
+    local normalizedEventId = tostring(eventId or "")
+    local records = self.recordsByEvent[normalizedEventId] or {}
+    local record = records[tostring(transactionId or "")]
+    if not record or not record.serverCreated or record.state ~= "awaiting-input" then
+        return false
+    end
+    if normalizedEventId ~= self.currentEventId or not self:IsAuthoritative() then
+        return false
+    end
+    if record.deadlineAt and now() >= record.deadlineAt then
+        self:ProcessTimeouts()
+        return false
+    end
+    self:_sendAwaitingInput(record, true)
+    self:_scheduleAwaitingInputRetry(record)
+    return true
+end
+
+ServerService.ProcessRequestRetry = ServerService.ProcessAwaitingInputRetry
+
 function ServerService:_terminalize(record, state, outcome, result)
     if not transition(record, state, outcome and outcome.reason or state) then
         return false
@@ -1092,6 +1167,11 @@ function ServerService:_terminalize(record, state, outcome, result)
         record.timeoutTimer:Cancel()
     end
     record.timeoutTimer = nil
+    if record.requestRetryTimer and type(record.requestRetryTimer.Cancel) == "function" then
+        record.requestRetryTimer:Cancel()
+    end
+    record.requestRetryTimer = nil
+    record.nextRequestRetryAt = nil
     local terminal = self:_terminalEnvelope(record.envelope, state, record.outcome, record)
     record.terminal = terminal
     local records = self.recordsByEvent[record.eventId]
@@ -1349,6 +1429,11 @@ function ServerService:ReceiveInput(payload, sender)
     record.inputDigest = inputDigest
     record.submittedAt = now()
     transition(record, "submitted", "client-input")
+    if record.requestRetryTimer and type(record.requestRetryTimer.Cancel) == "function" then
+        record.requestRetryTimer:Cancel()
+    end
+    record.requestRetryTimer = nil
+    record.nextRequestRetryAt = nil
     recordDiagnostic(self, record.eventId, {
         transactionId = record.id,
         operation = record.envelope.operation,

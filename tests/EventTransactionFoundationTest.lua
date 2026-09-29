@@ -217,6 +217,8 @@ end
 do
     local world, host, playerA, playerB, executions = setup()
     local hostTransactions = host.Addon.Server.EventTransactions
+    local requestOpcode = host.Addon.Internal.Comms.EventTransactions.Opcodes.EVENT_TX_REQUEST
+    world:DropNext("Host", "PlayerB", requestOpcode)
     local serverRecord = hostTransactions:BeginAwaitingInput({
         operation = "synthetic",
         originName = "PlayerA",
@@ -228,8 +230,13 @@ do
     world:DeliverAll()
 
     local defender = playerB.Addon.Client.EventTransactions
+    assertTrue(defender:GetPending(serverRecord.id, "event-a") == nil,
+        "dropped request was delivered before retry")
+    world:AdvanceTime(1500)
+    world:DeliverAll()
     local defenderRecord = defender:GetPending(serverRecord.id, "event-a")
     assertTrue(defenderRecord ~= nil, "defender received the awaiting-input request")
+    assertEqual(2, serverRecord.requestAttempts, "server request did not retry once")
     assertEqual("awaiting-input", defenderRecord.state, "defender awaiting-input state")
     assertEqual(serverRecord.id, defenderRecord.id, "server and defender transaction IDs differ")
 
