@@ -24,7 +24,7 @@ Standalone `RPE_DATASET_ENTRY_V1` import codes for the Warlock class dataset `e8
 
 - **Curse of Tongues** is authored as an instant Main Action, 1-turn silence, costing **5% base Mana**. Silence uses the existing control effect with `preventCasting = true` and does not add movement control or auto-hit behavior.
 - **Curse of Elements** lasts 5 turns and reduces the percentage-point **Magic Resistance** stat by **5 + 0.01 × Spell Power**. This means its magnitude increases by 20% of the base reduction per 100 Spell Power.
-- **Curse of Shadows** had no duration specified, so it uses the same **5-turn curse duration**. It reduces both Arcane and Shadow Resistance by **25 + 0.05 × Spell Power**, preserving the same 20%-of-base-per-100-SP scaling convention as Curse of Elements.
+- **Curse of Shadows** uses ranks and the same **5-turn curse duration**. It reduces both Arcane and Shadow Resistance by **25 + 0.05 × Spell Power**, preserving the same 20%-of-base-per-100-SP scaling convention as Curse of Elements.
 - **Death Coil** is a Bonus Action that applies the existing Warlock Fear aura for **1 turn** and heals the caster for **27.625 + 0.16575 × Spell Power**. Its heal uses the current DPS secondary-healing budget and costs **15% base Mana**.
 - **Howl of Terror** copies current Warrior **Intimidating Shout** mechanically: instant Bonus Action, up to 3 targets, 1-turn break-on-damage casting prevention, 10-turn cooldown and `fear` cooldown group. Rage is replaced with the current multi-target-control Mana analogue: **18.1% base Mana**.
 - **Demon Skin** is a 10-turn Buff Action self-buff granting **+100% Armor** and **+20% Healing Received**, costing **5% base Mana**.
@@ -1927,7 +1927,7 @@ RPE_DATASET_ENTRY_V1
             {
                             baseAmount = -25,
                             operation = "flat",
-                            scaleWithRank = false,
+                            scaleWithRank = true,
                             statRef = "f82db71a:954yunb9",
                             statScaling = {
                                 {
@@ -1940,7 +1940,7 @@ RPE_DATASET_ENTRY_V1
             {
                             baseAmount = -25,
                             operation = "flat",
-                            scaleWithRank = false,
+                            scaleWithRank = true,
                             statRef = "f82db71a:itpo751d",
                             statScaling = {
                                 {
@@ -2016,7 +2016,7 @@ RPE_DATASET_ENTRY_V1
         cooldownChannel = 1,
         learnMode = "always_learned",
         learnLevel = 1,
-        usesRanks = false,
+        usesRanks = true,
         rankInterval = 8,
         mountedCombatOnly = false,
         name = "Curse of Shadows",

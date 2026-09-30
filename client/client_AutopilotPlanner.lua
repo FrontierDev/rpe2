@@ -609,6 +609,7 @@ end
 local scheduleMutationMethods = {
     "ReconcileClientEventSession",
     "AddEventNpcUnit",
+    "SummonEventControlledUnit",
     "SummonEventPetUnit",
     "SetEventUnitActive",
     "SetEventUnitRaidMarker",

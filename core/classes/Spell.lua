@@ -411,6 +411,20 @@ local function normalizeRef(value)
     return ref
 end
 
+local function normalizeQualifiedUnitRef(value)
+    local ref = normalizeRef(value)
+    if not ref then
+        return nil
+    end
+
+    local datasetId, unitId = string.match(ref, "^([^:]+):(.+)$")
+    if not datasetId or not unitId or datasetId == "" or unitId == "" then
+        return nil
+    end
+
+    return ref
+end
+
 local function normalizeCastingGroup(value)
     local group = ensureString(value)
     if group == "" then
@@ -507,6 +521,13 @@ local function buildDefaultEffect(effectType)
     if normalizedType == "summon_pet" then
         return {
             type = "summon_pet",
+            targetEvents = {},
+        }
+    end
+
+    if normalizedType == "summon_unit" then
+        return {
+            type = "summon_unit",
             unitRef = nil,
             targetEvents = {},
         }
@@ -657,7 +678,12 @@ local function normalizeEffect(value)
     end
 
     if effect.type == "summon_pet" then
-        effect.unitRef = normalizeRef(data.unitRef)
+        effect.targetEvents = normalizeEventList(data.targetEvents)
+        return effect
+    end
+
+    if effect.type == "summon_unit" then
+        effect.unitRef = normalizeQualifiedUnitRef(data.unitRef)
         effect.targetEvents = normalizeEventList(data.targetEvents)
         return effect
     end

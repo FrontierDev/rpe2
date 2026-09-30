@@ -87,7 +87,7 @@ assertClass("c4a91e7d", 1, "shaman01", "Shaman", {
     ["f82db71a:4c8mfm99"] = { 53, 24.86 },
 })
 
-assertClass("e8f3b2c6", 4, "warlock1", "Warlock", {
+assertClass("e8f3b2c6", 6, "warlock1", "Warlock", {
     ["f82db71a:zfqm8dxp"] = { 0, 0.42 },
     ["f82db71a:xqz0daz2"] = { 0, 0.51 },
     ["f82db71a:ygjno50i"] = { 1, 0.75 },
@@ -124,14 +124,15 @@ for _, name in ipairs({
     local aura = findByName(warlockDataset.auras, name)
     assertTrue(aura ~= nil, "Warlock includes " .. name .. " aura")
     assertEqual(aura.description, "", name .. " aura keeps its description generator-owned")
-    assertTrue(type(aura.tooltipTemplateData) == "table", name .. " aura has generated tooltip data")
+    assertEqual(aura.tooltipTemplate, false, name .. " aura uses generated descriptions")
+    assertTrue(aura.tooltipTemplateData == nil, name .. " aura has no hand-authored tooltip payload")
 end
 
 for index = 1, #warlockDataset.spells do
     local spell = warlockDataset.spells[index]
     assertEqual(spell.description, "", spell.name .. " keeps its description generator-owned")
-    assertTrue(type(spell.tooltipTemplateData) == "table", spell.name .. " has generated tooltip data")
-    assertTrue(spell.tooltipTemplateData.mainText ~= "", spell.name .. " has generated tooltip text")
+    assertEqual(spell.tooltipTemplate, false, spell.name .. " uses generated descriptions")
+    assertTrue(spell.tooltipTemplateData == nil, spell.name .. " has no hand-authored tooltip payload")
 end
 
 local knownAuraRefs = {}

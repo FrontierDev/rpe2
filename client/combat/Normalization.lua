@@ -440,7 +440,29 @@ local function normalizeSummonPetEffect(value)
     local data = Normalization.EnsureTable(value)
     return {
         type = "summon_pet",
-        unitRef = Normalization.NormalizeRef(data.unitRef),
+        targetEvents = normalizeEventList(data.targetEvents),
+    }
+end
+
+local function normalizeQualifiedUnitRef(value)
+    local ref = Normalization.NormalizeRef(value)
+    if not ref then
+        return nil
+    end
+
+    local datasetId, unitId = string.match(ref, "^([^:]+):(.+)$")
+    if not datasetId or not unitId or datasetId == "" or unitId == "" then
+        return nil
+    end
+
+    return ref
+end
+
+local function normalizeSummonUnitEffect(value)
+    local data = Normalization.EnsureTable(value)
+    return {
+        type = "summon_unit",
+        unitRef = normalizeQualifiedUnitRef(data.unitRef),
         targetEvents = normalizeEventList(data.targetEvents),
     }
 end
@@ -509,6 +531,10 @@ function Normalization.NormalizeSummonPetEffect(value)
     return normalizeSummonPetEffect(value)
 end
 
+function Normalization.NormalizeSummonUnitEffect(value)
+    return normalizeSummonUnitEffect(value)
+end
+
 function Normalization.NormalizeInterruptEffect(value)
     return normalizeInterruptEffect(value)
 end
@@ -570,6 +596,10 @@ function Normalization.NormalizeEffectData(effectType, value)
 
     if normalizedType == "summon_pet" then
         return normalizeSummonPetEffect(value)
+    end
+
+    if normalizedType == "summon_unit" then
+        return normalizeSummonUnitEffect(value)
     end
 
     return nil

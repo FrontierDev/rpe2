@@ -168,6 +168,7 @@ local scheduleSensitiveMethods = {
     "GetEventDraftState",
     "ReconcileClientEventSession",
     "AddEventNpcUnit",
+    "SummonEventControlledUnit",
     "SummonEventPetUnit",
     "SetEventUnitActive",
     "ClearEventNpcUnits",

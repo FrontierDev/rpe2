@@ -1062,6 +1062,10 @@ local function buildSummonPetSentence()
     return "Summon the selected unit under your control."
 end
 
+local function buildSummonUnitSentence()
+    return "Summon the specified unit under your control."
+end
+
 local function buildInterruptSentence(component)
     local targetPhrase = resolveTargetPhrase(component and component.target or nil)
     local possessive = resolveTargetPossessivePhrase(targetPhrase)
@@ -1227,6 +1231,9 @@ local function buildSentence(detail, casterUnit, component, rankMultiplier)
     end
     if effectType == "summon_pet" then
         return buildSummonPetSentence()
+    end
+    if effectType == "summon_unit" then
+        return buildSummonUnitSentence()
     end
     if effectType == "interrupt" then
         return buildInterruptSentence(component)
@@ -1402,6 +1409,9 @@ local function buildTemplateSentence(detail, componentIndex, component, state)
     end
     if effectType == "summon_pet" then
         return buildSummonPetSentence()
+    end
+    if effectType == "summon_unit" then
+        return buildSummonUnitSentence()
     end
     if effectType == "interrupt" then
         return buildInterruptSentence(component)

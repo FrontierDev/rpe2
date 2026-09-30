@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 42,
+    version = 43,
     dataset = {
         achievements = {},
         auras = {},
@@ -3193,8 +3193,7 @@ Addon.Data.DefaultDatasets:Register({
                         castingGroup = "default",
                         effect = {
                             targetEvents = {},
-                            type = "summon_pet",
-                            unitRef = "f82db71a:176uzpns"
+                            type = "summon_pet"
                         },
                         key = "9b68b6a9",
                         target = {
@@ -5580,6 +5579,240 @@ units = {
             },
             {
                 initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:0w7c7p09",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:hj6d4kvy",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:jjn0my8k",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:pg0ytacb",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:954yunb9",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:itpo751d",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:hlyrsstn",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:rgnrtg01",
+            },
+            {
+                initialValue = 30,
+                perLevelValue = 0,
+                statRef = "f82db71a:s1mt6jh9",
+            },
+        },
+        tags = {  },
+    },
+{
+        appearances = {  },
+        attributes = {  },
+        challengeLevel = "minor",
+        creatureSize = "small",
+        creatureType = "demon",
+        id = "imp00001",
+        name = "Imp",
+        presets = {
+            {
+                name = "Flamecaster",
+                appearances = {
+                    {
+                        displayId = 66827,
+                        fileDataId = 1138493,
+                        cam = 0.60,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                    {
+                        displayId = 67920,
+                        fileDataId = 1138493,
+                        cam = 0.60,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                    {
+                        displayId = 67906,
+                        fileDataId = 1138493,
+                        cam = 0.60,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                },
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "d7c874c4:68dy7na1",
+                    "e8f3b2c6:wlimmol1",
+                },
+                equipment = {  },
+            },
+            {
+                name = "Felcaster",
+                appearances = {
+                    {
+                        displayId = 67727,
+                        fileDataId = 1098889,
+                        cam = 0.60,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                    {
+                        displayId = 67735,
+                        fileDataId = 1098889,
+                        cam = 0.60,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                    {
+                        displayId = 67724,
+                        fileDataId = 1098889,
+                        cam = 0.60,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                },
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "d7c874c4:68dy7na1",
+                },
+                equipment = {  },
+            },
+            {
+                name = "Shadowcaster",
+                appearances = {
+                    {
+                        displayId = 16889,
+                        fileDataId = 124630,
+                        cam = 0.60,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                    {
+                        displayId = 19611,
+                        fileDataId = 124630,
+                        cam = 0.60,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                },
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "e8f3b2c6:wlsbolt1",
+                    "e8f3b2c6:wlcorru1",
+                },
+                equipment = {  },
+            },
+        },
+        resistances = {  },
+        resources = {
+            {
+                initialValue = 120,
+                perLevelValue = 23.389831,
+                resourceRef = "f82db71a:q2ktkztt",
+            },
+            {
+                initialValue = 100,
+                perLevelValue = 23.728814,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        spells = {  },
+        stats = {
+            {
+                initialValue = 0,
+                perLevelValue = 10.169492,
+                statRef = "f82db71a:v42albuv",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:wbj4zuf3",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:dd88li4c",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:v2g0tw0o",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:tcn0s8kx",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:o6113cir",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:p8syz5ba",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:zs1nbz13",
+            },
+            {
+                initialValue = 35,
+                perLevelValue = 3.644068,
+                statRef = "f82db71a:u7b49vs9",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:v2rs9cpy",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 2.966102,
+                statRef = "f82db71a:7t7xgzcx",
+            },
+            {
+                initialValue = 5,
+                perLevelValue = 0,
+                statRef = "f82db71a:jslmczbi",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:fercjhm5",
+            },
+            {
+                initialValue = 5,
+                perLevelValue = 0,
+                statRef = "f82db71a:69hfqhne",
+            },
+            {
+                initialValue = 20,
                 perLevelValue = 0,
                 statRef = "f82db71a:0w7c7p09",
             },

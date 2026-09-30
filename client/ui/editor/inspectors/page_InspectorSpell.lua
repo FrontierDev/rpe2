@@ -295,6 +295,8 @@ function DataEditor:RefreshSpellInspectorPage()
     local isResource = effectType == "resource"
     local isTaunt = effectType == "taunt"
     local isSummonPet = effectType == "summon_pet"
+    local isSummonUnit = effectType == "summon_unit"
+    local isSummonEffect = isSummonPet or isSummonUnit
     local targetType = tostring(target.type or "single")
     local isPetTarget = targetType == "pet"
     local isLastAttackersTarget = targetType == "last_attackers"
@@ -307,7 +309,7 @@ function DataEditor:RefreshSpellInspectorPage()
     local supportsLegacyAuraApplication = isDamage or isHeal
     local showsAuraApplicationControls = isApplyAura or isRemoveAuraExact or (supportsLegacyAuraApplication and effect.applyAura == true)
     local isCasterTarget = targetType == "caster"
-    local supportsTargetSelection = component ~= nil and not isCasterTarget and not isSummonPet and not isPetTarget
+    local supportsTargetSelection = component ~= nil and not isCasterTarget and not isSummonEffect and not isPetTarget
 
     if shouldRefreshCost then
         self:RefreshSpellInspectorResourceCostsTable()
@@ -329,12 +331,12 @@ function DataEditor:RefreshSpellInspectorPage()
         )
     end
     if self.SpellInspectorComponentTargetTypeDropdown then
-        local effectiveTargetType = isSummonPet and "caster" or targetType
+        local effectiveTargetType = isSummonEffect and "caster" or targetType
         self.SpellInspectorComponentTargetTypeDropdown:SetSelectedValue(effectiveTargetType, true)
-        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorComponentTargetTypeDropdown, component ~= nil and not isSummonPet)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorComponentTargetTypeDropdown, component ~= nil and not isSummonEffect)
     end
     if self.SpellInspectorComponentRequiresTargetCheckbox then
-        self.SpellInspectorComponentRequiresTargetCheckbox:SetChecked((isSummonPet or isPetTarget) and false or target.requiresTarget == true, true)
+        self.SpellInspectorComponentRequiresTargetCheckbox:SetChecked((isSummonEffect or isPetTarget) and false or target.requiresTarget == true, true)
         self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorComponentRequiresTargetCheckbox, supportsTargetSelection)
     end
     if self.SpellInspectorComponentDisableSelfCastCheckbox then
@@ -342,17 +344,17 @@ function DataEditor:RefreshSpellInspectorPage()
         self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorComponentDisableSelfCastCheckbox, supportsTargetSelection)
     end
     if self.SpellInspectorComponentTargetDispositionDropdown then
-        self.SpellInspectorComponentTargetDispositionDropdown:SetSelectedValue((isSummonPet or isPetTarget) and "ally" or target.targetDisposition or "enemy", true)
+        self.SpellInspectorComponentTargetDispositionDropdown:SetSelectedValue((isSummonEffect or isPetTarget) and "ally" or target.targetDisposition or "enemy", true)
         self:SetSpellInspectorDropdownEnabled(self.SpellInspectorComponentTargetDispositionDropdown, supportsTargetSelection and not isLastAttackersTarget and not isLastMeleeAttackerTarget and not isAllAlliesTarget)
     end
     if self.SpellInspectorComponentMinTargetsInput then
-        self.SpellInspectorComponentMinTargetsInput:SetText(tostring((isSummonPet or isPetTarget or isLastAttackersTarget or isLastMeleeAttackerTarget) and 1 or target.minTargets or 0))
+        self.SpellInspectorComponentMinTargetsInput:SetText(tostring((isSummonEffect or isPetTarget or isLastAttackersTarget or isLastMeleeAttackerTarget) and 1 or target.minTargets or 0))
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMinTargetsInput, supportsTargetSelection and isMinTargetCountEditable)
     end
     if self.SpellInspectorComponentMaxTargetsInput then
         self.SpellInspectorComponentMaxTargetsInput:SetText(isAllAlliesTarget
             and "All"
-            or tostring((isSummonPet or isPetTarget or isLastAttackersTarget or isLastMeleeAttackerTarget) and 1 or target.maxTargets or 0))
+            or tostring((isSummonEffect or isPetTarget or isLastAttackersTarget or isLastMeleeAttackerTarget) and 1 or target.maxTargets or 0))
         self:SetSpellInspectorTextElementEnabled(self.SpellInspectorComponentMaxTargetsInput, supportsTargetSelection and isMaxTargetCountEditable)
     end
     if self.SpellInspectorEffectTypeDropdown then
@@ -422,10 +424,10 @@ function DataEditor:RefreshSpellInspectorPage()
         self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorResourceScaleWithRankCheckbox, isResource and component ~= nil)
         self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceScaleWithRankCheckbox, isResource)
     end
-    if self.SpellInspectorSummonPetUnitDropdown then
-        self.SpellInspectorSummonPetUnitDropdown:SetItems(self:BuildSpellInspectorUnitsAcrossDatasets())
-        self.SpellInspectorSummonPetUnitDropdown:SetSelectedValue(effect.unitRef or "", true)
-        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorSummonPetUnitDropdown, isSummonPet and component ~= nil)
+    if self.SpellInspectorSummonUnitDropdown then
+        self.SpellInspectorSummonUnitDropdown:SetItems(self:BuildSpellInspectorUnitsAcrossDatasets())
+        self.SpellInspectorSummonUnitDropdown:SetSelectedValue(effect.unitRef or "", true)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorSummonUnitDropdown, isSummonUnit and component ~= nil)
     end
     if self.SpellInspectorHitTypeDropdown then
         self.SpellInspectorHitTypeDropdown:SetSelectedValue(effect.hitType or "ability", true)
@@ -477,7 +479,7 @@ function DataEditor:RefreshSpellInspectorPage()
     end
     if self.SpellInspectorTargetEventsDropdown then
         self.SpellInspectorTargetEventsDropdown:SetSelectedValues(effect.targetEvents or {}, true)
-        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorTargetEventsDropdown, component ~= nil and not isSummonPet)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorTargetEventsDropdown, component ~= nil and not isSummonEffect)
     end
 
     self:SetSpellInspectorGroupVisible(self.SpellInspectorBaseDamageGroup, isDamage)
@@ -491,7 +493,6 @@ function DataEditor:RefreshSpellInspectorPage()
     self:SetSpellInspectorGroupVisible(self.SpellInspectorRemoveAuraTagGroup, isRemoveAuraTag)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorRemoveAuraMaxAurasGroup, isRemoveAuraTag)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceEffectGroup, isResource)
-    self:SetSpellInspectorGroupVisible(self.SpellInspectorSummonPetUnitGroup, isSummonPet)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorHitTypeGroup, isDamage)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorDamageTypeGroup, isDamage)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorAuraStacksGroup, showsAuraApplicationControls)
@@ -499,7 +500,8 @@ function DataEditor:RefreshSpellInspectorPage()
     self:SetSpellInspectorGroupVisible(self.SpellInspectorTauntDurationGroup, isTaunt)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountGroup, isResource)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountModeGroup, isResource)
-    self:SetSpellInspectorGroupVisible(self.SpellInspectorTargetEventsGroup, not isSummonPet)
+    self:SetSpellInspectorGroupVisible(self.SpellInspectorSummonUnitGroup, isSummonUnit)
+    self:SetSpellInspectorGroupVisible(self.SpellInspectorTargetEventsGroup, not isSummonEffect)
     if self.SpellInspectorComponentsRoot and self.SpellInspectorComponentsRoot.RefreshLayout then
         self.SpellInspectorComponentsRoot:RefreshLayout()
     end

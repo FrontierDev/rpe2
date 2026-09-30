@@ -71,6 +71,37 @@ local function findActivatedUnitDefinition(registryId)
     return registry:ResolveUnitDefinition(registryId)
 end
 
+local function findActivatedPetDefinition(petRef)
+    local normalizedRef = tostring(petRef or "")
+    local separatorIndex = string.find(normalizedRef, ":", 1, true)
+    if not separatorIndex then
+        return nil, nil
+    end
+
+    local datasetId = string.sub(normalizedRef, 1, separatorIndex - 1)
+    local petId = string.sub(normalizedRef, separatorIndex + 1)
+    if datasetId == "" or petId == "" then
+        return nil, nil
+    end
+
+    local registry = Addon.Internal and Addon.Internal.Registry or nil
+    local datasets = type(registry) == "table" and type(registry.GetActivatedDatasets) == "function"
+        and registry:GetActivatedDatasets() or {}
+    for index = 1, #datasets do
+        local dataset = datasets[index]
+        if type(dataset) == "table" and tostring(dataset.id or "") == datasetId then
+            for petIndex = 1, #(dataset.pets or {}) do
+                local pet = dataset.pets[petIndex]
+                if type(pet) == "table" and tostring(pet.id or "") == petId then
+                    return dataset, pet
+                end
+            end
+        end
+    end
+
+    return nil, nil
+end
+
 local function buildSendMetadata(opcode)
     local metadata = {
         opcode = opcode,
@@ -534,6 +565,8 @@ local function buildPlayerUnit(playerName, nextEventUnitId)
         team = 1,
         ownerID = playerName,
         controllerID = playerName,
+        petRef = nil,
+        petStats = {},
         resources = {},
         active = true,
         hidden = false,
@@ -600,6 +633,56 @@ local function resolveControllingPlayerEventId(casterUnit)
     end
 
     return tonumber(casterUnit.controllerID) or nil
+end
+
+local function resolveControllingPlayerUnit(eventState, casterUnit, controllerEventId)
+    if type(eventState) ~= "table" or type(casterUnit) ~= "table" then
+        return nil
+    end
+
+    local numericControllerEventId = tonumber(controllerEventId) or 0
+    if numericControllerEventId > 0 then
+        local controllerUnit = findEventUnitById(eventState.units, numericControllerEventId)
+        if controllerUnit and controllerUnit.isPlayer == true then
+            return controllerUnit
+        end
+    end
+
+    if casterUnit.isPlayer == true then
+        return casterUnit
+    end
+
+    local controllerName = Common.NormalizeName(casterUnit.controllerID)
+    local ownerName = Common.NormalizeName(casterUnit.ownerID)
+    if controllerName ~= "" then
+        local controllerUnit = findPlayerUnitByName(eventState.units, controllerName)
+        if controllerUnit then
+            return controllerUnit
+        end
+    end
+    if ownerName ~= "" then
+        local ownerUnit = findPlayerUnitByName(eventState.units, ownerName)
+        if ownerUnit then
+            return ownerUnit
+        end
+    end
+
+    return nil
+end
+
+local function normalizeQualifiedUnitRef(value)
+    local ref = tostring(value or "")
+    local datasetId, unitId = string.match(ref, "^([^:]+):(.+)$")
+    if not datasetId or not unitId or datasetId == "" or unitId == "" then
+        return nil
+    end
+
+    return ref
+end
+
+local function normalizeRef(value)
+    local ref = tostring(value or "")
+    return ref ~= "" and ref or nil
 end
 
 local function isEventUnitActive(unit)
@@ -770,6 +853,12 @@ local function buildEventUnits(sessionState, sourceUnits, hostName, level, diffi
             playerUnit.registryID = nil
             playerUnit.ownerID = playerName
             playerUnit.controllerID = playerName
+            if clientState then
+                playerUnit.petRef = clientState.petRef
+                playerUnit.petStats = deepCopy(clientState.petStats or {})
+            else
+                playerUnit.petStats = deepCopy(playerUnit.petStats or {})
+            end
             playerUnit.resources = ResourceSync.CloneResources and ResourceSync.CloneResources(clientState and clientState.resources or {}) or {}
             playerUnit.active = true
             units[#units + 1] = playerUnit
@@ -788,6 +877,12 @@ local function buildEventUnits(sessionState, sourceUnits, hostName, level, diffi
         hostUnit.registryID = nil
         hostUnit.ownerID = hostName
         hostUnit.controllerID = hostName
+        if hostClientState then
+            hostUnit.petRef = hostClientState.petRef
+            hostUnit.petStats = deepCopy(hostClientState.petStats or {})
+        else
+            hostUnit.petStats = deepCopy(hostUnit.petStats or {})
+        end
         hostUnit.resources = ResourceSync.CloneResources and ResourceSync.CloneResources(hostClientState and hostClientState.resources or {}) or {}
         hostUnit.active = true
         units[#units + 1] = hostUnit
@@ -834,6 +929,12 @@ local function buildLivePlayerUnit(sessionState, playerName, nextEventUnitId, so
     playerUnit.registryID = nil
     playerUnit.ownerID = playerName
     playerUnit.controllerID = playerName
+    if clientState then
+        playerUnit.petRef = clientState.petRef
+        playerUnit.petStats = deepCopy(clientState.petStats or {})
+    else
+        playerUnit.petStats = deepCopy(playerUnit.petStats or {})
+    end
     playerUnit.resources = ResourceSync.CloneResources and ResourceSync.CloneResources(clientState and clientState.resources or {}) or {}
     playerUnit.active = true
     playerUnit.hidden = sourceUnit and sourceUnit.hidden == true or false
@@ -1752,44 +1853,52 @@ function Server:AddEventNpcUnit(data)
     return unit
 end
 
-function Server:SummonEventPetUnit(casterUnit, registryId, options)
+function Server:SummonEventControlledUnit(casterUnit, unitRef, options)
     local eventState = self:GetEditableEventState()
     if not eventState or eventState.active ~= true or type(casterUnit) ~= "table" then
-        return nil
+        return nil, "event-inactive"
     end
 
-    local resolvedRegistryId = tostring(registryId or "")
-    if resolvedRegistryId == "" then
-        return nil
+    local resolvedOptions = type(options) == "table" and deepCopy(options) or {}
+    local resolvedRegistryId = normalizeQualifiedUnitRef(unitRef)
+    if not resolvedRegistryId then
+        self.LastSummonUnitError = { code = "unit-ref-malformed", unitRef = tostring(unitRef or "") }
+        return nil, "unit-ref-malformed"
     end
 
     local _, resolvedUnit = findActivatedUnitDefinition(resolvedRegistryId)
     if not resolvedUnit then
-        return nil
+        self.LastSummonUnitError = {
+            code = "unit-unavailable",
+            unitRef = resolvedRegistryId,
+        }
+        return nil, "unit-unavailable"
     end
 
     local controllingPlayerEventId = resolveControllingPlayerEventId(casterUnit)
-    if not controllingPlayerEventId or controllingPlayerEventId <= 0 then
-        return nil
+    local controllingPlayerUnit = resolveControllingPlayerUnit(eventState, casterUnit, controllingPlayerEventId)
+    if not controllingPlayerUnit and casterUnit.isPlayer ~= true then
+        local controllerName = Common.NormalizeName(casterUnit.controllerID or casterUnit.ownerID)
+        controllingPlayerUnit = findPlayerUnitByName(eventState.units, controllerName)
+        controllingPlayerEventId = controllingPlayerUnit and tonumber(controllingPlayerUnit.eventID) or controllingPlayerEventId
+    elseif controllingPlayerUnit and (not controllingPlayerEventId or controllingPlayerEventId <= 0) then
+        controllingPlayerEventId = tonumber(controllingPlayerUnit.eventID) or controllingPlayerEventId
+    end
+    if not controllingPlayerEventId or controllingPlayerEventId <= 0 or not controllingPlayerUnit then
+        self.LastSummonUnitError = { code = "controller-missing", unitRef = resolvedRegistryId }
+        return nil, "controller-missing"
     end
 
-    local resolvedOptions = type(options) == "table" and options or {}
+    local casterEventId = tonumber(casterUnit.eventID) or 0
+    if casterEventId <= 0 then
+        self.LastSummonUnitError = { code = "caster-event-id-missing", unitRef = resolvedRegistryId }
+        return nil, "caster-event-id-missing"
+    end
+
     local previousTurnNumber = tonumber(eventState.turnNumber) or 0
     local previousTickNumber = tonumber(eventState.tickNumber) or 0
     local previousTotalTicks = tonumber(eventState.totalTicks) or 0
     local removedEntries = {}
-    local casterEventId = tonumber(casterUnit.eventID) or 0
-
-    for index = #(eventState.units or {}), 1, -1 do
-        local unit = eventState.units[index]
-        if unit and unit.isPlayer ~= true and tonumber(unit.summonedByEventID) == casterEventId then
-            removedEntries[#removedEntries + 1] = {
-                operation = "remove",
-                eventID = tonumber(unit.eventID) or 0,
-            }
-            table.remove(eventState.units, index)
-        end
-    end
 
     local summonData = self:BuildEventNpcUnitDataFromDefinition(resolvedRegistryId, {
         team = tonumber(casterUnit.team) or 1,
@@ -1797,20 +1906,49 @@ function Server:SummonEventPetUnit(casterUnit, registryId, options)
         hidden = false,
     })
     if not summonData then
-        return nil
+        self.LastSummonUnitError = {
+            code = "unit-build-failed",
+            unitRef = resolvedRegistryId,
+        }
+        return nil, "unit-build-failed"
     end
 
-    summonData.ownerID = resolvedOptions.ownerID
+    summonData.ownerID = Common.NormalizeName(controllingPlayerUnit.ownerID or controllingPlayerUnit.name)
+    if summonData.ownerID == "" then
+        self.LastSummonUnitError = { code = "controller-owner-missing", unitRef = resolvedRegistryId }
+        return nil, "controller-owner-missing"
+    end
     summonData.controllerID = controllingPlayerEventId
     summonData.summonedByEventID = casterEventId > 0 and casterEventId or nil
-    summonData.petRef = type(resolvedOptions.petRef) == "string" and resolvedOptions.petRef or nil
+    summonData.petRef = resolvedOptions.profilePet == true and normalizeRef(resolvedOptions.petRef) or nil
     if type(resolvedOptions.spells) == "table" then
         summonData.spells = deepCopy(resolvedOptions.spells)
-    else
-        summonData.spells = nil
     end
     if type(resolvedOptions.stats) == "table" then
-        summonData.stats = deepCopy(resolvedOptions.stats)
+        -- Profile.BuildSelectedPetRuntimeStats returns the complete runtime
+        -- rows (Unit base stats plus equipped-item modifications). Preserve
+        -- those authoritative rows instead of adding the base stats twice.
+        if #resolvedOptions.stats > 0 then
+            summonData.stats = deepCopy(resolvedOptions.stats)
+        end
+    end
+
+    if resolvedOptions.replaceProfilePet == true then
+        -- Replace only this caster's previous profile pet. Generic controlled
+        -- summons intentionally coexist, even when they share the caster.
+        for index = #(eventState.units or {}), 1, -1 do
+            local unit = eventState.units[index]
+            if unit and unit.isPlayer ~= true
+                and tonumber(unit.summonedByEventID) == casterEventId
+                and tostring(unit.petRef or "") ~= ""
+            then
+                removedEntries[#removedEntries + 1] = {
+                    operation = "remove",
+                    eventID = tonumber(unit.eventID) or 0,
+                }
+                table.remove(eventState.units, index)
+            end
+        end
     end
 
     local hostName = Common.NormalizeName(eventState.hostName ~= "" and eventState.hostName or Common.GetPlayerName())
@@ -1820,8 +1958,11 @@ function Server:SummonEventPetUnit(casterUnit, registryId, options)
     upsertAppendedEventUnit(eventState.units, unit)
     normalizeEventStepState(eventState)
     if not unit then
-        return nil
+        self.LastSummonUnitError = { code = "summon-build-failed", unitRef = resolvedRegistryId }
+        return nil, "summon-build-failed"
     end
+
+    self.LastSummonUnitError = nil
 
     if eventState.active == true then
         copyLiveEventToDraft(self, eventState)
@@ -1838,6 +1979,67 @@ function Server:SummonEventPetUnit(casterUnit, registryId, options)
 
     refreshEventManagePage()
     return unit
+end
+
+function Server:SummonEventPetUnit(casterUnit, _registryId, options)
+    -- The legacy registryId argument is intentionally ignored. Summon Pet is
+    -- always resolved from the caster EventUnit's synchronized petRef.
+    local eventState = self:GetEditableEventState()
+    if not eventState or eventState.active ~= true or type(casterUnit) ~= "table" then
+        return nil, "event-inactive"
+    end
+
+    local resolvedOptions = type(options) == "table" and deepCopy(options) or {}
+    local selectedPetRef = tostring(casterUnit.petRef or "")
+    local selectedPet = nil
+
+    if selectedPetRef == "" then
+        self.LastSummonPetError = { code = "selected-pet-missing" }
+        return nil, "selected-pet-missing"
+    end
+
+    local petDataset
+    petDataset, selectedPet = findActivatedPetDefinition(selectedPetRef)
+    if not petDataset or not selectedPet then
+        self.LastSummonPetError = { code = "selected-pet-unavailable", petRef = selectedPetRef }
+        return nil, "selected-pet-unavailable"
+    end
+
+    local selectedUnitRef = normalizeQualifiedUnitRef(selectedPet.unitRef)
+    if not selectedUnitRef then
+        self.LastSummonPetError = { code = "selected-pet-unit-missing", petRef = selectedPetRef }
+        return nil, "selected-pet-unit-missing"
+    end
+
+    -- Runtime pet modifications are authoritative on the caster EventUnit;
+    -- never substitute the host's local profile or caller-supplied stats.
+    resolvedOptions.profilePet = true
+    resolvedOptions.replaceProfilePet = true
+    resolvedOptions.petRef = selectedPetRef
+    resolvedOptions.stats = deepCopy(casterUnit.petStats or {})
+    resolvedOptions.spells = nil
+    if type(selectedPet.spells) == "table" and #selectedPet.spells > 0 then
+        resolvedOptions.spells = deepCopy(selectedPet.spells)
+    end
+
+    local unit, summonError = self:SummonEventControlledUnit(casterUnit, selectedUnitRef, resolvedOptions)
+    if unit then
+        self.LastSummonPetError = nil
+        return unit
+    end
+
+    local petError = summonError
+    if petError == "unit-unavailable" then
+        petError = "selected-pet-unit-unavailable"
+    elseif petError == "unit-ref-malformed" then
+        petError = "selected-pet-unit-unavailable"
+    end
+    self.LastSummonPetError = {
+        code = petError or "summon-build-failed",
+        petRef = selectedPetRef,
+        unitRef = selectedUnitRef,
+    }
+    return nil, self.LastSummonPetError.code
 end
 
 function Server:BuildEventNpcUnitDataFromDefinition(registryId, options)
