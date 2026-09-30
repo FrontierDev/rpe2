@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 43,
+    version = 44,
     dataset = {
         achievements = {},
         auras = {},
@@ -3103,7 +3103,8 @@ Addon.Data.DefaultDatasets:Register({
                 canMoveWhileCasting = false,
                 castTime = 0,
                 casterEvents = {
-                    "on_auto_attack_hit"
+                    "on_melee_hit",
+                    "on_critical_hit"
                 },
                 charges = 0,
                 components = {
@@ -3130,7 +3131,8 @@ Addon.Data.DefaultDatasets:Register({
                                 }
                             },
                             targetEvents = {
-                                "on_auto_attack_taken"
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
                             },
                             threatCoefficient = 1,
                             type = "damage",
@@ -3165,15 +3167,7 @@ Addon.Data.DefaultDatasets:Register({
                 mountedCombatOnly = false,
                 name = "Pet Attack",
                 range = 0,
-                resourceCosts = {
-                    {
-                        amount = 20,
-                        amountMode = "flat",
-                        castPhase = "on_cast_end",
-                        refundOnInterrupt = 0,
-                        resourceRef = "f82db71a:c3gaf7dd"
-                    }
-                },
+                resourceCosts = {},
                 seedNPCSpell = false,
                 spellbookCategory = "",
                 tags = {},
