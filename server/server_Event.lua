@@ -596,6 +596,7 @@ local function buildNpcUnit(unitData, ownerName, nextEventUnitId, playerCount, l
         hidden = coerceEventUnitBoolean(values.hidden, false),
         boss = coerceEventUnitBoolean(values.boss, false),
         showInNpcMode = coerceEventUnitBoolean(values.showInNpcMode, false),
+        isPet = coerceEventUnitBoolean(values.isPet, false),
         petRef = values.petRef,
         summonedByEventID = values.summonedByEventID,
         mainHandWeapon = values.mainHandWeapon,
@@ -1920,6 +1921,7 @@ function Server:SummonEventControlledUnit(casterUnit, unitRef, options)
     end
     summonData.controllerID = controllingPlayerEventId
     summonData.summonedByEventID = casterEventId > 0 and casterEventId or nil
+    summonData.isPet = resolvedOptions.asPet == true or resolvedOptions.profilePet == true
     summonData.petRef = resolvedOptions.profilePet == true and normalizeRef(resolvedOptions.petRef) or nil
     if type(resolvedOptions.spells) == "table" then
         summonData.spells = deepCopy(resolvedOptions.spells)
@@ -1933,15 +1935,15 @@ function Server:SummonEventControlledUnit(casterUnit, unitRef, options)
         end
     end
 
-    if resolvedOptions.replaceProfilePet == true then
-        -- Replace only this caster's previous profile pet. Generic controlled
-        -- summons intentionally coexist, even when they share the caster.
+    if resolvedOptions.replacePet == true or resolvedOptions.replaceProfilePet == true then
+        -- A player has one active pet-role unit at a time. Generic controlled
+        -- summons that are not marked as pets continue to coexist.
         for index = #(eventState.units or {}), 1, -1 do
             local unit = eventState.units[index]
-            if unit and unit.isPlayer ~= true
-                and tonumber(unit.summonedByEventID) == casterEventId
-                and tostring(unit.petRef or "") ~= ""
-            then
+            local unitIsPet = unit
+                and unit.isPlayer ~= true
+                and (unit.isPet == true or tostring(unit.petRef or "") ~= "")
+            if unitIsPet and tonumber(unit.controllerID) == controllingPlayerEventId then
                 removedEntries[#removedEntries + 1] = {
                     operation = "remove",
                     eventID = tonumber(unit.eventID) or 0,
