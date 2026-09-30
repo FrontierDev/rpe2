@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 47,
+    version = 48,
     dataset = {
         achievements = {},
         auras = {},
@@ -2141,29 +2141,7 @@ Addon.Data.DefaultDatasets:Register({
             }
         },
         name = "_Core",
-        pets = {
-            {
-                equipmentSlotRefs = {},
-                id = "smnfelgd",
-                name = "Summoned Felguard",
-                spells = {
-                    "f82db71a:6uix049h",
-                    "7bbb4cb9:e0mooybr",
-                },
-                unitRef = "f82db71a:felgrd01",
-            },
-            {
-                equipmentSlotRefs = {},
-                id = "smnimp01",
-                name = "Summoned Imp",
-                spells = {
-                    "f82db71a:6uix049h",
-                    "d7c874c4:68dy7na1",
-                    "d7c874c4:fireward",
-                },
-                unitRef = "f82db71a:imp00001",
-            },
-        },
+        pets = {},
         races = {
             {
                 description = "The humans are the most populous and the youngest race in Azeroth. The humans have become the de facto leaders of the Alliance, with their youthful ambitions and resilience. The humans are the founders of the Alliance. Their diplomacy skills go back to the Second War, where the seven kingdoms joined together to defeat the Horde.",
