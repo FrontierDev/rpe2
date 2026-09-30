@@ -102,6 +102,30 @@ local function findActivatedPetDefinition(petRef)
     return nil, nil
 end
 
+local function findActivatedPetDefinitionByUnitRef(unitRef)
+    local normalizedUnitRef = tostring(unitRef or "")
+    if normalizedUnitRef == "" then
+        return nil, nil
+    end
+
+    local registry = Addon.Internal and Addon.Internal.Registry or nil
+    local datasets = type(registry) == "table" and type(registry.GetActivatedDatasets) == "function"
+        and registry:GetActivatedDatasets() or {}
+    for index = 1, #datasets do
+        local dataset = datasets[index]
+        if type(dataset) == "table" then
+            for petIndex = 1, #(dataset.pets or {}) do
+                local pet = dataset.pets[petIndex]
+                if type(pet) == "table" and tostring(pet.unitRef or "") == normalizedUnitRef then
+                    return dataset, pet
+                end
+            end
+        end
+    end
+
+    return nil, nil
+end
+
 local function buildSendMetadata(opcode)
     local metadata = {
         opcode = opcode,
@@ -2009,6 +2033,21 @@ function Server:SummonEventPetUnit(casterUnit, registryId, options)
         resolvedOptions.stats = nil
         resolvedOptions.spells = nil
         resolvedOptions.isPet = true
+
+        -- Authored pet Units do not use the caster's selected-pet stats or
+        -- equipment. Preserve the Unit's own spell list, and retain the
+        -- canonical Pet spell list for Unit definitions that store their
+        -- pet abilities on the matching Pet entry (as the default Warlock
+        -- Imp and Felguard do).
+        local _, authoredUnit = findActivatedUnitDefinition(selectedUnitRef)
+        if type(authoredUnit) == "table" and type(authoredUnit.spells) == "table" and #authoredUnit.spells > 0 then
+            resolvedOptions.spells = deepCopy(authoredUnit.spells)
+        else
+            local _, authoredPet = findActivatedPetDefinitionByUnitRef(selectedUnitRef)
+            if type(authoredPet) == "table" and type(authoredPet.spells) == "table" and #authoredPet.spells > 0 then
+                resolvedOptions.spells = deepCopy(authoredPet.spells)
+            end
+        end
 
         local unit, summonError = self:SummonEventControlledUnit(casterUnit, selectedUnitRef, resolvedOptions)
         if unit then

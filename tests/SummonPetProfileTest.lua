@@ -161,6 +161,8 @@ dataset = {
         { id = "wolf", unitRef = "test:wolf-unit" },
         { id = "cat", unitRef = "test:cat-unit" },
         { id = "broken", unitRef = "test:missing-unit" },
+        { id = "imp", unitRef = "test:imp-unit", spells = { "test:imp-spell" } },
+        { id = "felguard", unitRef = "test:felguard-unit", spells = { "test:felguard-spell" } },
     },
 }
 
@@ -270,6 +272,7 @@ assertEqual(explicitImpError, nil, "explicit Imp summon does not return an error
 assertEqual(explicitImp.registryID, "test:imp-unit", "explicit pet summon uses the authored Unit")
 assertEqual(explicitImp.petRef, nil, "explicit pet summon does not invent a profile Pet reference")
 assertEqual(explicitImp.isPet, true, "explicit pet summon uses the shared pet-role representation")
+assertEqual(explicitImp.spells[1], "test:imp-spell", "explicit Imp summon preserves the authored pet spell list")
 assertEqual(explicitImp.controllerID, 1, "explicit pet summon uses the profile caster controller")
 assertEqual(countUnitsByRegistry(Server.EventState.units, "test:imp-unit", 1), 1, "explicit Imp summon creates one pet unit")
 assertTrue(findUnit(Server.EventState.units, "test:wolf") == nil, "explicit pet summon replaces the profile pet")
@@ -281,6 +284,7 @@ assertTrue(explicitFelguard ~= nil, "explicit Felguard Unit can be summoned as a
 assertEqual(explicitFelguardError, nil, "explicit Felguard summon does not return an error")
 assertEqual(explicitFelguard.registryID, "test:felguard-unit", "explicit Felguard summon uses the authored Unit")
 assertEqual(explicitFelguard.isPet, true, "explicit Felguard uses the shared pet-role representation")
+assertEqual(explicitFelguard.spells[1], "test:felguard-spell", "explicit Felguard summon preserves the authored pet spell list")
 assertEqual(countUnitsByRegistry(Server.EventState.units, "test:imp-unit", 1), 0, "Felguard replaces the previous explicit pet")
 assertEqual(countUnitsByRegistry(Server.EventState.units, "test:felguard-unit", 1), 1, "Felguard leaves one active pet unit")
 assertTrue(
