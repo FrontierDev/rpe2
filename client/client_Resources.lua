@@ -1475,6 +1475,7 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         self:RefreshActionBarWidget("pending-resource-flush")
     end
     local targetedResourceDeltas = {}
+    local aggregatedThreatUpdates = {}
     local targetEventIds = {}
     local reason = ""
     local matchingBatches = {}
@@ -1504,6 +1505,7 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
                     currentValue = deltaEntry.currentValue,
                 }
             end
+            aggregatedThreatUpdates = coalesceThreatUpdates(aggregatedThreatUpdates, batch.threatUpdates)
         end
     end
 
@@ -1527,6 +1529,7 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         targetedResourceDeltas,
         {
             allowLocalEchoApply = false,
+            threatUpdates = aggregatedThreatUpdates,
         }
     )
     settleQueuedRPEKillAchievements(self, state, {
