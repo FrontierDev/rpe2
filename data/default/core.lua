@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 46,
+    version = 47,
     dataset = {
         achievements = {},
         auras = {},
@@ -5854,6 +5854,175 @@ units = {
             {
                 initialValue = 0,
                 perLevelValue = 2.966102,
+                statRef = "f82db71a:7t7xgzcx",
+            },
+            {
+                initialValue = 5,
+                perLevelValue = 0,
+                statRef = "f82db71a:jslmczbi",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:fercjhm5",
+            },
+            {
+                initialValue = 5,
+                perLevelValue = 0,
+                statRef = "f82db71a:69hfqhne",
+            },
+            {
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
+                statRef = "f82db71a:0w7c7p09",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:hj6d4kvy",
+            },
+            {
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
+                statRef = "f82db71a:jjn0my8k",
+            },
+            {
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
+                statRef = "f82db71a:pg0ytacb",
+            },
+            {
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
+                statRef = "f82db71a:954yunb9",
+            },
+            {
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
+                statRef = "f82db71a:itpo751d",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:hlyrsstn",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:rgnrtg01",
+            },
+            {
+                initialValue = 30,
+                perLevelValue = 0,
+                statRef = "f82db71a:s1mt6jh9",
+            },
+        },
+        tags = {  },
+    },
+    {
+        appearances = {
+            {
+                displayId = 1132,
+            },
+            {
+                displayId = 1131,
+            },
+        },
+        attributes = {  },
+        challengeLevel = "normal",
+        creatureSize = "medium",
+        creatureType = "demon",
+        id = "voidw001",
+        name = "Voidwalker",
+        presets = {
+            {
+                name = "Corruptor",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "e8f3b2c6:wlcora01",
+                    "e8f3b2c6:wlcshada",
+                },
+                equipment = {  },
+            },
+            {
+                name = "Tormenter",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "f82db71a:npcmulti",
+                },
+                equipment = {  },
+            },
+        },
+        resistances = {  },
+        resources = {
+            {
+                initialValue = 180,
+                perLevelValue = 47.796610,
+                resourceRef = "f82db71a:q2ktkztt",
+            },
+            {
+                initialValue = 100,
+                perLevelValue = 23.728814,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        spells = {  },
+        stats = {
+            {
+                initialValue = 100,
+                perLevelValue = 44.915254,
+                statRef = "f82db71a:v42albuv",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:wbj4zuf3",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:dd88li4c",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:v2g0tw0o",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:tcn0s8kx",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:o6113cir",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:p8syz5ba",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:zs1nbz13",
+            },
+            {
+                initialValue = 40,
+                perLevelValue = 4.406780,
+                statRef = "f82db71a:u7b49vs9",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:v2rs9cpy",
+            },
+            {
+                initialValue = 20,
+                perLevelValue = 2.203390,
                 statRef = "f82db71a:7t7xgzcx",
             },
             {

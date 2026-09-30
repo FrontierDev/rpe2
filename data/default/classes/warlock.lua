@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 10,
+    version = 11,
     dataset = {
         achievements = {},
         auras = {
@@ -403,7 +403,19 @@ Addon.Data.DefaultDatasets:Register({
         loot = {},
         mounts = {},
         name = "Warlock",
-        pets = {},
+        pets = {
+            {
+                equipmentSlotRefs = {},
+                id = "smnvoid1",
+                name = "Summoned Voidwalker",
+                spells = {
+                    "e8f3b2c6:wlshwads",
+                    "7bbb4cb9:tntwar01",
+                    "f82db71a:6uix049h",
+                },
+                unitRef = "f82db71a:voidw001",
+            },
+        },
         races = {},
         recipes = {},
         resources = {},
