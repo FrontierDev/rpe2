@@ -1062,7 +1062,11 @@ local function buildSummonPetSentence()
     return "Summon the selected unit under your control."
 end
 
-local function buildSummonUnitSentence()
+local function buildSummonUnitSentence(component)
+    local effect = type(component) == "table" and component.effect or nil
+    if type(effect) == "table" and effect.summonAsPet == true then
+        return "Summon the specified unit as your pet."
+    end
     return "Summon the specified unit under your control."
 end
 
@@ -1233,7 +1237,7 @@ local function buildSentence(detail, casterUnit, component, rankMultiplier)
         return buildSummonPetSentence()
     end
     if effectType == "summon_unit" then
-        return buildSummonUnitSentence()
+        return buildSummonUnitSentence(component)
     end
     if effectType == "interrupt" then
         return buildInterruptSentence(component)
@@ -1411,7 +1415,7 @@ local function buildTemplateSentence(detail, componentIndex, component, state)
         return buildSummonPetSentence()
     end
     if effectType == "summon_unit" then
-        return buildSummonUnitSentence()
+        return buildSummonUnitSentence(component)
     end
     if effectType == "interrupt" then
         return buildInterruptSentence(component)
