@@ -1921,7 +1921,7 @@ function Server:SummonEventControlledUnit(casterUnit, unitRef, options)
     end
     summonData.controllerID = controllingPlayerEventId
     summonData.summonedByEventID = casterEventId > 0 and casterEventId or nil
-    summonData.isPet = resolvedOptions.asPet == true or resolvedOptions.profilePet == true
+    summonData.isPet = resolvedOptions.isPet == true or resolvedOptions.profilePet == true
     summonData.petRef = resolvedOptions.profilePet == true and normalizeRef(resolvedOptions.petRef) or nil
     if type(resolvedOptions.spells) == "table" then
         summonData.spells = deepCopy(resolvedOptions.spells)
@@ -1935,7 +1935,7 @@ function Server:SummonEventControlledUnit(casterUnit, unitRef, options)
         end
     end
 
-    if resolvedOptions.replacePet == true or resolvedOptions.replaceProfilePet == true then
+    if resolvedOptions.isPet == true or resolvedOptions.profilePet == true then
         -- A player has one active pet-role unit at a time. Generic controlled
         -- summons that are not marked as pets continue to coexist.
         for index = #(eventState.units or {}), 1, -1 do
@@ -1983,15 +1983,46 @@ function Server:SummonEventControlledUnit(casterUnit, unitRef, options)
     return unit
 end
 
-function Server:SummonEventPetUnit(casterUnit, _registryId, options)
-    -- The legacy registryId argument is intentionally ignored. Summon Pet is
-    -- always resolved from the caster EventUnit's synchronized petRef.
+function Server:SummonEventPetUnit(casterUnit, registryId, options)
+    -- A blank registryId preserves the profile-selected path. A supplied
+    -- registryId is an authored Unit reference and must never fall back to the
+    -- caster's profile pet.
     local eventState = self:GetEditableEventState()
     if not eventState or eventState.active ~= true or type(casterUnit) ~= "table" then
         return nil, "event-inactive"
     end
 
     local resolvedOptions = type(options) == "table" and deepCopy(options) or {}
+    local authoredUnitRef = tostring(registryId or "")
+    if authoredUnitRef ~= "" then
+        local selectedUnitRef = normalizeQualifiedUnitRef(authoredUnitRef)
+        if not selectedUnitRef then
+            self.LastSummonPetError = {
+                code = "unit-ref-malformed",
+                unitRef = authoredUnitRef,
+            }
+            return nil, "unit-ref-malformed"
+        end
+
+        resolvedOptions.profilePet = nil
+        resolvedOptions.petRef = nil
+        resolvedOptions.stats = nil
+        resolvedOptions.spells = nil
+        resolvedOptions.isPet = true
+
+        local unit, summonError = self:SummonEventControlledUnit(casterUnit, selectedUnitRef, resolvedOptions)
+        if unit then
+            self.LastSummonPetError = nil
+            return unit
+        end
+
+        self.LastSummonPetError = {
+            code = summonError or "summon-build-failed",
+            unitRef = selectedUnitRef,
+        }
+        return nil, self.LastSummonPetError.code
+    end
+
     local selectedPetRef = tostring(casterUnit.petRef or "")
     local selectedPet = nil
 
@@ -2016,8 +2047,8 @@ function Server:SummonEventPetUnit(casterUnit, _registryId, options)
     -- Runtime pet modifications are authoritative on the caster EventUnit;
     -- never substitute the host's local profile or caller-supplied stats.
     resolvedOptions.profilePet = true
-    resolvedOptions.replaceProfilePet = true
     resolvedOptions.petRef = selectedPetRef
+    resolvedOptions.isPet = true
     resolvedOptions.stats = deepCopy(casterUnit.petStats or {})
     resolvedOptions.spells = nil
     if type(selectedPet.spells) == "table" and #selectedPet.spells > 0 then

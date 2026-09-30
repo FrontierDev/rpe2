@@ -295,6 +295,7 @@ local selectedPetFields = splitPreservingEmpty(
 )
 assertEqual(selectedPetFields[16], "test:pet-wolf", "event snapshot carries the selected pet identity")
 assertEqual(selectedPetFields[33] ~= "", true, "event snapshot carries selected pet runtime stats")
+assertEqual(selectedPetFields[34], "0", "event snapshot carries the pet-role marker extension")
 local selectedPetSnapshot = Event.DeserializeUnitsFromNetwork(selectedPetEvent:SerializeUnitsForNetwork(), {
     level = 1,
     difficulty = "normal",
@@ -342,6 +343,42 @@ local genericSummonSnapshot = Event.DeserializeUnitsFromNetwork(genericSummonEve
 assertEqual(genericSummonSnapshot[2].petRef, nil, "generic summon snapshots omit profile pet identity")
 assertEqual(tonumber(genericSummonSnapshot[2].controllerID), 1, "generic summon snapshots preserve controller identity")
 assertEqual(genericSummonSnapshot[2].summonedByEventID, 1, "generic summon snapshots preserve caster identity")
+
+local authoredPet = EventUnit:New({
+    eventID = 4,
+    name = "Authored Pet",
+    registryID = "test:npc",
+    ownerID = "Pet Owner",
+    controllerID = 1,
+    summonedByEventID = 1,
+    isPet = true,
+})
+local authoredPetEvent = Event:New({
+    id = "authored-pet-network-event",
+    active = true,
+    level = 1,
+    difficulty = "normal",
+    units = {
+        EventUnit:New({ eventID = 1, isPlayer = true, name = "Pet Owner" }),
+        authoredPet,
+    },
+})
+local authoredPetSnapshot = Event.DeserializeUnitsFromNetwork(authoredPetEvent:SerializeUnitsForNetwork(), {
+    level = 1,
+    difficulty = "normal",
+    playerCount = 1,
+})
+assertEqual(authoredPetSnapshot[2].isPet, true, "authored pet snapshots preserve the pet-role marker")
+local authoredPetFields = splitPreservingEmpty(
+    splitPreservingEmpty(authoredPetEvent:SerializeUnitsForNetwork(), string.char(30))[2],
+    string.char(29)
+)
+assertEqual(authoredPetFields[34], "1", "authored pet snapshots serialize the pet-role marker extension")
+local authoredPetDelta = Event.SerializeUnitDeltaBatchForNetwork({
+    { operation = "upsert", eventID = 4, unit = authoredPet },
+})
+local authoredPetDeltaEntries = Event.DeserializeUnitDeltaBatchFromNetwork(authoredPetDelta)
+assertEqual(authoredPetDeltaEntries[1].unit.isPet, true, "authored pet deltas preserve the pet-role marker")
 local genericSummonDelta = Event.SerializeUnitDeltaBatchForNetwork({
     { operation = "upsert", eventID = 2, unit = genericSummon },
 })

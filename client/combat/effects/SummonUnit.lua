@@ -41,7 +41,6 @@ function Combat:ExecuteSummonUnitEffect(context, effect, component)
         resultType = "applied",
         applied = true,
         unitRef = unitRef,
-        summonAsPet = type(effect) == "table" and effect.summonAsPet == true or false,
         component = component,
     }
 end
@@ -49,16 +48,14 @@ end
 local SummonUnitEffect = Combat:CreateEffectContract({
     type = "summon_unit",
     label = "Summon Unit",
-    description = "Summons the selected Unit definition under the caster's control, optionally as the player's pet.",
+    description = "Summons the selected Unit definition under the caster's control.",
     defaults = {
         type = "summon_unit",
         unitRef = nil,
-        summonAsPet = false,
         targetEvents = {},
     },
     fields = {
         "unitRef",
-        "summonAsPet",
         "targetEvents",
     },
     Execute = function(self, context, effect, component)

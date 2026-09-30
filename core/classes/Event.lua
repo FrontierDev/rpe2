@@ -434,7 +434,10 @@ local function findUnitByEventId(units, eventId)
 end
 
 local function isPlayerSharedTurnPet(units, unit)
-    if type(unit) ~= "table" or unit.isPlayer == true or tostring(unit.petRef or "") == "" then
+    if type(unit) ~= "table" or unit.isPlayer == true then
+        return false
+    end
+    if unit.isPet ~= true and tostring(unit.petRef or "") == "" then
         return false
     end
 

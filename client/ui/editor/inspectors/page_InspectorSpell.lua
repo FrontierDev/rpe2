@@ -427,12 +427,7 @@ function DataEditor:RefreshSpellInspectorPage()
     if self.SpellInspectorSummonUnitDropdown then
         self.SpellInspectorSummonUnitDropdown:SetItems(self:BuildSpellInspectorUnitsAcrossDatasets())
         self.SpellInspectorSummonUnitDropdown:SetSelectedValue(effect.unitRef or "", true)
-        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorSummonUnitDropdown, isSummonUnit and component ~= nil)
-    end
-    if self.SpellInspectorSummonUnitAsPetCheckbox then
-        self.SpellInspectorSummonUnitAsPetCheckbox:SetChecked(effect.summonAsPet == true, true)
-        self:SetSpellInspectorCheckboxEnabled(self.SpellInspectorSummonUnitAsPetCheckbox, isSummonUnit and component ~= nil)
-        self:SetSpellInspectorGroupVisible(self.SpellInspectorSummonUnitAsPetCheckbox, isSummonUnit)
+        self:SetSpellInspectorDropdownEnabled(self.SpellInspectorSummonUnitDropdown, isSummonEffect and component ~= nil)
     end
     if self.SpellInspectorHitTypeDropdown then
         self.SpellInspectorHitTypeDropdown:SetSelectedValue(effect.hitType or "ability", true)
@@ -505,8 +500,7 @@ function DataEditor:RefreshSpellInspectorPage()
     self:SetSpellInspectorGroupVisible(self.SpellInspectorTauntDurationGroup, isTaunt)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountGroup, isResource)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorResourceAmountModeGroup, isResource)
-    self:SetSpellInspectorGroupVisible(self.SpellInspectorSummonUnitGroup, isSummonUnit)
-    self:SetSpellInspectorGroupVisible(self.SpellInspectorSummonUnitAsPetCheckbox, isSummonUnit)
+    self:SetSpellInspectorGroupVisible(self.SpellInspectorSummonUnitGroup, isSummonEffect)
     self:SetSpellInspectorGroupVisible(self.SpellInspectorTargetEventsGroup, not isSummonEffect)
     if self.SpellInspectorComponentsRoot and self.SpellInspectorComponentsRoot.RefreshLayout then
         self.SpellInspectorComponentsRoot:RefreshLayout()

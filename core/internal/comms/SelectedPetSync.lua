@@ -22,8 +22,10 @@ local UNIT_FIELD_SEPARATOR = string.char(29)
 local UNIT_DELTA_RECORD_SEPARATOR = string.char(23)
 local UNIT_DELTA_FIELD_SEPARATOR = string.char(22)
 -- Fields 24-32 belong to the existing variant, equipment, NPC-mode, and
--- primary-resource extensions. Keep selected-pet runtime stats after them.
+-- primary-resource extensions. Keep selected-pet runtime stats and the
+-- synchronized pet-role marker after them.
 local PET_STATS_FIELD = 33
+local PET_ROLE_FIELD = 34
 
 local function normalizeName(value)
     if type(Common.NormalizeName) == "function" then
@@ -106,6 +108,7 @@ local function appendPetStats(record, sourceUnit)
         fields[#fields + 1] = ""
     end
     fields[PET_STATS_FIELD] = serializeStats(type(sourceUnit) == "table" and sourceUnit.petStats or nil)
+    fields[PET_ROLE_FIELD] = type(sourceUnit) == "table" and sourceUnit.isPet == true and "1" or "0"
     return table.concat(fields, UNIT_FIELD_SEPARATOR)
 end
 
@@ -117,6 +120,9 @@ local function applyPetStats(unit, record)
     local fields = splitPreservingEmpty(record, UNIT_FIELD_SEPARATOR)
     if #fields >= PET_STATS_FIELD then
         unit.petStats = normalizePetStats(deserializeStats(fields[PET_STATS_FIELD] or ""))
+    end
+    if #fields >= PET_ROLE_FIELD then
+        unit.isPet = tostring(fields[PET_ROLE_FIELD] or "") == "1"
     end
     return unit
 end

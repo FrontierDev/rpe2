@@ -387,7 +387,7 @@ local function executeSummonComponents(self, payload)
         then
             summoned = self:SummonEventPetUnit(
                 payload.casterUnit,
-                nil,
+                effect and effect.unitRef or nil,
                 { ownerID = payload.sender }
             ) ~= nil or summoned
         elseif castPhase == "on_cast_end" and effectType == "summon_unit"
@@ -396,11 +396,7 @@ local function executeSummonComponents(self, payload)
             summoned = self:SummonEventControlledUnit(
                 payload.casterUnit,
                 effect and effect.unitRef or nil,
-                {
-                    ownerID = payload.sender,
-                    asPet = effect and effect.summonAsPet == true or false,
-                    replacePet = effect and effect.summonAsPet == true or false,
-                }
+                { ownerID = payload.sender }
             ) ~= nil or summoned
         end
     end

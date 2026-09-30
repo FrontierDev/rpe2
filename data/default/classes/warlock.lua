@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 8,
+    version = 9,
     dataset = {
         achievements = {},
         auras = {
@@ -2244,9 +2244,8 @@ Addon.Data.DefaultDatasets:Register({
                         castingGroup = "default",
                         effect = {
                             targetEvents = {},
-                            type = "summon_unit",
+                            type = "summon_pet",
                             unitRef = "f82db71a:felgrd01",
-                            summonAsPet = true,
                         },
                         key = "wlsmfelc",
                         target = {
@@ -2297,9 +2296,8 @@ Addon.Data.DefaultDatasets:Register({
                         castingGroup = "default",
                         effect = {
                             targetEvents = {},
-                            type = "summon_unit",
+                            type = "summon_pet",
                             unitRef = "f82db71a:imp00001",
-                            summonAsPet = true,
                         },
                         key = "wlsmimpc",
                         target = {

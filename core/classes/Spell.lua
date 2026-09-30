@@ -425,6 +425,10 @@ local function normalizeQualifiedUnitRef(value)
     return ref
 end
 
+local function normalizeOptionalUnitRef(value)
+    return normalizeRef(value)
+end
+
 local function normalizeCastingGroup(value)
     local group = ensureString(value)
     if group == "" then
@@ -521,6 +525,7 @@ local function buildDefaultEffect(effectType)
     if normalizedType == "summon_pet" then
         return {
             type = "summon_pet",
+            unitRef = nil,
             targetEvents = {},
         }
     end
@@ -529,7 +534,6 @@ local function buildDefaultEffect(effectType)
         return {
             type = "summon_unit",
             unitRef = nil,
-            summonAsPet = false,
             targetEvents = {},
         }
     end
@@ -679,13 +683,13 @@ local function normalizeEffect(value)
     end
 
     if effect.type == "summon_pet" then
+        effect.unitRef = normalizeOptionalUnitRef(data.unitRef)
         effect.targetEvents = normalizeEventList(data.targetEvents)
         return effect
     end
 
     if effect.type == "summon_unit" then
         effect.unitRef = normalizeQualifiedUnitRef(data.unitRef)
-        effect.summonAsPet = normalizeBool(data.summonAsPet, false)
         effect.targetEvents = normalizeEventList(data.targetEvents)
         return effect
     end

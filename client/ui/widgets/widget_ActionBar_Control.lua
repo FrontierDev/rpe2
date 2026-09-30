@@ -585,6 +585,7 @@ function ActionBarWidget:ResolveControllablePetUnit(controlContext)
     end
 
     local preferredPetRef = Profile.GetPetRef and tostring(Profile.GetPetRef() or "") or ""
+    local fallbackPet = nil
     for index = 1, #eventUnits do
         local eventUnit = eventUnits[index]
         if isLocalPlayerPet(eventUnit, localEventUnit)
@@ -594,10 +595,13 @@ function ActionBarWidget:ResolveControllablePetUnit(controlContext)
             if preferredPetRef ~= "" and tostring(eventUnit.petRef or "") == preferredPetRef then
                 return eventUnit
             end
+            if eventUnit.isPet == true and tostring(eventUnit.petRef or "") == "" then
+                fallbackPet = fallbackPet or eventUnit
+            end
         end
     end
 
-    return nil
+    return fallbackPet
 end
 
 function ActionBarWidget:GetActionBarRows()

@@ -138,11 +138,25 @@ local guardianUnit = Unit:New({
         { statRef = "test:power", initialValue = 30, perLevelValue = 1 },
     },
 }):ToTable()
+local impUnit = Unit:New({
+    id = "imp-unit",
+    name = "Imp",
+    stats = {
+        { statRef = "test:power", initialValue = 40, perLevelValue = 1 },
+    },
+}):ToTable()
+local felguardUnit = Unit:New({
+    id = "felguard-unit",
+    name = "Felguard",
+    stats = {
+        { statRef = "test:power", initialValue = 50, perLevelValue = 1 },
+    },
+}):ToTable()
 
 dataset = {
     id = "test",
     name = "Summon test",
-    units = { wolfUnit, catUnit, guardianUnit },
+    units = { wolfUnit, catUnit, guardianUnit, impUnit, felguardUnit },
     pets = {
         { id = "wolf", unitRef = "test:wolf-unit" },
         { id = "cat", unitRef = "test:cat-unit" },
@@ -218,6 +232,7 @@ assertEqual(hostPet.petRef, "test:wolf", "summon carries the selected petRef")
 assertEqual(hostPet.summonedByEventID, 1, "summon carries the caster event ID")
 assertEqual(hostPet.controllerID, 1, "summon is controlled by the caster")
 assertEqual(hostPet.ownerID, "Host", "summon carries the caster owner")
+assertEqual(hostPet.isPet, true, "profile summon uses the shared pet-role representation")
 assertEqual(hostPet.stats[1].value, 109, "selected pet runtime stat modifications are applied")
 assertEqual(hostPet.mainHandWeapon, "test:claw", "selected pet equipment is applied")
 assertEqual(findUnit(Server.EventState.units, "test:wolf"), hostPet, "re-summoning replaces the previous profile pet")
@@ -246,6 +261,62 @@ assertEqual(hostGuardianOne.controllerID, 1, "generic summon is controlled by th
 assertEqual(hostGuardianOne.ownerID, "Host", "generic summon uses the controlling player's normalized owner")
 assertEqual(hostGuardianOne.summonedByEventID, 1, "generic summon records the caster EventUnit")
 assertTrue(findUnit(Server.EventState.units, "test:wolf") == hostPet, "generic summon does not replace the profile pet")
+
+local explicitImp, explicitImpError = Server:SummonEventPetUnit(Server.EventState.units[1], "test:imp-unit", {
+    ownerID = "Host",
+})
+assertTrue(explicitImp ~= nil, "explicit Imp Unit can be summoned as a pet")
+assertEqual(explicitImpError, nil, "explicit Imp summon does not return an error")
+assertEqual(explicitImp.registryID, "test:imp-unit", "explicit pet summon uses the authored Unit")
+assertEqual(explicitImp.petRef, nil, "explicit pet summon does not invent a profile Pet reference")
+assertEqual(explicitImp.isPet, true, "explicit pet summon uses the shared pet-role representation")
+assertEqual(explicitImp.controllerID, 1, "explicit pet summon uses the profile caster controller")
+assertEqual(countUnitsByRegistry(Server.EventState.units, "test:imp-unit", 1), 1, "explicit Imp summon creates one pet unit")
+assertTrue(findUnit(Server.EventState.units, "test:wolf") == nil, "explicit pet summon replaces the profile pet")
+
+local explicitFelguard, explicitFelguardError = Server:SummonEventPetUnit(Server.EventState.units[1], "test:felguard-unit", {
+    ownerID = "Host",
+})
+assertTrue(explicitFelguard ~= nil, "explicit Felguard Unit can be summoned as a pet")
+assertEqual(explicitFelguardError, nil, "explicit Felguard summon does not return an error")
+assertEqual(explicitFelguard.registryID, "test:felguard-unit", "explicit Felguard summon uses the authored Unit")
+assertEqual(explicitFelguard.isPet, true, "explicit Felguard uses the shared pet-role representation")
+assertEqual(countUnitsByRegistry(Server.EventState.units, "test:imp-unit", 1), 0, "Felguard replaces the previous explicit pet")
+assertEqual(countUnitsByRegistry(Server.EventState.units, "test:felguard-unit", 1), 1, "Felguard leaves one active pet unit")
+assertTrue(
+    Event.IsPlayerSharedTurnPet(Server.EventState.units, explicitFelguard),
+    "explicit Felguard is hidden from the independent event-unit portrait list"
+)
+local hostPageUnits = Event.GetUnitsForPage(Server.EventState.units, 1, 20)
+for index = 1, #hostPageUnits do
+    assertTrue(hostPageUnits[index] ~= explicitFelguard, "explicit Felguard is not an independent event portrait")
+end
+
+local remoteExplicitImp, remoteExplicitImpError = Server:SummonEventPetUnit(Server.EventState.units[2], "test:imp-unit", {
+    ownerID = "Remote",
+})
+assertTrue(remoteExplicitImp ~= nil, "remote explicit pet summon succeeds")
+assertEqual(remoteExplicitImpError, nil, "remote explicit pet summon does not return an error")
+assertEqual(remoteExplicitImp.registryID, "test:imp-unit", "remote explicit summon uses its authored Unit")
+assertEqual(remoteExplicitImp.controllerID, 2, "remote explicit summon uses the remote caster controller")
+assertEqual(remoteExplicitImp.ownerID, "Remote", "remote explicit summon uses the remote caster owner")
+
+local invalidExplicitPet, invalidExplicitPetError = Server:SummonEventPetUnit(
+    Server.EventState.units[1],
+    "test:missing-unit",
+    {}
+)
+assertEqual(invalidExplicitPet, nil, "an invalid explicit pet Unit fails")
+assertEqual(invalidExplicitPetError, "unit-unavailable", "an invalid explicit pet Unit reports its error")
+assertEqual(countUnitsByRegistry(Server.EventState.units, "test:felguard-unit", 1), 1, "an invalid explicit pet does not replace the current pet")
+local malformedExplicitPet, malformedExplicitPetError = Server:SummonEventPetUnit(
+    Server.EventState.units[1],
+    "felguard-unit",
+    {}
+)
+assertEqual(malformedExplicitPet, nil, "a malformed explicit pet Unit fails")
+assertEqual(malformedExplicitPetError, "unit-ref-malformed", "a malformed explicit pet Unit reports its error")
+assertEqual(countUnitsByRegistry(Server.EventState.units, "test:felguard-unit", 1), 1, "a malformed explicit pet does not replace the current pet")
 
 local hostGuardianTwo, hostGuardianTwoError = Server:SummonEventControlledUnit(Server.EventState.units[1], "test:guardian-unit", {
     ownerID = "Host",
@@ -294,14 +365,14 @@ local actionBarContext = {
 }
 assertEqual(
     actionBarInstance:ResolveControllablePetUnit(actionBarContext),
-    hostPet,
-    "action bar resolves the local summoned pet by selected petRef"
+    explicitFelguard,
+    "action bar resolves the local explicit-unit pet"
 )
 selectedPetRef = "test:not-summoned"
 assertEqual(
     actionBarInstance:ResolveControllablePetUnit(actionBarContext),
-    nil,
-    "action bar does not fall back to another summoned pet"
+    explicitFelguard,
+    "action bar keeps resolving an authored pet when the selected profile ref is absent"
 )
 
 local invalidCaster = EventUnit:New({ eventID = 4, isPlayer = true, ownerID = "Invalid", controllerID = "Invalid" })
@@ -369,5 +440,33 @@ coreFile:close()
 local summonPetDefinition = coreText:match('type = "summon_pet".-key = "9b68b6a9"')
 assertTrue(summonPetDefinition ~= nil, "Core contains the Summon Pet definition")
 assertTrue(summonPetDefinition:find("unitRef", 1, true) == nil, "Core Summon Pet has no authored Unit reference")
+
+local explicitSummonPetSpell = Spell:New({
+    id = "summon-explicit-pet-spell",
+    components = {{
+        effect = { type = "summon_pet", unitRef = "test:imp-unit" },
+    }},
+})
+assertEqual(
+    explicitSummonPetSpell:ToTable().components[1].effect.unitRef,
+    "test:imp-unit",
+    "Summon Pet serializes its optional explicit Unit reference"
+)
+local malformedSummonPetSpell = Spell:New({
+    components = {{ effect = { type = "summon_pet", unitRef = "imp-unit" } }},
+})
+assertEqual(
+    malformedSummonPetSpell.components[1].effect.unitRef,
+    "imp-unit",
+    "Summon Pet normalization preserves a malformed explicit Unit reference for server validation"
+)
+local legacyPetModeSpell = Spell:New({
+    components = {{ effect = { type = "summon_unit", unitRef = "test:guardian-unit", summonAsPet = true } }},
+})
+assertEqual(
+    legacyPetModeSpell.components[1].effect.summonAsPet,
+    nil,
+    "Summon Unit no longer serializes the removed pet mode"
+)
 
 print("SummonPetProfileTest passed")

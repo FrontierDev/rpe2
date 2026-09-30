@@ -1058,15 +1058,15 @@ local function buildHideSentence(component)
     return ("Cause %s to become hidden."):format(targetPhrase)
 end
 
-local function buildSummonPetSentence()
-    return "Summon the selected unit under your control."
+local function buildSummonPetSentence(component)
+    local effect = type(component) == "table" and component.effect or nil
+    if type(effect) == "table" and tostring(effect.unitRef or "") ~= "" then
+        return "Summon the specified unit as your pet."
+    end
+    return "Summon the selected pet under your control."
 end
 
 local function buildSummonUnitSentence(component)
-    local effect = type(component) == "table" and component.effect or nil
-    if type(effect) == "table" and effect.summonAsPet == true then
-        return "Summon the specified unit as your pet."
-    end
     return "Summon the specified unit under your control."
 end
 
@@ -1234,7 +1234,7 @@ local function buildSentence(detail, casterUnit, component, rankMultiplier)
         return buildHideSentence(component)
     end
     if effectType == "summon_pet" then
-        return buildSummonPetSentence()
+        return buildSummonPetSentence(component)
     end
     if effectType == "summon_unit" then
         return buildSummonUnitSentence(component)
@@ -1412,7 +1412,7 @@ local function buildTemplateSentence(detail, componentIndex, component, state)
         return buildHideSentence(component)
     end
     if effectType == "summon_pet" then
-        return buildSummonPetSentence()
+        return buildSummonPetSentence(component)
     end
     if effectType == "summon_unit" then
         return buildSummonUnitSentence(component)

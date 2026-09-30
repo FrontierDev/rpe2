@@ -436,14 +436,6 @@ local function normalizeRemoveAuraByTagEffect(value)
     }
 end
 
-local function normalizeSummonPetEffect(value)
-    local data = Normalization.EnsureTable(value)
-    return {
-        type = "summon_pet",
-        targetEvents = normalizeEventList(data.targetEvents),
-    }
-end
-
 local function normalizeQualifiedUnitRef(value)
     local ref = Normalization.NormalizeRef(value)
     if not ref then
@@ -458,12 +450,24 @@ local function normalizeQualifiedUnitRef(value)
     return ref
 end
 
+local function normalizeOptionalUnitRef(value)
+    return Normalization.NormalizeRef(value)
+end
+
+local function normalizeSummonPetEffect(value)
+    local data = Normalization.EnsureTable(value)
+    return {
+        type = "summon_pet",
+        unitRef = normalizeOptionalUnitRef(data.unitRef),
+        targetEvents = normalizeEventList(data.targetEvents),
+    }
+end
+
 local function normalizeSummonUnitEffect(value)
     local data = Normalization.EnsureTable(value)
     return {
         type = "summon_unit",
         unitRef = normalizeQualifiedUnitRef(data.unitRef),
-        summonAsPet = Normalization.NormalizeBool(data.summonAsPet, false),
         targetEvents = normalizeEventList(data.targetEvents),
     }
 end
