@@ -1134,19 +1134,21 @@ function Client:GetPendingSpellTargetingDisplayState()
             lockedRaidMarker = getUnitRaidMarker(anchorUnit)
             selectedByEventId = {}
             selectedCount = 0
-            if anchorUnit and lockedRaidMarker > 0 then
+            if anchorUnit then
                 selectedByEventId[anchorEventId] = true
                 selectedCount = 1
-                local maxTargets = math.max(1, tonumber(group.policy and group.policy.maxTargets) or 1)
-                for candidateIndex = 1, #candidates do
-                    local candidate = candidates[candidateIndex]
-                    local candidateEventId = tonumber(candidate and candidate.eventID) or 0
-                    if candidateEventId ~= anchorEventId
-                        and getUnitRaidMarker(candidate) == lockedRaidMarker
-                        and selectedCount < maxTargets
-                    then
-                        selectedByEventId[candidateEventId] = true
-                        selectedCount = selectedCount + 1
+                if lockedRaidMarker > 0 then
+                    local maxTargets = math.max(1, tonumber(group.policy and group.policy.maxTargets) or 1)
+                    for candidateIndex = 1, #candidates do
+                        local candidate = candidates[candidateIndex]
+                        local candidateEventId = tonumber(candidate and candidate.eventID) or 0
+                        if candidateEventId ~= anchorEventId
+                            and getUnitRaidMarker(candidate) == lockedRaidMarker
+                            and selectedCount < maxTargets
+                        then
+                            selectedByEventId[candidateEventId] = true
+                            selectedCount = selectedCount + 1
+                        end
                     end
                 end
             else
@@ -1172,7 +1174,7 @@ function Client:GetPendingSpellTargetingDisplayState()
                 selected = selectedByEventId[numericEventId] == true,
                 enabled = targetType ~= "all_allies"
                     and (targetType ~= "raid_marker"
-                        or lockedRaidMarker == 0
+                        or selectedCount == 0
                         or selectedByEventId[numericEventId] == true),
             }
         end
@@ -1181,6 +1183,8 @@ function Client:GetPendingSpellTargetingDisplayState()
         local maxTargets = math.max(minTargets, tonumber(group.policy and group.policy.maxTargets) or 0)
         if targetType == "all_allies" then
             maxTargets = #candidates
+        elseif targetType == "raid_marker" and lockedRaidMarker == 0 and selectedCount > 0 then
+            maxTargets = 1
         end
         local focusedTargetEventId = tonumber(group.focusedTargetEventId) or 0
         local selectedUnit = nil
@@ -1582,7 +1586,7 @@ function Client:TogglePendingSpellTarget(eventId)
                 break
             end
         end
-        if getUnitRaidMarker(anchorUnit) <= 0 then
+        if not anchorUnit then
             return false
         end
 

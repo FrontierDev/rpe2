@@ -13,6 +13,8 @@ local Event = Addon.Internal
 Client.AutopilotSpatial = Client.AutopilotSpatial or {}
 local Spatial = Client.AutopilotSpatial
 
+Spatial.RAID_MARKER_NPC_AOE_RADIUS_YARDS = Spatial.RAID_MARKER_NPC_AOE_RADIUS_YARDS or 8
+
 local function normalizeFiniteNumber(value)
     local numeric = tonumber(value)
     if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
@@ -248,6 +250,20 @@ function Spatial.DistanceBetweenCachedUnits(runtime, eventState, leftUnit, right
     end
 
     return Spatial.DistanceBetweenPositions(leftPosition, rightPosition)
+end
+
+function Spatial.IsWithinRaidMarkerNpcAoeRadius(runtime, eventState, primaryUnit, candidateUnit)
+    local distance, reason = Spatial.DistanceBetweenCachedUnits(
+        runtime,
+        eventState,
+        primaryUnit,
+        candidateUnit
+    )
+    if distance == nil then
+        return false, nil, reason
+    end
+
+    return distance <= Spatial.RAID_MARKER_NPC_AOE_RADIUS_YARDS, distance
 end
 
 function Spatial.SetActorPosition(runtime, eventState, actorKey, position)

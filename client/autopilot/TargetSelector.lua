@@ -147,6 +147,24 @@ local function getCachedDistance(runtime, eventState, leftUnit, rightUnit)
     return tonumber(distance)
 end
 
+local function getRaidMarkerNpcAoeDistance(state, entry)
+    if type(Spatial.IsWithinRaidMarkerNpcAoeRadius) ~= "function"
+        or type(state) ~= "table"
+        or type(entry) ~= "table"
+        or type(state.primaryEntry) ~= "table"
+    then
+        return false, nil
+    end
+
+    local withinRadius, distance = Spatial.IsWithinRaidMarkerNpcAoeRadius(
+        state.spatialRuntime,
+        state.eventState,
+        state.primaryEntry.unit,
+        entry.unit
+    )
+    return withinRadius == true, tonumber(distance)
+end
+
 local function buildHostileEntry(state, targetUnit)
     return {
         unit = targetUnit,
@@ -398,9 +416,13 @@ local function markSelected(state, entryIndex)
 
     state.selectedEntries[#state.selectedEntries + 1] = entry
     state.selectedByEventId[eventId] = true
-    if state.kind == "hostile" and state.primaryEntry == nil then
+    if state.primaryEntry == nil
+        and (state.kind == "hostile" or (state.targetType == "raid_marker" and state.isNpcCaster == true))
+    then
         state.primaryEntry = entry
-        state.primarySelectionReason = resolveHostileSelectionReason(state, entry)
+        if state.kind == "hostile" then
+            state.primarySelectionReason = resolveHostileSelectionReason(state, entry)
+        end
     end
     return true
 end
@@ -468,6 +490,12 @@ local function resetSelectionScan(state, phase)
 end
 
 local function compareForPhase(state, left, right)
+    if state.phase == "select-secondary"
+        and state.targetType == "raid_marker"
+        and state.isNpcCaster == true
+    then
+        return compareHostileSecondary(left, right)
+    end
     if state.kind == "healing" then
         return compareHealing(left, right)
     end
@@ -506,6 +534,20 @@ local function completeSelectionPass(state)
     end
 
     if state.targetType == "raid_marker" then
+        if state.isNpcCaster then
+            if state.phase == "select" and state.maxTargets > 1 then
+                state.phase = "prepare-secondary"
+                state.secondaryPrepareIndex = 1
+                return false
+            end
+            if state.phase == "select-secondary" then
+                resetSelectionScan(state, "select-secondary")
+                return false
+            end
+            finishSelection(state)
+            return true
+        end
+
         if state.phase == "select" then
             state.anchorRaidMarker = normalizeRaidMarker(bestEntry.unit and bestEntry.unit.raidMarker)
             if state.anchorRaidMarker <= 0 then
@@ -551,16 +593,6 @@ function Selector.CreateState(activationSnapshot, options)
     end
 
     local targetType = tostring(policy.type or "single")
-    if targetType == "raid_marker" then
-        local markedCandidates = {}
-        for index = 1, #candidates do
-            if normalizeRaidMarker(candidates[index] and candidates[index].raidMarker) > 0 then
-                markedCandidates[#markedCandidates + 1] = candidates[index]
-            end
-        end
-        candidates = markedCandidates
-    end
-
     local tauntSourceEventId, tauntRemainingTurns = 0, 0
     if kind == "hostile" then
         tauntSourceEventId, tauntRemainingTurns = resolveTauntOverride(
@@ -580,6 +612,7 @@ function Selector.CreateState(activationSnapshot, options)
         targetGroupKey = groupKey,
         policy = policy,
         targetType = targetType,
+        isNpcCaster = activationSnapshot.casterUnit.isPlayer ~= true,
         minTargets = policy.minTargets,
         maxTargets = policy.maxTargets,
         candidates = candidates,
@@ -650,12 +683,16 @@ function Selector.Step(state, deadlineMs)
             while state.secondaryPrepareIndex <= #(state.entries or {}) do
                 local entry = state.entries[state.secondaryPrepareIndex]
                 if type(entry) == "table" and entry ~= state.primaryEntry then
-                    entry.primaryDistance = getCachedDistance(
-                        state.spatialRuntime,
-                        state.eventState,
-                        state.primaryEntry and state.primaryEntry.unit,
-                        entry.unit
-                    )
+                    if state.targetType == "raid_marker" and state.isNpcCaster then
+                        entry.raidMarkerAoeEligible, entry.primaryDistance = getRaidMarkerNpcAoeDistance(state, entry)
+                    else
+                        entry.primaryDistance = getCachedDistance(
+                            state.spatialRuntime,
+                            state.eventState,
+                            state.primaryEntry and state.primaryEntry.unit,
+                            entry.unit
+                        )
+                    end
                 end
                 state.secondaryPrepareIndex = state.secondaryPrepareIndex + 1
                 if shouldYield(deadlineMs) then
@@ -678,7 +715,16 @@ function Selector.Step(state, deadlineMs)
                 local entryMarker = normalizeRaidMarker(entry and entry.unit and entry.unit.raidMarker)
                 local markerMatches = state.phase ~= "select-raid-marker"
                     or entryMarker == state.anchorRaidMarker
-                if eventId > 0 and state.selectedByEventId[eventId] ~= true and markerMatches then
+                local raidMarkerNpcAoeMatches = state.phase ~= "select-secondary"
+                    or state.targetType ~= "raid_marker"
+                    or state.isNpcCaster ~= true
+                    or entry == state.primaryEntry
+                    or entry.raidMarkerAoeEligible == true
+                if eventId > 0
+                    and state.selectedByEventId[eventId] ~= true
+                    and markerMatches
+                    and raidMarkerNpcAoeMatches
+                then
                     local best = state.bestEntryIndex and state.entries[state.bestEntryIndex] or nil
                     if type(best) ~= "table" or compareForPhase(state, entry, best) > 0 then
                         state.bestEntryIndex = entryIndex

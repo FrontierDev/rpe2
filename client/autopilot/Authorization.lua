@@ -77,6 +77,28 @@ local function copyPosition(position)
     return type(position) == "table" and copyMap(position) or nil
 end
 
+local function copyPositionMap(values)
+    local copied = {}
+    for key, position in pairs(type(values) == "table" and values or {}) do
+        local copiedPosition = copyPosition(position)
+        if copiedPosition then
+            copied[key] = copiedPosition
+        end
+    end
+    return copied
+end
+
+local function copyPlanSpatialRuntime(completedPlan, runtime)
+    local snapshot = type(completedPlan) == "table" and completedPlan.snapshot or nil
+    return {
+        eventId = tostring(completedPlan and completedPlan.eventId or ""),
+        status = "ready",
+        instanceID = runtime and runtime.instanceID or nil,
+        playerPositionByEventId = copyPositionMap(snapshot and snapshot.playerPositions),
+        positionByActorKey = copyPositionMap(snapshot and snapshot.actorPositions),
+    }
+end
+
 local function copyTargetSelections(values)
     local copied = {}
     for key, targets in pairs(type(values) == "table" and values or {}) do
@@ -416,6 +438,7 @@ function Client:PublishAutopilotPendingPlan(completedPlan, runtimeOverride)
         spellActionIds = {},
         noActions = {},
         warnings = {},
+        spatialRuntime = copyPlanSpatialRuntime(completedPlan, runtime),
     }
 
     local movementById = {}
