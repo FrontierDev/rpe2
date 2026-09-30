@@ -1227,11 +1227,19 @@ function Client:QueueClientResourceSync(reason, options)
 
     local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
     local queuedEventId = type(currentEventState) == "table" and tostring(currentEventState.id or "") or ""
-    local targetEventId = tonumber(options.targetEventId) or 0
-    if targetEventId > 0 and (type(currentEventState) ~= "table" or currentEventState.active ~= true) then
+    local targetEventId = tonumber(options.targetEventId)
+    if targetEventId and targetEventId > 0
+        and (type(currentEventState) ~= "table" or currentEventState.active ~= true)
+    then
         return false
     end
     if self.ResourceSyncQueued and tostring(self.ResourceSyncQueuedEventId or "") == queuedEventId then
+        return true
+    end
+    if queuedEventId ~= ""
+        and tostring(self.ResourceSyncTransactionEventId or "") == queuedEventId
+        and tostring(self.ResourceSyncTransactionId or "") ~= ""
+    then
         return true
     end
 
@@ -1259,7 +1267,25 @@ function Client:QueueClientResourceSync(reason, options)
             return
         end
 
-        targetClient:SendClientResources(expectedState, syncReason, queuedPlayerName, queuedResources, targetEventId)
+        local sent, transactionId = targetClient:SendClientResources(
+            expectedState,
+            syncReason,
+            queuedPlayerName,
+            queuedResources,
+            targetEventId,
+            { startupResourceSync = true }
+        )
+        local pending = type(targetClient.EventTransactions) == "table"
+            and type(targetClient.EventTransactions.GetPending) == "function"
+            and targetClient.EventTransactions:GetPending(transactionId, expectedEventId)
+            or nil
+        if sent == true and transactionId and expectedEventId ~= "" and pending then
+            targetClient.ResourceSyncTransactionEventId = expectedEventId
+            targetClient.ResourceSyncTransactionId = transactionId
+        elseif tostring(targetClient.ResourceSyncTransactionEventId or "") == expectedEventId then
+            targetClient.ResourceSyncTransactionEventId = nil
+            targetClient.ResourceSyncTransactionId = nil
+        end
     end, self, state, queuedEventId, reason, playerName, capturedResources)
     if not enqueued then
         if tostring(self.ResourceSyncQueuedEventId or "") == queuedEventId then
@@ -1395,7 +1421,7 @@ local submitEventResourceTransaction
 
 -- Sends the current profile resources to the server for the given session state. 
 -- Returns true if the send was accepted, false otherwise.
-function Client:SendClientResources(state, reason, playerNameOverride, resourcesOverride, targetEventIdOverride)
+function Client:SendClientResources(state, reason, playerNameOverride, resourcesOverride, targetEventIdOverride, options)
     if not state or state.active ~= true then
         if Debug and Debug.Error then
             Debug.Error("RESOURCE sync skipped: client session is inactive.")
@@ -1411,7 +1437,7 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
     end
 
     bindStateSessionRuntime(state)
-    local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
+    options = type(options) == "table" and options or {}
     local channelId = resolveChannelId(state)
     if not channelId then
         if Debug and Debug.Error then
@@ -1446,7 +1472,10 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
         return false
     end
 
-    local targetEventId = tonumber(targetEventIdOverride) or authoritativeTargetEventId or 0
+    local targetEventId = tonumber(targetEventIdOverride)
+    if not targetEventId or targetEventId <= 0 then
+        targetEventId = authoritativeTargetEventId or 0
+    end
     if targetEventId > 0 then
         if type(ResourceSync.NormalizeResources) ~= "function" then
             if Debug and Debug.Error then
@@ -1478,15 +1507,9 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
             { targetEventId },
             {
                 stepSensitive = false,
+                startupResourceSync = options.startupResourceSync == true,
             }
         )
-        if sent == true
-            and type(currentEventState) == "table"
-            and currentEventState.active == true
-            and currentEventState.channelName == state.channelName
-        then
-            state.lastResourceSyncEventId = currentEventState.id
-        end
         return sent, transactionId
     end
 
@@ -1531,13 +1554,6 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
             )
         end
         return false
-    end
-
-    if type(currentEventState) == "table"
-        and currentEventState.active == true
-        and currentEventState.channelName == state.channelName
-    then
-        state.lastResourceSyncEventId = currentEventState.id
     end
 
     return true
@@ -1660,6 +1676,26 @@ submitEventResourceTransaction = function(client, state, operation, reason, inpu
         return false, createReason or "transaction-create-failed"
     end
     record.options.onTerminal = function(envelope)
+        local terminalEventState = client.GetEventState and client:GetEventState() or client.EventState
+        local terminalTargetEventId = tonumber(envelope and envelope.targetEventIds and envelope.targetEventIds[1]) or 0
+        local startupTargetEventId = tonumber(input and input.targetEventId) or 0
+        if tostring(client.ResourceSyncTransactionId or "") == tostring(envelope and envelope.transactionId or "") then
+            client.ResourceSyncTransactionEventId = nil
+            client.ResourceSyncTransactionId = nil
+        end
+        if options.startupResourceSync == true then
+            local committed = envelope and envelope.state == "committed"
+                and envelope.operation == "event-resource-replace"
+                and startupTargetEventId > 0
+                and terminalTargetEventId == startupTargetEventId
+                and type(terminalEventState) == "table"
+                and terminalEventState.active == true
+                and tostring(envelope.eventId or "") == tostring(terminalEventState.id or "")
+                and terminalEventState.channelName == state.channelName
+            if committed then
+                state.lastResourceSyncEventId = terminalEventState.id
+            end
+        end
         client:HandleEventResourceTransactionTerminal(envelope)
     end
     local submitted, submitReason = transactions:Submit(record, input)

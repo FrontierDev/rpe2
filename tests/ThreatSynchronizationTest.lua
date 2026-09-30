@@ -82,11 +82,25 @@ end
 
 local ResourceSync = Addon.Internal.Comms.ResourceSync
 ResourceSync.CloneResources = cloneResources
+ResourceSync.NormalizeResources = cloneResources
+ResourceSync.UpdateEventReadiness = function(eventState)
+    return eventState
+end
 ResourceSync.CoalesceResourceDeltas = function(resourceDeltas)
     return resourceDeltas or {}
 end
 ResourceSync.CoalesceTargetedResourceDeltas = function(targetedResourceDeltas)
     return targetedResourceDeltas or {}
+end
+ResourceSync.ApplyResourcesToEventUnitByEventID = function(units, eventId, resources)
+    for index = 1, #(units or {}) do
+        local unit = units[index]
+        if tonumber(unit and unit.eventID) == tonumber(eventId) then
+            unit.resources = cloneResources(resources)
+            return true, unit
+        end
+    end
+    return false, nil
 end
 ResourceSync.ApplyResourceDeltasToEventUnitByEventID = function(units, eventId, deltas)
     local target = nil

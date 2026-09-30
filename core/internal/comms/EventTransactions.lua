@@ -1142,6 +1142,13 @@ function ServerService:_publish(envelope, recipient)
         transactionId = envelope.transactionId,
         eventId = envelope.eventId,
     }
+    -- Resource transactions already publish their authoritative state through
+    -- EVENT_UNIT_DELTA_BATCH. Their terminal exists only to settle the origin
+    -- transaction; broadcasting it on the same throttled channel can prevent
+    -- the host from ever receiving that terminal and cause replay traffic.
+    if tostring(envelope.operation or ""):sub(1, 15) == "event-resource-" then
+        return sendPayload(key, envelope, "WHISPER", recipient or envelope.originName, metadata)
+    end
     if envelope.state == "committed" or envelope.state == "cancelled" then
         return sendToChannel(key, envelope, channelIdFor(eventState), metadata)
     end

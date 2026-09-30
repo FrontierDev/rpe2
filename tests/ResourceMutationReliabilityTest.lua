@@ -458,6 +458,25 @@ do
     })
     local eventId = host.EventState.id
     local serverState = host.Addon.Server.EventState
+    local resourceOpcode = host.Addon.Internal.Comms.Operations:GetOpcode("RESOURCE")
+    local commitOpcode = host.Addon.Internal.Comms.EventTransactions.Opcodes.EVENT_TX_COMMIT
+    local startupRecords = {}
+    local startupSubmissionCounts = {}
+
+    local function captureStartupSubmission(node)
+        local originalSend = node.Addon.Client.SendClientResources
+        node.Addon.Client.SendClientResources = function(client, ...)
+            local sent, transactionId = originalSend(client, ...)
+            if sent == true and transactionId then
+                startupRecords[node.Name] = client.EventTransactions:GetPending(transactionId, eventId)
+                startupSubmissionCounts[node.Name] = (startupSubmissionCounts[node.Name] or 0) + 1
+            end
+            return sent, transactionId
+        end
+    end
+
+    captureStartupSubmission(playerA)
+    captureStartupSubmission(playerB)
 
     assertEqual(0, serverState.liveUnitRevision, "startup regression begins at revision zero")
     assertTrue(resourceByRef(findUnit(serverState, 2).resources, "health") == nil,
@@ -472,9 +491,35 @@ do
     assertTrue(playerA.SessionState.lastResourceSyncEventId == nil,
         "queued startup sync is not marked complete before submission")
     world:AdvanceTime(0)
-    assertEqual(eventId, playerA.SessionState.lastResourceSyncEventId,
-        "PlayerA startup completion recorded after transaction submission")
+    assertTrue(startupRecords.PlayerA ~= nil, "PlayerA startup transaction was captured")
+    assertEqual("event-resource-replace", startupRecords.PlayerA.envelope.operation,
+        "PlayerA startup uses the authoritative replace operation")
+    assertEqual(2, startupRecords.PlayerA.envelope.targetEventIds[1],
+        "PlayerA startup targets its live EventUnit")
+    assertEqual(2, startupRecords.PlayerA.envelope.input.targetEventId,
+        "PlayerA startup input targets its live EventUnit")
+    assertTrue(playerA.SessionState.lastResourceSyncEventId == nil,
+        "startup completion waits for the committed terminal")
+    assertTrue(playerA.Addon.Client:QueueClientResourceSync("startup-duplicate"),
+        "duplicate startup request is accepted as an in-flight no-op")
+    world:AdvanceTime(0)
+    assertEqual(1, startupSubmissionCounts.PlayerA,
+        "only one PlayerA replacement exists before its terminal")
+    for _, send in ipairs(world.Router.sendHistory) do
+        assertTrue(not (send.sender == "PlayerA" and send.opcode == resourceOpcode),
+            "PlayerA startup did not use legacy RESOURCE")
+    end
     world:DeliverAll()
+    assertEqual(eventId, playerA.SessionState.lastResourceSyncEventId,
+        "PlayerA startup completion recorded after committed terminal")
+    for _, send in ipairs(world.Router.sendHistory) do
+        if send.sender == "Host" and send.opcode == commitOpcode then
+            assertEqual("WHISPER", send.distribution,
+                "resource transaction terminal is sent only to its origin")
+            assertEqual("PlayerA", send.target,
+                "PlayerA resource terminal is not broadcast to peers")
+        end
+    end
 
     assertEqual(1, serverState.liveUnitRevision, "PlayerA replacement advanced revision once")
     assertTrue(resourceByRef(findUnit(playerB.EventState, 3).resources, "health") == nil,
@@ -485,9 +530,22 @@ do
     assertTrue(playerB.Addon.Client:QueueClientResourceSync("startup-player-b"),
         "PlayerB startup resource sync queued after revision advanced")
     world:AdvanceTime(0)
-    assertEqual(eventId, playerB.SessionState.lastResourceSyncEventId,
-        "PlayerB startup completion recorded after its own submission")
+    assertTrue(startupRecords.PlayerB ~= nil, "PlayerB startup transaction was captured")
+    assertEqual("event-resource-replace", startupRecords.PlayerB.envelope.operation,
+        "PlayerB startup uses the authoritative replace operation")
+    assertEqual(3, startupRecords.PlayerB.envelope.targetEventIds[1],
+        "PlayerB startup targets its live EventUnit")
+    assertEqual(3, startupRecords.PlayerB.envelope.input.targetEventId,
+        "PlayerB startup input targets its live EventUnit")
+    assertTrue(playerB.SessionState.lastResourceSyncEventId == nil,
+        "PlayerB startup completion waits for the committed terminal")
+    for _, send in ipairs(world.Router.sendHistory) do
+        assertTrue(not (send.sender == "PlayerB" and send.opcode == resourceOpcode),
+            "PlayerB startup did not use legacy RESOURCE")
+    end
     world:DeliverAll()
+    assertEqual(eventId, playerB.SessionState.lastResourceSyncEventId,
+        "PlayerB startup completion recorded after committed terminal")
 
     assertEqual(2, stats.broadcasts, "each player replacement committed exactly once")
     for _, node in ipairs(world.nodes) do
@@ -505,6 +563,40 @@ do
     end
     assertEqual(0, host.Addon.Server.EventTransactions:GetDiagnosticsSnapshot().pendingCount,
         "server startup pending transactions")
+end
+
+-- A rejected startup replacement must not satisfy the local completion marker;
+-- the same startup path must be able to submit again after the rejection.
+do
+    local world, host, playerA = setup({ eventId = "startup-resource-retry" })
+    local eventId = host.EventState.id
+
+    assertTrue(playerA.Addon.Client:QueueClientResourceSync("startup-rejected"),
+        "rejected startup resource sync queued")
+    world:AdvanceTime(0)
+    host.Addon.Server.EventState.active = false
+    world:DeliverAll()
+
+    local terminal = playerA.Addon.Client.EventTransactions.TerminalTransactions[eventId]
+    local terminalRecord
+    for _, record in pairs(terminal or {}) do
+        terminalRecord = record
+        break
+    end
+    assertTrue(terminalRecord ~= nil, "rejected startup transaction terminal received")
+    assertEqual("rejected", terminalRecord.state, "startup replacement rejection is terminal")
+    assertTrue(playerA.SessionState.lastResourceSyncEventId == nil,
+        "rejected startup replacement does not complete resource sync")
+
+    host.Addon.Server.EventState.active = true
+    assertTrue(playerA.Addon.Client:QueueClientResourceSync("startup-retry"),
+        "rejected startup resource sync remains retryable")
+    world:AdvanceTime(0)
+    assertTrue(playerA.SessionState.lastResourceSyncEventId == nil,
+        "retried startup replacement waits for its committed terminal")
+    world:DeliverAll()
+    assertEqual(eventId, playerA.SessionState.lastResourceSyncEventId,
+        "retried startup replacement completes after commit")
 end
 
 local function sendDelta(player, reason, targetEventId, delta, options)
