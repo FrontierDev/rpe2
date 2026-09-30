@@ -1548,6 +1548,172 @@ local function isDefaultProfileRecord(record)
         and isEmptyProfileGuildState(profile.guild)
 end
 
+local PROFILE_SEQUENCE_FIELDS = {
+    ["spellbook"] = true,
+    ["recipebook"] = true,
+    ["traits"] = true,
+    ["activeTraits"] = true,
+    ["inactiveTraits"] = true,
+    ["selectedClassTalentTraits"] = true,
+    ["preferredConsumables"] = true,
+    ["setupWizard.startingItemRefs"] = true,
+    ["recipeKnowledge.knownRecipeRefs"] = true,
+    ["recipeKnowledge.unknownTrainerRecipeRefs"] = true,
+}
+
+local function isProfileSequenceField(path)
+    return PROFILE_SEQUENCE_FIELDS[path] == true
+end
+
+local function areProfileValuesEqual(left, right)
+    if type(left) ~= type(right) then
+        return false
+    end
+
+    if type(left) ~= "table" then
+        return left == right
+    end
+
+    for key, leftValue in pairs(left) do
+        if not areProfileValuesEqual(leftValue, right[key]) then
+            return false
+        end
+    end
+
+    for key in pairs(right) do
+        if left[key] == nil then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function isDefaultProfileMergeValue(path, value)
+    if value == nil then
+        return true
+    end
+
+    if path == "level" then
+        return tonumber(value) == getRulesetStartingLevel()
+    end
+
+    if path == "widgets.actionBarMode" then
+        return ensureString(value, "spells") == "spells"
+    end
+
+    if string.match(path, "%.rewardState%.status$") then
+        return ensureString(value, "pending") == "pending"
+    end
+
+    local valueType = type(value)
+    if valueType == "boolean" then
+        return value ~= true
+    end
+
+    if valueType == "number" then
+        return value == 0
+    end
+
+    if valueType == "string" then
+        return value == ""
+    end
+
+    if valueType ~= "table" then
+        return false
+    end
+
+    if next(value) == nil then
+        return true
+    end
+
+    for key, nestedValue in pairs(value) do
+        local nestedPath = path ~= ""
+            and (path .. "." .. tostring(key))
+            or tostring(key)
+        if not isDefaultProfileMergeValue(nestedPath, nestedValue) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function reportDuplicateProfileConflict(characterKey, path)
+    local debug = Addon.Debug
+    if debug and type(debug.Internal) == "function" then
+        debug.Internal(
+            "Duplicate profile conflict for %s at %s; canonical value preserved.",
+            tostring(characterKey),
+            tostring(path)
+        )
+    end
+end
+
+local function mergeDuplicateProfileValue(canonicalValue, legacyValue, path, characterKey)
+    local canonicalIsDefault = isDefaultProfileMergeValue(path, canonicalValue)
+    local legacyIsDefault = isDefaultProfileMergeValue(path, legacyValue)
+
+    if canonicalIsDefault and not legacyIsDefault then
+        return deepCopy(legacyValue)
+    end
+
+    if legacyIsDefault or areProfileValuesEqual(canonicalValue, legacyValue) then
+        return canonicalValue
+    end
+
+    if type(canonicalValue) ~= "table" or type(legacyValue) ~= "table" then
+        reportDuplicateProfileConflict(characterKey, path)
+        return canonicalValue
+    end
+
+    if isProfileSequenceField(path) then
+        reportDuplicateProfileConflict(characterKey, path)
+        return canonicalValue
+    end
+
+    local keys = {}
+    for key in pairs(legacyValue) do
+        keys[#keys + 1] = key
+    end
+    table.sort(keys, compareSerializedTableKeys)
+
+    for index = 1, #keys do
+        local key = keys[index]
+        local nestedPath = path ~= ""
+            and (path .. "." .. tostring(key))
+            or tostring(key)
+        canonicalValue[key] = mergeDuplicateProfileValue(
+            canonicalValue[key],
+            legacyValue[key],
+            nestedPath,
+            characterKey
+        )
+    end
+
+    return canonicalValue
+end
+
+local function mergeDuplicateProfileRecords(canonicalProfile, legacyProfile, characterKey)
+    local keys = {}
+    for key in pairs(legacyProfile) do
+        if key ~= "characterKey" and key ~= "name" then
+            keys[#keys + 1] = key
+        end
+    end
+    table.sort(keys, compareSerializedTableKeys)
+
+    for index = 1, #keys do
+        local key = keys[index]
+        canonicalProfile[key] = mergeDuplicateProfileValue(
+            canonicalProfile[key],
+            legacyProfile[key],
+            tostring(key),
+            characterKey
+        )
+    end
+end
+
 local function migrateUnknownPlayerProfile(root, normalizedProfiles)
     if type(root) ~= "table" then
         return false, false
@@ -1609,7 +1775,10 @@ local function migrateBareNameProfile(root, normalizedProfiles)
     local legacyProfile = profiles[bareName]
     local authoritativeProfile = profiles[characterKey]
     if type(authoritativeProfile) == "table" then
-        if type(legacyProfile) == "table" and isDefaultProfileRecord(legacyProfile) then
+        if type(legacyProfile) == "table" then
+            mergeDuplicateProfileRecords(authoritativeProfile, legacyProfile, characterKey)
+            authoritativeProfile.characterKey = characterKey
+            authoritativeProfile.name = displayName ~= "" and displayName or ensureString(authoritativeProfile.name, characterKey)
             profiles[bareName] = nil
             return false, true
         end
