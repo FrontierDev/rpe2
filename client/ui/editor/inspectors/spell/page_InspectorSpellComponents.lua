@@ -503,9 +503,13 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                 self:CommitSelectedSpell(function()
                     local nextEffect = shallowCloneTable(component.effect)
                     nextEffect.type = value
-                    -- Unit references are authored only by the Summon Unit
-                    -- selector, never carried across effect-type changes.
+                    -- Summon Unit-only fields are never carried across
+                    -- effect-type changes.
                     nextEffect.unitRef = nil
+                    nextEffect.summonAsPet = nil
+                    if value == "summon_unit" then
+                        nextEffect.summonAsPet = false
+                    end
                     if value == "apply_aura" then
                         nextEffect.stacks = tonumber(nextEffect.stacks or nextEffect.auraStacks) or 1
                         nextEffect.statScaling = nil
@@ -1121,6 +1125,28 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
     })
     self.SpellInspectorSummonUnitGroup:AddChild(self.SpellInspectorSummonUnitDropdown)
     attachMouseWheel(self.SpellInspectorSummonUnitDropdown)
+
+    self.SpellInspectorSummonUnitAsPetCheckbox = self:CreateSpellInspectorCheckbox(
+        root:GetFrame(),
+        "RPEDataEditorSpellInspectorSummonUnitAsPetCheckbox",
+        "Summon as Pet",
+        false,
+        function(checked)
+            if self._refreshingSpellInspector then
+                return
+            end
+
+            local component = self:GetSelectedSpellInspectorComponent()
+            if component and tostring(component.effect and component.effect.type or "") == "summon_unit" then
+                self:CommitSelectedSpell(function()
+                    component.effect.summonAsPet = checked == true
+                end)
+            end
+        end
+    )
+    self.SpellInspectorSummonUnitAsPetCheckbox._visibleHeight = 18
+    root:AddChild(self.SpellInspectorSummonUnitAsPetCheckbox)
+    attachMouseWheel(self.SpellInspectorSummonUnitAsPetCheckbox)
 
     self.SpellInspectorCasterEventsGroup = createGroup("RPEDataEditorSpellInspectorCasterEventsGroup", "Caster Events (Spell)", 18)
     self.SpellInspectorCasterEventsDropdown = UI.CreateDropdown(self.SpellInspectorCasterEventsGroup:GetFrame(), "RPEDataEditorSpellInspectorCasterEventsDropdown", {
