@@ -57,6 +57,7 @@ local function ensureDatasetEntryCache(dataset, collectionKey)
 
     local revision = getConfigurationRevision()
     local entries = dataset[collectionKey]
+    local entryCount = #(entries or {})
     local cacheByCollection = type(dataset.__entryCacheByCollection) == "table" and dataset.__entryCacheByCollection or {}
     dataset.__entryCacheByCollection = cacheByCollection
 
@@ -64,6 +65,7 @@ local function ensureDatasetEntryCache(dataset, collectionKey)
     if type(cached) == "table"
         and cached.revision == revision
         and cached.entries == entries
+        and cached.entryCount == entryCount
     then
         return cached.byId
     end
@@ -80,6 +82,7 @@ local function ensureDatasetEntryCache(dataset, collectionKey)
     cacheByCollection[collectionKey] = {
         revision = revision,
         entries = entries,
+        entryCount = entryCount,
         byId = byId,
     }
     return byId
@@ -273,8 +276,8 @@ function Registry:GenerateActivatedDatasetsHash()
             and Database.ExportDatasetForCompatibilityHash(datasetId)
             or nil
         if type(exportText) ~= "string" or exportText == "" then
-            local dataset = Database.GetDatasetByID and Database.GetDatasetByID(datasetId) or nil
-            exportText = tostring(dataset and dataset.name or "")
+            error(("Unable to generate compatibility export for dataset '%s'.")
+                :format(datasetId), 2)
         end
 
         segments[#segments + 1] = datasetId
@@ -307,10 +310,12 @@ function Registry:GenerateActiveRulesetHash()
         return nil
     end
 
-    local exportText = Database.ExportRuleset and Database.ExportRuleset(rulesetId) or nil
+    local exportText = Database.ExportRulesetForCompatibilityHash
+        and Database.ExportRulesetForCompatibilityHash(rulesetId)
+        or nil
     if type(exportText) ~= "string" or exportText == "" then
-        local ruleset = Database.GetRulesetByID and Database.GetRulesetByID(rulesetId) or nil
-        exportText = tostring(ruleset and ruleset.name or "")
+        error(("Unable to generate compatibility export for ruleset '%s'.")
+            :format(tostring(rulesetId)), 2)
     end
 
     local hash = generateHashFromSegments(RULESET_HASH_SALTS, {
@@ -421,13 +426,8 @@ local function findUnitRecord(unitRef, includeInactive)
     for datasetIndex = 1, #datasets do
         local dataset = datasets[datasetIndex]
         if dataset and tostring(dataset.id or "") == datasetId then
-            for unitIndex = 1, #(dataset.units or {}) do
-                local unit = dataset.units[unitIndex]
-                if unit and tostring(unit.id or "") == unitId then
-                    return dataset, unit
-                end
-            end
-            return dataset, nil
+            local byId = ensureDatasetEntryCache(dataset, "units")
+            return dataset, byId and byId[unitId] or nil
         end
     end
 

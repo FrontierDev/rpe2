@@ -583,6 +583,17 @@ function Combat:IsWeaponBasedDamageEffect(effect)
     return type(effect) == "table" and tostring(effect.weaponDamageMode or "none") ~= "none"
 end
 
+function Combat:ResolvePrimaryWeaponSlotForEffect(effect, component, attackTypeOverride)
+    local attackType = tostring(attackTypeOverride or self:ResolveHitCheckAttackType(effect, component) or "")
+    local hitType = tostring(effect and effect.hitType or "ability")
+
+    if attackType == "ranged" or (attackType == "spell" and hitType == "auto") then
+        return "ranged", "rangedWeapon"
+    end
+
+    return "mainhand", "mainHandWeapon"
+end
+
 function Combat:ResolveWeaponRefsForEffect(attackerUnit, effect, component)
     local attackType = self:ResolveHitCheckAttackType(effect, component)
     local weaponDamageMode = tostring(effect and effect.weaponDamageMode or "none")
@@ -590,8 +601,7 @@ function Combat:ResolveWeaponRefsForEffect(attackerUnit, effect, component)
         return {}
     end
 
-    local primarySlotKey = attackType == "ranged" and "ranged" or "mainhand"
-    local primaryField = attackType == "ranged" and "rangedWeapon" or "mainHandWeapon"
+    local primarySlotKey, primaryField = self:ResolvePrimaryWeaponSlotForEffect(effect, component, attackType)
     local rows = {}
 
     local function appendWeapon(slotKey, fallbackField)
@@ -982,9 +992,12 @@ function Combat:ResolveResourceEffectAmount(context, effect)
             and ((localUnit == targetUnit) or (targetEventId and localEventId and targetEventId == localEventId))
 
         if isLocalPlayer and type(Profile.GetResolvedBaseResourceValue) == "function" then
-            resourceValue = tonumber(Profile.GetResolvedBaseResourceValue(resourceRef, {
+            -- GetResolvedBaseResourceValue also returns its resolved row. The
+            -- parentheses retain only the numeric first return before tonumber
+            -- sees it as an optional base argument.
+            resourceValue = tonumber((Profile.GetResolvedBaseResourceValue(resourceRef, {
                 includeAuraBonuses = false,
-            })) or 0
+            }))) or 0
         end
     end
 

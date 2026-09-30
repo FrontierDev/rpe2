@@ -38,6 +38,18 @@ end
 local savedManagerRoot = rawget(_G, "RPEngineManagerDB")
 local savedDatasetRoot = rawget(_G, "RPEngineDatasetDB")
 local savedGetServerTime = rawget(_G, "GetServerTime")
+local savedChatFrame = rawget(_G, "DEFAULT_CHAT_FRAME")
+local chatMessages = {}
+rawset(_G, "DEFAULT_CHAT_FRAME", {
+    AddMessage = function(_, message, red, green, blue)
+        chatMessages[#chatMessages + 1] = {
+            message = message,
+            red = red,
+            green = green,
+            blue = blue,
+        }
+    end,
+})
 
 local databaseState = {
     datasets = {},
@@ -68,7 +80,7 @@ function Database.ImportDataset(payload)
         return nil, "Invalid test dataset payload."
     end
 
-    local dataset = { id = datasetId }
+    local dataset = { id = datasetId, name = "Dataset " .. datasetId }
     databaseState.datasets[datasetId] = dataset
     return dataset
 end
@@ -156,6 +168,10 @@ local hashC = string.rep("c", 64)
 
 local firstResult = install("phase2-test", "dataset-a", 1, hashA)
 assertEqual(firstResult.status, "succeeded", "first install succeeds")
+assertEqual(chatMessages[1].message, "|TInterface\\AddOns\\RPEngine2\\data\\textures\\ui\\rpe.png:14:14|t Dataset dataset-a was installed.", "first install announces the dataset")
+assertEqual(chatMessages[1].red, 0, "first install announcement is green red channel")
+assertEqual(chatMessages[1].green, 1, "first install announcement is green green channel")
+assertEqual(chatMessages[1].blue, 0, "first install announcement is green blue channel")
 local initialManifest = deepCopy(root.installedPackages["phase2-test"])
 assertEqual(initialManifest.datasetId, "dataset-a", "new manifest identifies the dataset")
 assertEqual(initialManifest.revision, 1, "new manifest stores the revision")
@@ -183,6 +199,7 @@ assertDeepEqual(root.installedPackages["phase2-test"], initialManifest, "catalog
 
 local updatedResult = install("phase2-test", "dataset-a", 2, hashB)
 assertEqual(updatedResult.status, "succeeded", "higher revision succeeds")
+assertEqual(chatMessages[2].message, "|TInterface\\AddOns\\RPEngine2\\data\\textures\\ui\\rpe.png:14:14|t Dataset dataset-a was updated to version 2.", "update announces the dataset version")
 assertEqual(databaseState.importCalls, importsBeforeConflicts + 1, "higher revision imports once")
 local updatedManifest = deepCopy(root.installedPackages["phase2-test"])
 assertEqual(updatedManifest.revision, 2, "higher revision advances the manifest")
@@ -239,4 +256,5 @@ assertDeepEqual(rawget(_G, "RPEngineDatasetDB"), unchangedDatasetRoot, "manager 
 rawset(_G, "RPEngineManagerDB", savedManagerRoot)
 rawset(_G, "RPEngineDatasetDB", savedDatasetRoot)
 rawset(_G, "GetServerTime", savedGetServerTime)
+rawset(_G, "DEFAULT_CHAT_FRAME", savedChatFrame)
 print("ExternalManagerPackageStateTest passed")

@@ -461,6 +461,39 @@ local function getInstallationTimestamp()
     return nil
 end
 
+local function escapeChatMarkup(value)
+    return tostring(value or ""):gsub("|", "||")
+end
+
+local function getRPEIconMarkup()
+    local inline = Addon.UI and Addon.UI.Inline or nil
+    if type(inline) == "table" and type(inline.Get) == "function" then
+        local callOk, iconMarkup = pcall(inline.Get, inline, "RPE", 14, 14)
+        if callOk and type(iconMarkup) == "string" and iconMarkup ~= "" then
+            return iconMarkup
+        end
+    end
+
+    return "|TInterface\\AddOns\\RPEngine2\\data\\textures\\ui\\rpe.png:14:14|t"
+end
+
+local function announceDatasetImport(dataset, revision, wasUpdate)
+    if not (DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function") then
+        return false
+    end
+
+    local datasetName = type(Database.GetDatasetDisplayName) == "function"
+        and Database.GetDatasetDisplayName(dataset)
+        or (type(dataset) == "table" and dataset.name)
+        or "Unnamed Dataset"
+    local message = wasUpdate
+        and ("%s was updated to version %d."):format(escapeChatMarkup(datasetName), revision)
+        or ("%s was installed."):format(escapeChatMarkup(datasetName))
+
+    DEFAULT_CHAT_FRAME:AddMessage(("%s %s"):format(getRPEIconMarkup(), message), 0, 1, 0)
+    return true
+end
+
 local INSTALL_FIELDS = {
     "requestId",
     "operation",
@@ -753,6 +786,7 @@ local function processInstallDataset(root, operation, requestId, operationName, 
     end
 
     local existingEntry = root.installedPackages[catalogueId]
+    local wasUpdate = existingEntry ~= nil
     if existingEntry ~= nil then
         if not validateManifestEntry(existingEntry) then
             fail(
@@ -838,6 +872,8 @@ local function processInstallDataset(root, operation, requestId, operationName, 
     if not result then
         error("Could not persist a complete install_dataset result.")
     end
+
+    announceDatasetImport(importedDataset, revision, wasUpdate)
 end
 
 local function processRemoveDataset(root, operation, requestId, operationName, identity)

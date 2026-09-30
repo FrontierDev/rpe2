@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 32,
+    version = 42,
     dataset = {
         achievements = {},
         auras = {},
@@ -3252,13 +3252,13 @@ Addon.Data.DefaultDatasets:Register({
                             hitType = "auto",
                             projectilePath = "",
                             projectileSpeed = 0,
-                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:xqz0daz2" } },
+                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:v2rs9cpy" } },
                             targetEvents = { "on_auto_attack_taken" },
                             threatCoefficient = 1,
                             type = "damage",
                             usesProjectile = false,
                             weaponDamageCoefficient = 1,
-                            weaponDamageMode = "none"
+                            weaponDamageMode = "main_hand"
                         },
                         key = "shoota01",
                         target = { allowDeadTargets = false, disableSelfCast = false, maxTargets = 1, minTargets = 1, requiresTarget = true, targetDisposition = "enemy", type = "single" }
@@ -3316,9 +3316,9 @@ Addon.Data.DefaultDatasets:Register({
                             alwaysHits = false, amountMode = "flat", applyAura = false, auraStacks = 1, baseDamage = 0,
                             damageSchoolRefs = { "f82db71a:v1azo4j6" }, damageType = "ranged", hitType = "auto",
                             projectilePath = "", projectileSpeed = 0,
-                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:xqz0daz2" } },
+                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:v2rs9cpy" } },
                             targetEvents = { "on_auto_attack_taken" }, threatCoefficient = 1, type = "damage", usesProjectile = false,
-                            weaponDamageCoefficient = 1, weaponDamageMode = "none"
+                            weaponDamageCoefficient = 1, weaponDamageMode = "main_hand"
                         },
                         key = "throwa01",
                         target = { allowDeadTargets = false, disableSelfCast = false, maxTargets = 1, minTargets = 1, requiresTarget = true, targetDisposition = "enemy", type = "single" }
@@ -3348,11 +3348,11 @@ Addon.Data.DefaultDatasets:Register({
                         castingGroup = "default",
                         effect = {
                             alwaysHits = false, amountMode = "flat", applyAura = false, auraStacks = 1, baseDamage = 0,
-                            damageSchoolRefs = { "f82db71a:v1azo4j6" }, damageType = "ranged", hitType = "auto",
+                            damageSchoolRefs = { "f82db71a:v1azo4j6" }, damageType = "spell", hitType = "auto",
                             projectilePath = "", projectileSpeed = 0,
-                            statScaling = { { coefficient = 0.5, statRef = "f82db71a:xqz0daz2" } },
+                            statScaling = { { coefficient = 1.0, statRef = "f82db71a:7t7xgzcx" } },
                             targetEvents = { "on_auto_attack_taken" }, threatCoefficient = 1, type = "damage", usesProjectile = false,
-                            weaponDamageCoefficient = 1, weaponDamageMode = "none"
+                            weaponDamageCoefficient = 1, weaponDamageMode = "main_hand"
                         },
                         key = "wandauto",
                         target = { allowDeadTargets = false, disableSelfCast = false, maxTargets = 1, minTargets = 1, requiresTarget = true, targetDisposition = "enemy", type = "single" }
@@ -3364,7 +3364,7 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Wand", range = 0, resourceCosts = {}, seedNPCSpell = true, spellbookCategory = "", tags = {}, tooltipTemplate = true,
                 tooltipTemplateData = {
                     auraSections = {},
-                    mainText = "Basic ranged attack. Deal {DAMAGE_1} Physical damage to an enemy.",
+                    mainText = "Basic spell attack. Deal {DAMAGE_1} Physical damage to an enemy.",
                     tokens = { { applyMode = "damage_range", componentIndex = 1, key = "DAMAGE_1", tokenType = "spell_damage_range" } },
                     version = 1
                 },
@@ -3480,7 +3480,234 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 totalTicks = 0,
                 useCooldownCharges = false
-            }
+            },
+{
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {
+            "on_auto_attack_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraRef = "f82db71a:r0r1vl0a",
+                    auraStacks = 1,
+                    baseDamage = 0,
+                    damageSchoolRefs = {
+                        "f82db71a:v1azo4j6",
+                    },
+                    damageType = "melee",
+                    hitType = "auto",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.5,
+                            statRef = "f82db71a:u7b49vs9",
+                        },
+                    },
+                    targetEvents = {
+                        "on_auto_attack_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 1,
+                    weaponDamageMode = "main_hand",
+                },
+                key = "npcmulti",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {
+            {
+                invert = false,
+                showOnTooltip = true,
+                slotKey = "mainhand",
+                tooltipTextOverride = "Requires main hand",
+                type = "item_equipped",
+                weaponTypeRefs = {  },
+            },
+        },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/petbattle_attack.blp",
+        id = "npcmulti",
+        cooldownChannel = 4,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Multiattack",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = true,
+        spellbookCategory = "",
+        tags = {
+            "npc",
+            "basic_attack",
+        },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {  },
+            mainText = "Basic attack. Deal {DAMAGE_1} Physical damage to an enemy.",
+            tokens = {
+                {
+                    applyMode = "damage_range",
+                    componentIndex = 1,
+                    key = "DAMAGE_1",
+                    tokenType = "spell_damage_range",
+                },
+            },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+{
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {
+            "on_auto_attack_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraRef = "f82db71a:r0r1vl0a",
+                    auraStacks = 1,
+                    baseDamage = 0,
+                    damageSchoolRefs = {
+                        "f82db71a:v1azo4j6",
+                    },
+                    damageType = "melee",
+                    hitType = "auto",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.5,
+                            statRef = "f82db71a:u7b49vs9",
+                        },
+                    },
+                    targetEvents = {
+                        "on_auto_attack_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 1,
+                    weaponDamageMode = "main_hand",
+                },
+                key = "npcrage1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    amount = 15,
+                    amountMode = "flat",
+                    resourceRef = "f82db71a:e2tfklq7",
+                    targetEvents = {  },
+                    type = "resource",
+                },
+                key = "npcrage2",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
+                },
+            },
+        },
+        conditions = {
+            {
+                invert = false,
+                showOnTooltip = true,
+                slotKey = "mainhand",
+                tooltipTextOverride = "Requires main hand",
+                type = "item_equipped",
+                weaponTypeRefs = {  },
+            },
+        },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/ability_warrior_charge.blp",
+        id = "npcrage1",
+        cooldownChannel = 4,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Rage Attack",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = true,
+        spellbookCategory = "",
+        tags = {
+            "npc",
+            "basic_attack",
+        },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {  },
+            mainText = "Basic attack. Deal {DAMAGE_1} Physical damage to an enemy and generate 15 Rage.",
+            tokens = {
+                {
+                    applyMode = "damage_range",
+                    componentIndex = 1,
+                    key = "DAMAGE_1",
+                    tokenType = "spell_damage_range",
+                },
+            },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    }
         },
         stats = {
             {
@@ -4670,307 +4897,735 @@ Addon.Data.DefaultDatasets:Register({
             }
         },
 units = {
+{
+        appearances = {  },
+        attributes = {  },
+        challengeLevel = "normal",
+        creatureSize = "medium",
+        creatureType = "humanoid",
+        id = "7i40epa5",
+        mainHandWeapon = "f82db71a:stwswd01",
+        name = "Human",
+        presets = {
             {
-                appearances = {},
-                attributes = {},
+                name = "Militant",
                 challengeLevel = "normal",
-                creatureSize = "medium",
-                creatureType = "humanoid",
-                id = "7i40epa5",
-                mainHandWeapon = "f82db71a:stwswd01",
-                name = "Human",
-                presets = {
-                    {
-                        name = "Footman",
-                        resourceModifiers = {
-                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = 15, flatBonus = 0 },
-                        },
-                        statModifiers = {
-                            { statRef = "f82db71a:v42albuv", percentBonus = 35, flatBonus = 0 },
-                            { statRef = "f82db71a:p8syz5ba", percentBonus = 0, flatBonus = 10 },
-                            { statRef = "f82db71a:tcn0s8kx", percentBonus = 0, flatBonus = 3 },
-                            { statRef = "f82db71a:u7b49vs9", percentBonus = 5, flatBonus = 0 },
-                        },
-                        spells = {
-                            "f82db71a:z36xzk0w",
-                            "7bbb4cb9:ti2j4umn",
-                            "7bbb4cb9:tntwar01",
-                        },
-                        equipment = {
-                            mainHandWeapon = "f82db71a:stwswd01",
-                            shield = "f82db71a:stshld01",
-                        },
-                    },
-                    {
-                        name = "Berserker",
-                        resourceModifiers = {
-                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = 10, flatBonus = 0 },
-                        },
-                        statModifiers = {
-                            { statRef = "f82db71a:v42albuv", percentBonus = -25, flatBonus = 0 },
-                            { statRef = "f82db71a:u7b49vs9", percentBonus = 20, flatBonus = 0 },
-                            { statRef = "f82db71a:jslmczbi", percentBonus = 0, flatBonus = 5 },
-                            { statRef = "f82db71a:gj9wxb0x", percentBonus = 0, flatBonus = 10 },
-                        },
-                        spells = {
-                            "f82db71a:z36xzk0w",
-                            "7bbb4cb9:c1s93sif",
-                            "7bbb4cb9:e0mooybr",
-                            "7bbb4cb9:berrage1",
-                        },
-                        equipment = {
-                            mainHandWeapon = "f82db71a:stw2sw01",
-                        },
-                    },
-                    {
-                        name = "Archer",
-                        resourceModifiers = {
-                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = -15, flatBonus = 0 },
-                        },
-                        statModifiers = {
-                            { statRef = "f82db71a:v42albuv", percentBonus = -25, flatBonus = 0 },
-                            { statRef = "f82db71a:v2rs9cpy", percentBonus = 20, flatBonus = 0 },
-                            { statRef = "f82db71a:dd88li4c", percentBonus = 0, flatBonus = 5 },
-                            { statRef = "f82db71a:fercjhm5", percentBonus = 0, flatBonus = 5 },
-                        },
-                        equipment = {
-                            rangedWeapon = "f82db71a:stwbow01",
-                        },
-                    },
-                    {
-                        name = "Assassin",
-                        resourceModifiers = {
-                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = -20, flatBonus = 0 },
-                        },
-                        statModifiers = {
-                            { statRef = "f82db71a:v42albuv", percentBonus = -35, flatBonus = 0 },
-                            { statRef = "f82db71a:u7b49vs9", percentBonus = 15, flatBonus = 0 },
-                            { statRef = "f82db71a:wbj4zuf3", percentBonus = 0, flatBonus = 5 },
-                            { statRef = "f82db71a:jslmczbi", percentBonus = 0, flatBonus = 10 },
-                            { statRef = "f82db71a:o6113cir", percentBonus = 0, flatBonus = 10 },
-                        },
-                        spells = {
-                            "f82db71a:z36xzk0w",
-                            "23d5dce2:3yvu5lwf",
-                            "23d5dce2:pfskjkhi",
-                            "23d5dce2:kbifnqpj",
-                        },
-                        equipment = {
-                            mainHandWeapon = "f82db71a:stwdgr01",
-                        },
-                    },
-                    {
-                        name = "Mage",
-                        resourceModifiers = {
-                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = -25, flatBonus = 0 },
-                        },
-                        statModifiers = {
-                            { statRef = "f82db71a:v42albuv", percentBonus = -60, flatBonus = 0 },
-                            { statRef = "f82db71a:7t7xgzcx", percentBonus = 25, flatBonus = 0 },
-                            { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 5 },
-                            { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 5 },
-                            { statRef = "f82db71a:zs1nbz13", percentBonus = 0, flatBonus = 5 },
-                        },
-                        spells = {
-                            "d7c874c4:68dy7na1",
-                            "d7c874c4:lywroiqu",
-                            "d7c874c4:7ha8pdoy",
-                            "d7c874c4:polymr01",
-                            "d7c874c4:fireward",
-                            "d7c874c4:mgarma01",
-                        },
-                        equipment = {
-                            mainHandWeapon = "f82db71a:stwstf01",
-                        },
-                    },
-                    {
-                        name = "Priest",
-                        resourceModifiers = {
-                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = -20, flatBonus = 0 },
-                        },
-                        statModifiers = {
-                            { statRef = "f82db71a:v42albuv", percentBonus = -45, flatBonus = 0 },
-                            { statRef = "f82db71a:hj6d4kvy", percentBonus = 30, flatBonus = 0 },
-                            { statRef = "f82db71a:7t7xgzcx", percentBonus = 10, flatBonus = 0 },
-                            { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 5 },
-                            { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 5 },
-                            { statRef = "f82db71a:zs1nbz13", percentBonus = 0, flatBonus = 5 },
-                        },
-                        spells = {
-                            "1c1038a7:eet5xd4t",
-                            "1c1038a7:pwshld01",
-                            "1c1038a7:qqkkenuw",
-                            "1c1038a7:rm9rekvj",
-                        },
-                        equipment = {
-                            mainHandWeapon = "f82db71a:stwmac01",
-                        },
-                    },
-                    {
-                        name = "Battlemage",
-                        resourceModifiers = {
-                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = 5, flatBonus = 0 },
-                        },
-                        statModifiers = {
-                            { statRef = "f82db71a:v42albuv", percentBonus = 25, flatBonus = 0 },
-                            { statRef = "f82db71a:7t7xgzcx", percentBonus = 15, flatBonus = 0 },
-                            { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 3 },
-                            { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 3 },
-                            { statRef = "f82db71a:zs1nbz13", percentBonus = 0, flatBonus = 10 },
-                            { statRef = "f82db71a:u7b49vs9", percentBonus = 10, flatBonus = 0 },
-                        },
-                        spells = {
-                            "f82db71a:z36xzk0w",
-                            "d7c874c4:68dy7na1",
-                            "d7c874c4:fireward",
-                            "d7c874c4:mgarma01",
-                        },
-                        equipment = {
-                            mainHandWeapon = "f82db71a:stwmac01",
-                            shield = "f82db71a:stshld01",
-                        },
-                    },
-                    {
-                        name = "Commander",
-                        resourceModifiers = {
-                            { resourceRef = "f82db71a:q2ktkztt", percentBonus = 30, flatBonus = 0 },
-                        },
-                        statModifiers = {
-                            { statRef = "f82db71a:v42albuv", percentBonus = 20, flatBonus = 0 },
-                            { statRef = "f82db71a:u7b49vs9", percentBonus = 10, flatBonus = 0 },
-                            { statRef = "f82db71a:wbj4zuf3", percentBonus = 0, flatBonus = 3 },
-                            { statRef = "f82db71a:tcn0s8kx", percentBonus = 0, flatBonus = 5 },
-                            { statRef = "f82db71a:j8n012e6", percentBonus = 0, flatBonus = 25 },
-                            { statRef = "f82db71a:gj9wxb0x", percentBonus = 0, flatBonus = 5 },
-                        },
-                        spells = {
-                            "f82db71a:z36xzk0w",
-                            "7bbb4cb9:c1s93sif",
-                            "7bbb4cb9:tntwar01",
-                            "7bbb4cb9:9gh28pe5",
-                            "7bbb4cb9:demoshot",
-                        },
-                        equipment = {
-                            mainHandWeapon = "f82db71a:stwswd01",
-                        },
-                    },
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
                 },
-                resistances = {},
-                resources = {
-                    {
-                        initialValue = 208,
-                        perLevelValue = 29.63,
-                        resourceRef = "f82db71a:q2ktkztt"
-                    }
+                statModifiers = {  },
+                spells = {
+                    "f82db71a:npcrage1",
+                    "f82db71a:npcmulti",
+                    "7bbb4cb9:xniv44uu",
+                    "7bbb4cb9:ti2j4umn",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwswd01",
+                    shield = "f82db71a:stshld01",
+                },
+            },
+            {
+                name = "Cleric",
+                challengeLevel = "normal",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -20, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = 20, flatBonus = 0 },
+                    { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = -45, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = -75, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = 25, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = 50, flatBonus = 0 },
+                    { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 3 },
+                    { statRef = "f82db71a:hlyrsstn", percentBonus = 0, flatBonus = 15 },
+                    { statRef = "f82db71a:rgnrtg01", percentBonus = 0, flatBonus = 10 },
+                },
+                spells = {
+                    "1c1038a7:qqkkenuw",
+                    "1c1038a7:eet5xd4t",
+                    "1c1038a7:1x1q35og",
+                    "1c1038a7:pwshld01",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwstf01",
+                },
+            },
+            {
+                name = "Pyromancer",
+                challengeLevel = "normal",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -25, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = 15, flatBonus = 0 },
+                    { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = -60, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = 50, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 7 },
+                    { statRef = "f82db71a:0w7c7p09", percentBonus = 0, flatBonus = 20 },
+                    { statRef = "f82db71a:rgnrtg01", percentBonus = 0, flatBonus = 10 },
+                },
+                spells = {
+                    "d7c874c4:molarm01",
+                    "d7c874c4:68dy7na1",
+                    "d7c874c4:zilla37l",
+                },
+                equipment = {
+                    rangedWeapon = "f82db71a:stwwnd01",
+                },
+            },
+            {
+                name = "Arcanist",
+                challengeLevel = "normal",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -20, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = 30, flatBonus = 0 },
+                    { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = -55, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = 40, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 7 },
+                    { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:zs1nbz13", percentBonus = 0, flatBonus = 10 },
+                    { statRef = "f82db71a:954yunb9", percentBonus = 0, flatBonus = 20 },
+                    { statRef = "f82db71a:rgnrtg01", percentBonus = 0, flatBonus = 15 },
+                },
+                spells = {
+                    "d7c874c4:300h0gls",
+                    "d7c874c4:n6jbep9e",
+                    "d7c874c4:r760qxbn",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwstf01",
+                },
+            },
+            {
+                name = "Cryomancer",
+                challengeLevel = "normal",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -15, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = 20, flatBonus = 0 },
+                    { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = -50, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = 35, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:69hfqhne", percentBonus = 0, flatBonus = 3 },
+                    { statRef = "f82db71a:zs1nbz13", percentBonus = 0, flatBonus = 10 },
+                    { statRef = "f82db71a:jjn0my8k", percentBonus = 0, flatBonus = 20 },
+                    { statRef = "f82db71a:rgnrtg01", percentBonus = 0, flatBonus = 10 },
+                },
+                spells = {
+                    "d7c874c4:icearm01",
+                    "d7c874c4:lywroiqu",
+                    "d7c874c4:4yxpy77f",
+                },
+                equipment = {
+                    rangedWeapon = "f82db71a:stwwnd01",
+                },
+            },
+            {
+                name = "Sharpshooter",
+                challengeLevel = "normal",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -10, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = 15, flatBonus = 0 },
+                    { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = -25, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = -50, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = 40, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:dd88li4c", percentBonus = 0, flatBonus = 10 },
+                    { statRef = "f82db71a:fercjhm5", percentBonus = 0, flatBonus = 10 },
+                    { statRef = "f82db71a:o6113cir", percentBonus = 0, flatBonus = 5 },
+                },
+                spells = {
+                    "f82db71a:shoota01",
+                    "a93f7c12:nq9mgf7d",
+                    "a93f7c12:11yx5k2d",
+                    "a93f7c12:0ukabaim",
+                },
+                equipment = {
+                    rangedWeapon = "f82db71a:stwbow01",
+                },
+            },
+            {
+                name = "Assassin",
+                challengeLevel = "normal",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -15, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = -45, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = 35, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:wbj4zuf3", percentBonus = 0, flatBonus = 10 },
+                    { statRef = "f82db71a:jslmczbi", percentBonus = 0, flatBonus = 15 },
+                    { statRef = "f82db71a:o6113cir", percentBonus = 0, flatBonus = 15 },
+                    { statRef = "f82db71a:rgnrtg01", percentBonus = 0, flatBonus = 10 },
                 },
                 spells = {
                     "f82db71a:z36xzk0w",
-                    "f82db71a:shoota01"
+                    "f82db71a:zd3t6feq",
+                    "23d5dce2:300h0gls",
+                    "23d5dce2:7x7itakn",
+                    "23d5dce2:blind001",
+                    "23d5dce2:kbifnqpj",
                 },
-                stats = {
-                    {
-                        initialValue = 25,
-                        perLevelValue = 25,
-                        statRef = "f82db71a:v42albuv"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:wbj4zuf3"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:dd88li4c"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:v2g0tw0o"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:tcn0s8kx"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:o6113cir"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:p8syz5ba"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:zs1nbz13"
-                    },
-                    {
-                        initialValue = 65,
-                        perLevelValue = 4,
-                        statRef = "f82db71a:u7b49vs9"
-                    },
-                    {
-                        initialValue = 65,
-                        perLevelValue = 4,
-                        statRef = "f82db71a:v2rs9cpy"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 5.08,
-                        statRef = "f82db71a:7t7xgzcx"
-                    },
-                    {
-                        initialValue = 5,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:jslmczbi"
-                    },
-                    {
-                        initialValue = 5,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:fercjhm5"
-                    },
-                    {
-                        initialValue = 5,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:69hfqhne"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:0w7c7p09"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 5,
-                        statRef = "f82db71a:hj6d4kvy"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:jjn0my8k"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:pg0ytacb"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:954yunb9"
-                    },
-                    {
-                        initialValue = 0,
-                        perLevelValue = 0,
-                        statRef = "f82db71a:rgnrtg01"
-                    }
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwdgr01",
+                    offHandWeapon = "f82db71a:stwdgr01",
                 },
-                tags = {}
-            }
+            },
+            {
+                name = "Captain",
+                challengeLevel = "elite",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = 30, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = 25, flatBonus = 0 },
+                    { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = 40, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = 20, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = -50, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = 25, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = 30, flatBonus = 0 },
+                    { statRef = "f82db71a:wbj4zuf3", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:v2g0tw0o", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:p8syz5ba", percentBonus = 0, flatBonus = 10 },
+                    { statRef = "f82db71a:hlyrsstn", percentBonus = 0, flatBonus = 15 },
+                    { statRef = "f82db71a:j8n012e6", percentBonus = 0, flatBonus = 25 },
+                    { statRef = "f82db71a:rgnrtg01", percentBonus = 0, flatBonus = 10 },
+                },
+                spells = {
+                    "f82db71a:z36xzk0w",
+                    "b0211ab3:uesn7obf",
+                    "b0211ab3:h981ofan",
+                    "b0211ab3:0opb1tte",
+                    "b0211ab3:9nwvhorx",
+                    "1c1038a7:circheal",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwswd01",
+                    shield = "f82db71a:stshld01",
+                },
+            },
+        },
+        resistances = {  },
+        resources = {
+            {
+                initialValue = 208,
+                perLevelValue = 43.084746,
+                resourceRef = "f82db71a:q2ktkztt",
+            },
+            {
+                initialValue = 100,
+                perLevelValue = 23.5,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+            {
+                initialValue = 100,
+                perLevelValue = 0,
+                resourceRef = "f82db71a:c3gaf7dd",
+            },
+            {
+                initialValue = 100,
+                perLevelValue = 0,
+                resourceRef = "f82db71a:e2tfklq7",
+            },
+        },
+        spells = {
+            "f82db71a:z36xzk0w",
+            "f82db71a:shoota01",
+        },
+        stats = {
+            {
+                initialValue = 25,
+                perLevelValue = 33.474576,
+                statRef = "f82db71a:v42albuv",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:wbj4zuf3",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:dd88li4c",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:v2g0tw0o",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:tcn0s8kx",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:o6113cir",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:p8syz5ba",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:zs1nbz13",
+            },
+            {
+                initialValue = 65,
+                perLevelValue = 9.067797,
+                statRef = "f82db71a:u7b49vs9",
+            },
+            {
+                initialValue = 65,
+                perLevelValue = 9.067797,
+                statRef = "f82db71a:v2rs9cpy",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 3.389831,
+                statRef = "f82db71a:7t7xgzcx",
+            },
+            {
+                initialValue = 5,
+                perLevelValue = 0,
+                statRef = "f82db71a:jslmczbi",
+            },
+            {
+                initialValue = 5,
+                perLevelValue = 0,
+                statRef = "f82db71a:fercjhm5",
+            },
+            {
+                initialValue = 5,
+                perLevelValue = 0,
+                statRef = "f82db71a:69hfqhne",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:0w7c7p09",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 4.237288,
+                statRef = "f82db71a:hj6d4kvy",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:jjn0my8k",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:pg0ytacb",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:954yunb9",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:itpo751d",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:hlyrsstn",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:rgnrtg01",
+            },
+        },
+        tags = {  },
+    },
+    {
+        appearances = {  },
+        attributes = {  },
+        challengeLevel = "normal",
+        creatureSize = "large",
+        creatureType = "demon",
+        id = "felgrd01",
+        name = "Felguard",
+        presets = {
+            {
+                name = "Legionnaire",
+                challengeLevel = "normal",
+                appearances = {
+                    {
+                        displayId = 79677,
+                        fileDataId = 1711518,
+                        cam = 0.45,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                    {
+                        displayId = 79678,
+                        fileDataId = 1711518,
+                        cam = 0.45,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                },
+                resourceModifiers = {
+                    {
+                        resourceRef = "f82db71a:q2ktkztt",
+                        percentBonus = 10,
+                        flatBonus = 0,
+                    },
+                },
+                statModifiers = {
+                    {
+                        statRef = "f82db71a:v42albuv",
+                        percentBonus = 5,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:u7b49vs9",
+                        percentBonus = 4,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:wbj4zuf3",
+                        percentBonus = 0,
+                        flatBonus = 3,
+                    },
+                    {
+                        statRef = "f82db71a:tcn0s8kx",
+                        percentBonus = -100,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:p8syz5ba",
+                        percentBonus = 0,
+                        flatBonus = 10,
+                    },
+                },
+                spells = {
+                    "f82db71a:z36xzk0w",
+                    "f82db71a:npcrage1",
+                    "7bbb4cb9:g36ujwt9",
+                    "7bbb4cb9:ti2j4umn",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwswd01",
+                    shield = "f82db71a:stshld01",
+                },
+            },
+            {
+                name = "Destroyer",
+                challengeLevel = "normal",
+                appearances = {
+                    {
+                        displayId = 18193,
+                        fileDataId = 1100490,
+                        cam = 0.45,
+                        rot = 0.01,
+                        z = -0.35,
+                    },
+                },
+                resourceModifiers = {
+                    {
+                        resourceRef = "f82db71a:q2ktkztt",
+                        percentBonus = -15,
+                        flatBonus = 0,
+                    },
+                },
+                statModifiers = {
+                    {
+                        statRef = "f82db71a:v42albuv",
+                        percentBonus = -25,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:u7b49vs9",
+                        percentBonus = 4,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:wbj4zuf3",
+                        percentBonus = 0,
+                        flatBonus = 3,
+                    },
+                    {
+                        statRef = "f82db71a:jslmczbi",
+                        percentBonus = 0,
+                        flatBonus = 5,
+                    },
+                },
+                spells = {
+                    "f82db71a:z36xzk0w",
+                    "f82db71a:npcrage1",
+                    "7bbb4cb9:e0mooybr",
+                    "7bbb4cb9:demoshot",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stw2sw01",
+                },
+            },
+            {
+                name = "Lieutenant",
+                challengeLevel = "elite",
+                appearances = {
+                    {
+                        displayId = 64753,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                    {
+                        displayId = 64754,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                    {
+                        displayId = 64755,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                    {
+                        displayId = 65792,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                    {
+                        displayId = 73411,
+                        fileDataId = 1279257,
+                        cam = 0.25,
+                        rot = 0.01,
+                        z = -1.30,
+                    },
+                },
+                resourceModifiers = {
+                    {
+                        resourceRef = "f82db71a:q2ktkztt",
+                        percentBonus = 200,
+                        flatBonus = 0,
+                    },
+                },
+                statModifiers = {
+                    {
+                        statRef = "f82db71a:v42albuv",
+                        percentBonus = 45,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:u7b49vs9",
+                        percentBonus = 20,
+                        flatBonus = 0,
+                    },
+                    {
+                        statRef = "f82db71a:wbj4zuf3",
+                        percentBonus = 0,
+                        flatBonus = 5,
+                    },
+                    {
+                        statRef = "f82db71a:jslmczbi",
+                        percentBonus = 0,
+                        flatBonus = 2,
+                    },
+                    {
+                        statRef = "f82db71a:tcn0s8kx",
+                        percentBonus = 0,
+                        flatBonus = 5,
+                    },
+                },
+                spells = {
+                    "f82db71a:z36xzk0w",
+                    "f82db71a:npcrage1",
+                    "7bbb4cb9:9gh28pe5",
+                    "7bbb4cb9:0jiq0uoc",
+                    "f82db71a:npcmulti",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stw2sw01",
+                },
+            },
+        },
+        resistances = {  },
+        resources = {
+            {
+                initialValue = 208,
+                perLevelValue = 55.796610,
+                resourceRef = "f82db71a:q2ktkztt",
+            },
+            {
+                initialValue = 100,
+                perLevelValue = 0,
+                resourceRef = "f82db71a:e2tfklq7",
+            },
+        },
+        spells = {  },
+        stats = {
+            {
+                initialValue = 25,
+                perLevelValue = 46.186441,
+                statRef = "f82db71a:v42albuv",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:wbj4zuf3",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:dd88li4c",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:v2g0tw0o",
+            },
+            {
+                initialValue = 3,
+                perLevelValue = 0,
+                statRef = "f82db71a:tcn0s8kx",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:o6113cir",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:p8syz5ba",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:zs1nbz13",
+            },
+            {
+                initialValue = 65,
+                perLevelValue = 9.491525,
+                statRef = "f82db71a:u7b49vs9",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:v2rs9cpy",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:7t7xgzcx",
+            },
+            {
+                initialValue = 5,
+                perLevelValue = 0,
+                statRef = "f82db71a:jslmczbi",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:fercjhm5",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:69hfqhne",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:0w7c7p09",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:hj6d4kvy",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:jjn0my8k",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:pg0ytacb",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:954yunb9",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:itpo751d",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:hlyrsstn",
+            },
+            {
+                initialValue = 0,
+                perLevelValue = 0,
+                statRef = "f82db71a:rgnrtg01",
+            },
+            {
+                initialValue = 30,
+                perLevelValue = 0,
+                statRef = "f82db71a:s1mt6jh9",
+            },
+        },
+        tags = {  },
+    },
         },
         weaponTypes = {
             {

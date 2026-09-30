@@ -19,7 +19,7 @@ local RESOURCE_DELTA_BATCH_OPCODE = Operations:GetOpcode("RESOURCE_DELTA_BATCH")
 local NativeJoinChannel = Comms and Comms.JoinChannel or nil
 local NativeResolveChannelId = Comms and Comms.ResolveChannelId or nil
 local THREAT_UPDATE_RECORD_SEPARATOR = string.char(30)
-local THREAT_UPDATE_FIELD_SEPARATOR = string.char(31)
+local THREAT_UPDATE_FIELD_SEPARATOR = string.char(29)
 
 Client.ResourceSyncQueued = Client.ResourceSyncQueued or false
 Client.LastResourceSyncSignature = Client.LastResourceSyncSignature or nil
@@ -1475,6 +1475,7 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         self:RefreshActionBarWidget("pending-resource-flush")
     end
     local targetedResourceDeltas = {}
+    local aggregatedThreatUpdates = {}
     local targetEventIds = {}
     local reason = ""
     local matchingBatches = {}
@@ -1504,6 +1505,7 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
                     currentValue = deltaEntry.currentValue,
                 }
             end
+            aggregatedThreatUpdates = coalesceThreatUpdates(aggregatedThreatUpdates, batch.threatUpdates)
         end
     end
 
@@ -1527,6 +1529,7 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         targetedResourceDeltas,
         {
             allowLocalEchoApply = false,
+            threatUpdates = aggregatedThreatUpdates,
         }
     )
     settleQueuedRPEKillAchievements(self, state, {
@@ -1673,15 +1676,15 @@ function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStat
         return false
     end
 
-    local activeEventUnit, controlContext = nil, nil
+    local activeEventUnit = nil
     if type(self.ResolveActiveSpellcasterUnit) == "function" then
-        activeEventUnit, _, controlContext = self:ResolveActiveSpellcasterUnit(eventState)
+        activeEventUnit = self:ResolveActiveSpellcasterUnit(eventState)
     end
     local activeEventId = tonumber(activeEventUnit and activeEventUnit.eventID) or 0
     if activeEventId <= 0 then
         return false
     end
-    if activeEventUnit.isPlayer ~= true and not (type(controlContext) == "table" and controlContext.isControlled == true) then
+    if activeEventUnit.isPlayer ~= true then
         return false
     end
 

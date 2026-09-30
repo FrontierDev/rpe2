@@ -91,6 +91,44 @@ local function resolveUnitDefinition(registryId)
     return registry:ResolveUnitDefinition(registryId)
 end
 
+local function resolveResourceDefinition(resourceRef)
+    local normalizedRef = normalizeRef(resourceRef)
+    if not normalizedRef then
+        return nil
+    end
+
+    local registry = Addon.Internal and Addon.Internal.Registry or nil
+    if type(registry) ~= "table" or type(registry.GetActivatedDatasets) ~= "function" then
+        return nil
+    end
+
+    local separatorIndex = string.find(normalizedRef, ":", 1, true)
+    if not separatorIndex then
+        return nil
+    end
+
+    local datasetId = string.sub(normalizedRef, 1, separatorIndex - 1)
+    local resourceId = string.sub(normalizedRef, separatorIndex + 1)
+    if datasetId == "" or resourceId == "" then
+        return nil
+    end
+
+    local datasets = registry:GetActivatedDatasets() or {}
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        if type(dataset) == "table" and tostring(dataset.id or "") == datasetId then
+            for resourceIndex = 1, #(dataset.resources or {}) do
+                local resource = dataset.resources[resourceIndex]
+                if type(resource) == "table" and tostring(resource.id or "") == resourceId then
+                    return resource
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
 local function getUnitClass()
     return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes
         and Addon.Internal.Database.Classes.Unit or UnitClass
@@ -340,9 +378,15 @@ local function buildResolvedResources(eventUnit, playerCount, options)
         local resourceRef = normalizeString(entry and entry.resourceRef, "")
         if resourceRef ~= "" then
             local value = tonumber(entry.value) or 0
+            local resourceDefinition = resolveResourceDefinition(resourceRef)
+            local startsAtZero = eventUnit and eventUnit.isPlayer ~= true
+            local currentValue = value
+            if startsAtZero and resourceDefinition and resourceDefinition.startsAtZero == true then
+                currentValue = 0
+            end
             resolvedResources[#resolvedResources + 1] = {
                 resourceRef = resourceRef,
-                currentValue = value,
+                currentValue = currentValue,
                 maxValue = value,
             }
         end
@@ -808,6 +852,11 @@ EventUnit.CoerceBoolean = coerceBoolean
 
 function EventUnit.BuildResolvedResources(eventUnit, playerCount, options)
     return buildResolvedResources(eventUnit, playerCount, options)
+end
+
+function EventUnit.IsResourceStartsAtZero(resourceRef)
+    local resource = resolveResourceDefinition(resourceRef)
+    return resource ~= nil and resource.startsAtZero == true
 end
 
 function EventUnit.BuildResourceDeltas(baseResources, resolvedResources)

@@ -673,6 +673,10 @@ local function resolveResourceName(resourceRef)
     return ensureString(resourceId or resourceRef, "Resource")
 end
 
+local function isComboPointResource(resourceRef)
+    return string.lower(trimText(resolveResourceName(resourceRef))) == "combo points"
+end
+
 local function resolveAuraMetadata(detail, auraRef)
     local defaultName = "an aura"
     if type(auraRef) ~= "string" or auraRef == "" then
@@ -1012,6 +1016,9 @@ local function buildResourceSentence(detail, component, rankMultiplier)
     
     local targetPhrase = resolveTargetPhrase(component.target)
     if amount > 0 then
+        if isComboPointResource(effect.resourceRef) then
+            return ("Generates %s."):format(amountText)
+        end
         return ("Restore %s to %s."):format(amountText, targetPhrase)
     end
 
@@ -1358,6 +1365,9 @@ local function buildResourceSentenceTemplate(detail, componentIndex, component, 
             componentIndex = componentIndex,
             applyMode = "resource_gain_amount",
         })
+        if isComboPointResource(effect.resourceRef) then
+            return ("Generate %s."):format(amountToken)
+        end
         return ("Restore %s to %s."):format(amountToken, targetPhrase)
     end
 

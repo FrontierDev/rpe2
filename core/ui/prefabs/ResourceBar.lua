@@ -34,6 +34,7 @@ local function ResolveDefaults(options)
         iconSize = iconSize,
         valueWidth = valueWidth,
         progressFontSize = progressFontSize,
+        progressTextToken = options.progressTextToken or "progress.text",
         valueFontSize = valueFontSize,
         iconTexture = options.iconTexture or defaults.IconTexture or DEFAULT_ICON,
     }
@@ -61,6 +62,11 @@ local function DimColor(color)
         b = math.max(0, math.min(1, (tonumber(source.b) or 1) * 0.35)),
         a = tonumber(source.a) or 1,
     }
+end
+
+local function isValueInBar(resourceBar, state)
+    return resourceBar.options.valuePlacement == "bar"
+        or type(state) == "table" and state.valuePlacement == "bar"
 end
 
 function ResourceBar:New(options)
@@ -151,13 +157,15 @@ function ResourceBar:SetState(state)
             edgeFrame:Hide()
         end
     end
+    local valueInBar = isValueInBar(self, resolvedState)
     if self.progressBar and self.progressBar.SetText then
-        self.progressBar:SetText(resolvedState.progressText or "")
+        self.progressBar:SetText(valueInBar and resolvedState.currentText or resolvedState.progressText or "")
     end
 
     if self.progressBar and self.progressBar.label then
         ApplyLabelStyle(self.progressBar.label, self.options.progressFontSize or 10)
-        if resolvedState.progressText and resolvedState.progressText ~= "" then
+        local labelText = valueInBar and resolvedState.currentText or resolvedState.progressText
+        if labelText and labelText ~= "" then
             self.progressBar.label:Show()
         else
             self.progressBar.label:Hide()
@@ -224,7 +232,7 @@ function ResourceBar:Create()
         fontFlags = "OUTLINE",
         backgroundToken = "progress.background",
         borderToken = "progress.border",
-        textToken = "progress.text",
+        textToken = defaults.progressTextToken,
         showWhenUIHidden = false,
     })
     self.progressBar:SetParent(frame)
@@ -276,14 +284,24 @@ function ResourceBar:ApplyLayout()
         valueFrame:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
         valueFrame:SetWidth(defaults.valueWidth)
         valueFrame:SetHeight(defaults.height)
+        if isValueInBar(self, self.state) then
+            valueFrame:Hide()
+        else
+            valueFrame:Show()
+        end
     end
 
     if progressFrame and progressFrame.ClearAllPoints then
         progressFrame:ClearAllPoints()
         progressFrame:SetPoint("LEFT", iconFrame, "RIGHT", 4, 0)
-        progressFrame:SetPoint("RIGHT", valueFrame, "LEFT", -4, 0)
+        if isValueInBar(self, self.state) then
+            progressFrame:SetPoint("RIGHT", frame, "RIGHT", 0, 0)
+        else
+            progressFrame:SetPoint("RIGHT", valueFrame, "LEFT", -4, 0)
+        end
         progressFrame:SetHeight(defaults.height)
-        progressFrame:SetWidth(math.max(0, defaults.width - defaults.iconSize - defaults.valueWidth - 8))
+        local valueInset = isValueInBar(self, self.state) and 0 or defaults.valueWidth + 4
+        progressFrame:SetWidth(math.max(0, defaults.width - defaults.iconSize - 4 - valueInset))
     end
 
     return true

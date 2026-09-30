@@ -73,6 +73,10 @@ local function EnsureTitleRegion(self)
 end
 
 local function EnsureCloseButton(self)
+    if self.options.showCloseButton == false then
+        return nil
+    end
+
     if self.closeButton or not self.headerFrame then
         return self.closeButton
     end
@@ -157,7 +161,7 @@ local function LayoutHeaderChrome(self)
         if hasTabs and self.headerTabFrame then
             titleRegion:SetPoint("RIGHT", self.headerTabFrame, "LEFT", -8, 0)
         else
-            titleRegion:SetPoint("RIGHT", self.headerFrame, "RIGHT", -22, 0)
+            titleRegion:SetPoint("RIGHT", self.headerFrame, "RIGHT", closeFrame and -22 or -8, 0)
         end
     end
 
@@ -172,7 +176,7 @@ local function LayoutHeaderChrome(self)
         if closeFrame then
             self.headerTabFrame:SetPoint("RIGHT", closeFrame, "LEFT", -6, 0)
         else
-            self.headerTabFrame:SetPoint("RIGHT", self.headerFrame, "RIGHT", -22, 0)
+            self.headerTabFrame:SetPoint("RIGHT", self.headerFrame, "RIGHT", -8, 0)
         end
         self.headerTabFrame:SetPoint("TOP", self.headerFrame, "TOP", 0, 0)
         self.headerTabFrame:SetPoint("BOTTOM", self.headerFrame, "BOTTOM", 0, 0)

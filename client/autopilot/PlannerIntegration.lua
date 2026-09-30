@@ -13,6 +13,7 @@ local SequencePlanning = Client.AutopilotSequencePlanning or {}
 local TargetSelector = Client.AutopilotTargetSelector or {}
 local MovementSolver = Client.AutopilotMovementSolver or {}
 local Spatial = Client.AutopilotSpatial or {}
+local Ruleset = Addon.Internal.Ruleset or {}
 local Event = Addon.Internal
     and Addon.Internal.Database
     and Addon.Internal.Database.Classes
@@ -473,6 +474,14 @@ local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
+local function getActiveRulesetId()
+    if type(Ruleset.GetActiveRulesetId) == "function" then
+        return tostring(Ruleset.GetActiveRulesetId() or "")
+    end
+    local activeRuleset = type(Ruleset.GetActiveRuleset) == "function" and Ruleset.GetActiveRuleset() or nil
+    return tostring(type(activeRuleset) == "table" and activeRuleset.id or "")
+end
+
 local function buildFrozenClientProxy(frozenEventState)
     return setmetatable({
         GetEventState = function()
@@ -583,7 +592,7 @@ local function appendWarning(state, warning)
     state.output.warnings[#state.output.warnings + 1] = warning
 end
 
-local function appendNoAction(state, actorKey, unit, reason)
+local function appendNoAction(state, actorKey, unit, reason, diagnostic)
     local eventId = normalizeEventId(unit and unit.eventID)
     if eventId <= 0 then
         return
@@ -595,9 +604,86 @@ local function appendNoAction(state, actorKey, unit, reason)
         actorKey = tostring(actorKey or ""),
         casterEventId = eventId,
         reason = tostring(reason or "no-useful-action"),
+        diagnostic = tostring(diagnostic or ""),
         status = "ready",
     }
 end
+
+local PLANNER_REJECTION_TEXT = {
+    ["activation-unavailable"] = "activation snapshot could not be built",
+    ["profile-unavailable"] = "spell profile could not be built",
+    ["target-group-unavailable"] = "configured target group is unavailable",
+    ["no-valid-target"] = "no valid target satisfies the spell target policy",
+    ["zero-utility"] = "projected effect has zero utility",
+    ["melee-position-unreachable"] = "melee target is outside the reachable marker position",
+    ["invalid-cooldown-channel"] = "cooldown channel is not configured",
+    ["channel-cooldown"] = "cooldown channel is on cooldown",
+    ["cooldown"] = "spell is on personal cooldown",
+    ["not-your-turn"] = "it is not this caster's turn",
+    ["no-charges"] = "spell has no charges available",
+    ["insufficient-resources"] = "spell resources are insufficient",
+    ["conditions"] = "authored spell conditions are not satisfied",
+    ["basic-attack-type"] = "another basic-attack damage type was already used this turn",
+    ["activation-action-economy-metadata-missing"] = "internal action-economy channel metadata is missing",
+    ["illegal-activation"] = "spell activation is currently illegal",
+    ["not-useful"] = "projected effect has zero utility",
+}
+
+local function buildPlannerRejectionDetail(state, code, activation)
+    local detail = PLANNER_REJECTION_TEXT[code] or code:gsub("%-", " ")
+    if code == "conditions" and type(activation) == "table" then
+        local conditionState = activation.conditionState
+        local failureText = type(conditionState) == "table" and tostring(conditionState.failureText or "") or ""
+        if failureText ~= "" then
+            detail = detail .. ": " .. failureText
+        end
+    end
+    if code == "invalid-cooldown-channel" and type(activation) == "table" then
+        local spell = type(activation.spell) == "table" and activation.spell or {}
+        local snapshot = type(state) == "table" and state.snapshot or {}
+        detail = detail .. (" [authored=%s resolvedId=%s resolvedName=%s configured=%s activeRuleset=%s plannerRevision=%s currentRevision=%s]")
+            :format(
+                tostring(activation.authoredCooldownChannel or spell.cooldownChannel or ""),
+                tostring(activation.cooldownChannelId or ""),
+                tostring(activation.cooldownChannelName or ""),
+                tostring(activation.cooldownChannelConfigured == true),
+                tostring(snapshot.activeRulesetId or ""),
+                tostring(snapshot.configurationRevision or ""),
+                tostring(getConfigurationRevision())
+            )
+    end
+    return detail
+end
+
+local function recordPlannerRejection(state, eventId, spellRef, reason, activation)
+    local normalizedEventId = normalizeEventId(eventId)
+    if normalizedEventId <= 0 then return end
+    local code = tostring(reason or "candidate-rejected")
+    state.scratch.plannerRejectionsByEventId = state.scratch.plannerRejectionsByEventId or {}
+    local entries = state.scratch.plannerRejectionsByEventId[normalizedEventId] or {}
+    state.scratch.plannerRejectionsByEventId[normalizedEventId] = entries
+    local definition = state.scratch.spellDefinitionByRef and state.scratch.spellDefinitionByRef[tostring(spellRef or "")] or nil
+    local spellLabel = tostring(type(definition) == "table" and definition.name or spellRef or "Spell")
+    local detail = spellLabel .. ": " .. buildPlannerRejectionDetail(state, code, activation)
+    for index = 1, #entries do
+        if entries[index] == detail then return end
+    end
+    entries[#entries + 1] = detail
+end
+
+Planner.RecordPlannerRejection = recordPlannerRejection
+
+local function buildNoActionDiagnostic(state, unit, sequence)
+    local eventId = normalizeEventId(unit and unit.eventID)
+    for index = 1, #((sequence and sequence.rejected) or {}) do
+        local rejected = sequence.rejected[index]
+        recordPlannerRejection(state, eventId, rejected and rejected.spellRef, rejected and rejected.reason)
+    end
+    local entries = state.scratch.plannerRejectionsByEventId and state.scratch.plannerRejectionsByEventId[eventId] or {}
+    return #entries > 0 and table.concat(entries, "; ") or nil
+end
+
+Planner.BuildNoActionDiagnostic = buildNoActionDiagnostic
 
 local function buildSpellAction(state, actorKey, unit, candidate, movementActionId, sequenceIndex, sequenceCount, actionClass, previousActionId, actionEconomyEntry)
     local eventId = normalizeEventId(unit and unit.eventID)
@@ -715,7 +801,8 @@ end
 local function emitSequenceActions(state, actor, unit, sequence, movementActionId, noActionReason)
     local entries = type(sequence) == "table" and sequence.actions or {}
     if #entries == 0 then
-        appendNoAction(state, actor.key, unit, noActionReason or "no-useful-action")
+        local diagnostic = buildNoActionDiagnostic(state, unit, sequence)
+        appendNoAction(state, actor.key, unit, diagnostic and "autopilot-rejected" or noActionReason or "no-useful-action", diagnostic)
         return false
     end
 
@@ -744,7 +831,8 @@ local function emitSequenceActions(state, actor, unit, sequence, movementActionI
         end
     end
     if previousActionId == nil then
-        appendNoAction(state, actor.key, unit, noActionReason or "no-useful-action")
+        local diagnostic = buildNoActionDiagnostic(state, unit, sequence)
+        appendNoAction(state, actor.key, unit, diagnostic and "autopilot-rejected" or noActionReason or "no-useful-action", diagnostic)
         return false
     end
     return true
@@ -819,6 +907,8 @@ local function buildSnapshotResult(state)
         actorKey = state.actorKey,
         actorKeys = copyArray(state.actorKeys),
         scheduleRevision = state.scheduleRevision,
+        configurationRevision = state.snapshot.configurationRevision,
+        activeRulesetId = state.snapshot.activeRulesetId,
         members = members,
         playerPositions = playerPositions,
         actorPositions = actorPositions,
@@ -1365,6 +1455,19 @@ local function phaseActivation(state, deadlineMs)
                     })
                     or nil
                 state.scratch.profileByKey[cacheKey] = profile or false
+                if activation.canCast ~= true then
+                    recordPlannerRejection(
+                        state,
+                        eventId,
+                        spellRef,
+                        activation.reason or "illegal-activation",
+                        activation
+                    )
+                elseif type(profile) ~= "table" then
+                    recordPlannerRejection(state, eventId, spellRef, "profile-unavailable")
+                end
+            else
+                recordPlannerRejection(state, eventId, spellRef, "activation-unavailable")
             end
             state.cursors.spell = state.cursors.spell + 1
             if shouldYield(deadlineMs) then
@@ -1588,15 +1691,19 @@ local function phaseTargets(state, deadlineMs)
                     local selectionKey = table.concat({ eventId, spellRef, intent }, "\31")
                     local selectionState = state.scratch.targetSelectionByKey[selectionKey]
                     if type(selectionState) ~= "table" then
-                        selectionState = type(TargetSelector.CreateState) == "function"
-                            and select(1, TargetSelector.CreateState(activation, {
+                        local selectionReason = nil
+                        if type(TargetSelector.CreateState) == "function" then
+                            selectionState, selectionReason = TargetSelector.CreateState(activation, {
                                 intent = intent,
                                 spatialRuntime = state.snapshot.spatialRuntime,
                                 projectedHealingLedger = state.scratch.projectedHealingLedger,
                                 activeCastsByEventId = state.snapshot.activeCastsByEventId,
-                            }))
-                            or nil
+                            })
+                        end
                         state.scratch.targetSelectionByKey[selectionKey] = selectionState or false
+                        if type(selectionState) ~= "table" then
+                            recordPlannerRejection(state, eventId, spellRef, selectionReason or "target-group-unavailable")
+                        end
                     end
 
                     if type(selectionState) ~= "table" then
@@ -1628,6 +1735,10 @@ local function phaseTargets(state, deadlineMs)
                             end
                             bucket[#bucket + 1] = candidate
                             state.metrics.actionCandidateCount = state.metrics.actionCandidateCount + 1
+                        elseif type(selection) ~= "table" or selection.meetsMinTargets ~= true then
+                            recordPlannerRejection(state, eventId, spellRef, "no-valid-target")
+                        else
+                            recordPlannerRejection(state, eventId, spellRef, "zero-utility")
                         end
                         state.cursors.intent = state.cursors.intent + 1
                     end
@@ -1687,11 +1798,24 @@ local function finalizeMarkedActor(state, actor, solveState)
 
     local selectedSequences = solveState.bestAnchorEvaluation and solveState.bestAnchorEvaluation.selectedSequences or {}
     for index = 1, #actor.members do
+        local unit = actor.members[index]
+        local selectedSequence = selectedSequences[index]
+        if (type(selectedSequence) ~= "table" or #(selectedSequence.actions or {}) == 0)
+            and #((selectedSequence and selectedSequence.rejected) or {}) == 0
+        then
+            local candidates = state.scratch.actionCandidatesByEventId[normalizeEventId(unit and unit.eventID)] or {}
+            for candidateIndex = 1, #candidates do
+                local candidate = candidates[candidateIndex]
+                if candidateRequiresMelee(candidate) then
+                    recordPlannerRejection(state, unit and unit.eventID, candidate.spellRef, "melee-position-unreachable")
+                end
+            end
+        end
         emitSequenceActions(
             state,
             actor,
-            actor.members[index],
-            selectedSequences[index],
+            unit,
+            selectedSequence,
             movementActionId,
             "no-useful-action"
         )
@@ -1728,7 +1852,11 @@ local function stepFixedSolveState(state, solveState, deadlineMs)
                 local reevaluated = SequencePlanning.ReevaluateCandidate(candidate, solveState.tacticalLedger, context)
                 if type(reevaluated) == "table" then
                     solveState.reevaluatedCandidates[#solveState.reevaluatedCandidates + 1] = reevaluated
+                else
+                    recordPlannerRejection(state, unit and unit.eventID, candidate.spellRef, "zero-utility")
                 end
+            elseif candidateRequiresMelee(candidate) then
+                recordPlannerRejection(state, unit and unit.eventID, candidate.spellRef, "melee-position-unreachable")
             end
             solveState.candidateIndex = solveState.candidateIndex + 1
         else
@@ -1908,6 +2036,9 @@ local function phaseRevalidate(state, deadlineMs)
     -- reactions can legitimately alter resources, auras, and health while it
     -- is being calculated; those changes must not cancel the step's plan.
     -- Step changes are still rejected by Client:IsAutopilotPlanStateStale.
+    if Planner.IsConfigurationSnapshotStale(state) == true then
+        state.failureReason = "configuration-changed"
+    end
     state.phase = "finalize"
     return true
 end
@@ -1970,6 +2101,8 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
     end
 
     state.sourceEventState = eventState
+    state.configurationRevision = getConfigurationRevision()
+    state.activeRulesetId = getActiveRulesetId()
     state.phase = "validate"
     state.snapshot = {
         eventState = cloneEventShell(eventState),
@@ -1985,7 +2118,8 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         controlStateByTargetEventId = {},
         activeCastSummaries = {},
         activeCastsByEventId = {},
-        configurationRevision = getConfigurationRevision(),
+        configurationRevision = state.configurationRevision,
+        activeRulesetId = state.activeRulesetId,
         auraRevision = getAuraRevision(eventState.id),
         spatialRuntime = {
             eventId = tostring(eventState.id or ""),
@@ -2026,6 +2160,7 @@ function Planner.CreateState(eventState, descriptor, scheduleRevision, planId)
         targetSelectionByKey = {},
         targetOrderByKey = {},
         actionCandidatesByEventId = {},
+        plannerRejectionsByEventId = {},
         movementSolveByActorKey = {},
         fixedSolveByActorKey = {},
         positionWarningByActorKey = {},
@@ -2110,6 +2245,12 @@ end
 
 function Planner.Step(state, deadlineMs)
     if type(state) ~= "table" then
+        return true
+    end
+    if Planner.IsConfigurationSnapshotStale(state) == true then
+        state.failureReason = "configuration-changed"
+        state.phase = "complete"
+        state.result = nil
         return true
     end
     local startedAt = nowMilliseconds()
@@ -2261,13 +2402,28 @@ function Planner.IsFrozenSnapshotStale(state)
     return false
 end
 
+function Planner.IsConfigurationSnapshotStale(state)
+    local snapshot = type(state) == "table" and state.snapshot or nil
+    if type(snapshot) ~= "table" then
+        return true
+    end
+    return getConfigurationRevision() ~= math.max(0, math.floor(tonumber(snapshot.configurationRevision) or 0))
+        or getActiveRulesetId() ~= tostring(snapshot.activeRulesetId or "")
+end
+
 local baseIsAutopilotPlanStateStale = Client.IsAutopilotPlanStateStale
 if type(baseIsAutopilotPlanStateStale) == "function" then
     function Client:IsAutopilotPlanStateStale(state)
         if baseIsAutopilotPlanStateStale(self, state) == true then
             return true
         end
-        return Planner.IsFrozenSnapshotStale(state) == true
+        return Planner.IsConfigurationSnapshotStale(state) == true
+            or Planner.IsFrozenSnapshotStale(state) == true
+    end
+else
+    function Client:IsAutopilotPlanStateStale(state)
+        return Planner.IsConfigurationSnapshotStale(state) == true
+            or Planner.IsFrozenSnapshotStale(state) == true
     end
 end
 

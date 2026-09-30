@@ -25,7 +25,7 @@ local SKILL_ROLL_RESULT_OPCODE = Operations:GetOpcode("SKILL_ROLL_RESULT")
 local MAX_START_ATTEMPTS = 5
 local START_RETRY_DELAY = 1.5
 local THREAT_UPDATE_RECORD_SEPARATOR = string.char(30)
-local THREAT_UPDATE_FIELD_SEPARATOR = string.char(31)
+local THREAT_UPDATE_FIELD_SEPARATOR = string.char(29)
 
 local function buildChannelName()
     local now = tonumber(Common.GetNow()) or 0

@@ -257,6 +257,11 @@ function AuraEvaluator.ReserveProjectedAura(ledger, application, casterEventId, 
 
     local currentLedger = type(ledger) == "table" and ledger or AuraEvaluator.CreateProjectedAuraLedger()
     local previousState = cloneProjectedAuraStateShared(getProjectedAuraStateReference(currentLedger, identity))
+    if type(AuraEvaluator.ShouldSuppressProjectedAuraRefresh) == "function"
+        and AuraEvaluator.ShouldSuppressProjectedAuraRefresh(previousState, application)
+    then
+        return currentLedger, previousState, previousState, identity
+    end
     local nextState = applyProjectedAuraApplicationShared(previousState, application, identity)
     local nextLedger, nextByTarget = cloneAuraLedgerPath(currentLedger, identity)
     nextByTarget[identity.targetEventId] = nextState

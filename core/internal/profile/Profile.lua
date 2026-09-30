@@ -3796,29 +3796,42 @@ function Profile.IsSetupWizardEnabled()
     ) == true
 end
 
-function Profile.IsSetupComplete()
+function Profile.GetSetupAccessState()
     local wizardEnabled = Profile.IsSetupWizardEnabled()
-    if wizardEnabled == false then
-        return true
+    if wizardEnabled == nil then
+        return "setup-state-unavailable"
     end
-    if wizardEnabled ~= true then
-        return false
+
+    if wizardEnabled == false then
+        return "setup-complete"
     end
 
     if type(Database.GetProfileSetupWizardState) ~= "function" then
-        return false
+        return "setup-state-unavailable"
     end
 
     local state = Database.GetProfileSetupWizardState()
     if type(state) == "table" and state.completed == true then
-        return true
+        return "setup-complete"
     end
 
-    return false
+    return "setup-incomplete"
+end
+
+function Profile.IsSetupComplete()
+    local setupState = Profile.GetSetupAccessState()
+    if setupState == "setup-complete" then
+        return true, setupState
+    end
+    if setupState == "setup-state-unavailable" then
+        return nil, setupState
+    end
+
+    return false, setupState
 end
 
 function Profile.IsSetupRequired()
-    return Profile.IsSetupWizardEnabled() == true and not Profile.IsSetupComplete()
+    return Profile.GetSetupAccessState() == "setup-incomplete"
 end
 
 function Profile.GetResolvedBaseResourceValue(resourceRef, options)

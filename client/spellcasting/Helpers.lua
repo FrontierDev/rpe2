@@ -237,7 +237,16 @@ function Spellcasting.ResolveSpellRankContext(spell, options)
     end
     gainPercent = math.max(0, gainPercent or 5)
 
-    local resolved = spellClass.ResolveRankForLevel(spell, casterLevel)
+    local isNpcEventUnit = type(casterUnit) == "table" and casterUnit.isPlayer ~= true
+    local rankResolutionLevel = casterLevel
+    if isNpcEventUnit then
+        -- NPC spell lists are authored explicitly on their EventUnit or preset.
+        -- Learn level remains a player-spellbook restriction, while an NPC below
+        -- that level uses the spell's lowest valid rank/scaling instead.
+        rankResolutionLevel = math.max(casterLevel, spellClass.ResolveLearnLevel(spell))
+    end
+
+    local resolved = spellClass.ResolveRankForLevel(spell, rankResolutionLevel)
     local spellUsesRanks = true
     if type(spellClass.ResolveUsesRanks) == "function" then
         spellUsesRanks = spellClass.ResolveUsesRanks(spell) ~= false
@@ -262,6 +271,8 @@ function Spellcasting.ResolveSpellRankContext(spell, options)
         rank = rank,
         multiplier = multiplier,
         casterLevel = casterLevel,
+        rankResolutionLevel = rankResolutionLevel,
+        isNpcEventUnit = isNpcEventUnit,
         learnLevel = resolved and resolved.learnLevel or spellClass.ResolveLearnLevel(spell),
         rankInterval = resolved and resolved.rankInterval or spellClass.ResolveRankInterval(spell),
         nextRankLevel = resolved and resolved.nextRankLevel or nil,
@@ -1101,6 +1112,36 @@ function Spellcasting.GetLastMeleeAttackerForTarget(client, eventState, targetEv
     return 0
 end
 
+function Spellcasting.HasUnitAttackedTargetOnTurn(client, eventState, attackerEventId, targetEventId, turnNumber)
+    local eventId = type(eventState) == "table" and tostring(eventState.id or "") or ""
+    local numericAttackerEventId = tonumber(attackerEventId) or 0
+    local numericTargetEventId = tonumber(targetEventId) or 0
+    local numericTurnNumber = math.floor(tonumber(turnNumber) or 0)
+    if eventId == "" or numericAttackerEventId <= 0 or numericTargetEventId <= 0 or numericTurnNumber <= 0 then
+        return false
+    end
+
+    local eventBucket = getEventHistoryBucket(client.CombatHistoryByEventId or {}, eventId, false)
+    local turns = eventBucket and eventBucket.turns
+    local turnHistory = type(turns) == "table" and turns[numericTurnNumber] or nil
+    if type(turnHistory) ~= "table" or type(turnHistory.attacks) ~= "table" then
+        return false
+    end
+
+    for index = 1, #turnHistory.attacks do
+        local record = turnHistory.attacks[index]
+        if type(record) == "table"
+            and record.resolved == true
+            and tonumber(record.turnNumber) == numericTurnNumber
+            and tonumber(record.attackerEventId) == numericAttackerEventId
+            and tonumber(record.targetEventId) == numericTargetEventId
+        then
+            return true
+        end
+    end
+    return false
+end
+
 function Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(client, eventState, targetEventId)
     local turnHistory = getCombatTurnHistory(client, eventState, false)
     local numericTargetEventId = tonumber(targetEventId) or 0
@@ -1462,6 +1503,10 @@ end
 
 function Client:GetLastMeleeAttackerForTarget(eventState, targetEventId)
     return Spellcasting.GetLastMeleeAttackerForTarget(self, eventState, targetEventId)
+end
+
+function Client:HasUnitAttackedTargetOnTurn(eventState, attackerEventId, targetEventId, turnNumber)
+    return Spellcasting.HasUnitAttackedTargetOnTurn(self, eventState, attackerEventId, targetEventId, turnNumber)
 end
 
 function Client:HasSuccessfullyDefendedMeleeThisTurn(eventState, targetEventId)

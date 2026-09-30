@@ -705,8 +705,7 @@ local function buildWeaponContext(self, context, attackerUnit, effect, attackTyp
         weaponContext.totalDamage = weaponContext.totalDamage + damageValue
     end
 
-    local primarySlotKey = attackType == "ranged" and "ranged" or "mainhand"
-    local primaryField = attackType == "ranged" and "rangedWeapon" or "mainHandWeapon"
+    local primarySlotKey, primaryField = self:ResolvePrimaryWeaponSlotForEffect(effect, nil, attackType)
     if weaponDamageMode == "main_hand" or weaponDamageMode == "both" then
         appendSlot(primarySlotKey, primaryField)
     end

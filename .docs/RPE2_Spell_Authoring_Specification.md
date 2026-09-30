@@ -54,7 +54,7 @@ If the requested mechanic is explicitly outside this document's balance model, u
 
 The calculator has three balance actions:
 
-| Balance action | Power modifier | Threat modifier | Resource-cost modifier |
+| Balance action | Power modifier | Threat modifier | Mana-cost modifier |
 |---|---:|---:|---:|
 | Action | 1.00 | 1.00 | 1.00 |
 | Bonus Action | 0.65 | 0.75 | 1.25 |
@@ -112,12 +112,17 @@ The calculator only defines instant and 1-turn casts. Do not extrapolate a new c
 
 ## 3.2 Base stat coefficients
 
-| Scaling stat | Instant | 1-turn cast |
+| Damage scaling stat | Instant | 1-turn cast |
 |---|---:|---:|
 | Melee Attack Power | 0.35 | 0.50 |
 | Ranged Attack Power | 0.35 | 0.50 |
-| Spell Power | 0.50 | 0.70 |
+| Spell Power | 1.00 | 1.40 |
+
+| Healing scaling stat | Instant | 1-turn cast |
+|---|---:|---:|
 | Healing Power | 0.60 | 0.80 |
+
+The 1.00 / 1.40 Spell Power values are **damage coefficients only**. Existing heals, absorption effects, stat effects and other non-damage mechanics that intentionally scale from Spell Power are not automatically doubled. They retain their existing balance basis unless separately recalibrated. Absorption effects retain their existing non-damage Spell Power basis.
 
 **Important:** the cast benefit is already represented by choosing the Instant or 1-turn coefficient. Do not multiply the stat coefficient by the base-output cast modifier again.
 
@@ -157,7 +162,7 @@ For ordinary direct spells, use the runtime spell cooldown.
 
 Cooldown groups do not create an additional multiplier.
 
-For standard periodic spells, see the separate periodic rule: aura duration is used as the cooldown-equivalent for the periodic budget.
+For standard periodic spells, see the separate periodic rule: aura duration is used as the cooldown-equivalent for the **periodic flat-base budget**. DoT stat coefficients use the separate per-tick/lifetime guidance in section 6 rather than inheriting that modifier mechanically.
 
 ## 3.5 Secondary-effect modifier
 
@@ -309,31 +314,20 @@ Weapon coefficient = 0.85
 
 # 6. Periodic damage and healing
 
-This section is intentionally explicit because periodic effects use an asymmetric RPE rule.
+Periodic effects tick once per owner turn. An aura with duration `N` therefore has `N` ticks.
 
-## 6.1 Standard periodic archetype
+Runtime stat evaluation and authored coefficient budgeting are separate concerns:
 
-For an ordinary DoT or HoT:
+- MAP/RAP/SP/Healing Power is resolved on every tick using the current runtime stat value;
+- the coefficient stored on the aura is a **per-tick authored coefficient**;
+- runtime does not snapshot the stat contribution at application time;
+- the authored coefficient must already account for the intended lifetime budget of the effect.
 
-- model the periodic effect approximately as an **Instant Bonus Action**;
-- use the **aura duration as the cooldown-equivalent**;
-- calculate the periodic total **base** budget;
-- divide the **base amount only** across the aura ticks;
-- calculate the stat coefficient using the same Bonus Action / duration-equivalent modifiers;
-- apply the **full calculated stat coefficient on every tick**;
-- **do not divide the stat coefficient by duration**.
+Do not assume that a full duration-adjusted direct-spell coefficient belongs on every tick.
 
-RPE2 top-level aura effects tick once per owner turn.
+## 6.1 Periodic flat base
 
-Therefore an aura with duration `N` has `N` ticks.
-
-This rule is intentionally asymmetric.
-
-The total flat base is budgeted across the duration, but the scaling coefficient repeats at full strength on each tick.
-
-**Do not "correct" or normalize this asymmetry.**
-
-## 6.2 Periodic base amount
+For an ordinary active DoT or HoT, the standard flat-base starting point remains approximately an **Instant Bonus Action**, with aura duration used as the cooldown-equivalent:
 
 ```text
 Periodic Total Base / Target
@@ -349,104 +343,96 @@ Periodic Base / Tick / Target
 = Periodic Total Base / Duration
 ```
 
-## 6.3 Periodic stat coefficient
+A standard periodic spell may still have runtime `cooldown = 0`. That does not remove the duration-equivalent modifier from the periodic flat-base budget.
+
+Do not multiply by both aura duration and an unrelated runtime cooldown unless the design explicitly gives the periodic component both benefits.
+
+## 6.2 Periodic damage stat coefficients
+
+There is **no universal DoT coefficient formula** that turns the direct-spell coefficient into the authored per-tick coefficient.
+
+The previous rule that calculated a duration-adjusted coefficient and repeated that whole coefficient on every tick is obsolete.
+
+For a DoT:
 
 ```text
-Periodic Stat Coefficient / Tick / Target
-= Instant Base Stat Coefficient
-× 0.65                          [Bonus Action]
-× Per-Target Modifier
-× CooldownModifier(Duration)
-× Secondary Modifier
-× Role Effect Modifier
+Lifetime Stat Coefficient
+= Per-Tick Authored Coefficient × Duration
 ```
 
-There is **no division by duration** in this coefficient formula.
+Choose the per-tick coefficient from the intended total spell budget and the closest current analogue.
 
-## 6.4 Runtime cooldown vs duration-equivalent cooldown
+When budgeting a DoT, distinguish at minimum:
 
-A standard DoT/HoT may have runtime `cooldown = 0`.
+1. **Pure active DoT** — may have strong lifetime scaling because all output is delayed.
+2. **Hybrid direct + DoT** — allocate less scaling to the DoT because the parent spell already has immediate output.
+3. **Passive proc DoT** — substantially lower budget because it adds damage without consuming another action.
+4. **Stacking DoT** — balance around realistic/max stack state, not one stack in isolation.
+5. **Multi-target DoT** — account for maximum target count in the lifetime budget.
+6. **Spender/restricted opener DoT** — may retain stronger scaling when gated by Combo Points, Stealth, a special resource, or comparable restrictions.
 
-That does not mean its periodic budget uses the no-cooldown multiplier.
+Do **not** simply divide an old coefficient by duration. First choose an appropriate lifetime budget; then author the corresponding per-tick coefficient.
 
-For the periodic component, use:
+Do **not** reuse the ordinary direct-damage Spell Power coefficient table mechanically for DoTs.
+
+## 6.3 Periodic healing stat coefficients
+
+The DoT rebalance above does not automatically apply to HoTs.
+
+Current ordinary HoTs retain their existing healing-specific balance. For example, the current five-turn **Renew** archetype is:
 
 ```text
-CooldownModifier(aura duration)
+20.8 base healing per tick
++ 0.624 × Healing Power per tick
 ```
 
-as the balance surrogate.
+Its 0.624 coefficient corresponds to the current Healing Power HoT convention and is intentionally evaluated on every tick.
 
-Do not multiply by both the duration-equivalent modifier and the runtime cooldown unless the task explicitly defines a separate cooldown-based power increase.
+For a new HoT:
 
-## 6.5 Example — Shadow Word: Pain
+- use the healing coefficients and a current HoT analogue;
+- account for target count, duration, action economy, secondary effects and role;
+- do not copy a DoT coefficient merely because both effects are periodic;
+- bespoke/hybrid healing effects such as Vampiric Regeneration must use their current same-mechanic analogue or an explicit design value.
 
-Five turns, one target, DPS, primary DoT, Spell Power:
+## 6.4 Current default DoT regression values
 
-```text
-Periodic total flat base
-= 100 × 0.65 × 1.60
-= 104
+These are the current authored per-tick values enforced by `tests/PeriodicAuraAuthoringTest.lua`. They are reference points, not a new universal formula.
 
-Flat base per tick
-= 104 / 5
-= 20.8
-```
+| Class | Effect | Duration | Base / tick | Coefficient / tick | Lifetime coefficient |
+|---|---|---:|---:|---:|---:|
+| Hunter | Serpent Sting | 5 | 20.8 | 0.150 RAP | 0.750 RAP |
+| Hunter | Explosive Shot | 2 | 19.06125 | 0.080 RAP | 0.160 RAP |
+| Mage | Fireball DoT | 5 | 17.68 | 0.220 SP | 1.100 SP |
+| Mage | Ignite | 3 | 28.1667 | 0.250 SP | 0.750 SP |
+| Mage | Pyroblast DoT | 5 | 17.68 | 0.260 SP | 1.300 SP |
+| Paladin | Consecration | 3 | 11.2667 | 0.140 SP | 0.420 SP / target |
+| Paladin | Expurgation | 3 | 23.9417 | 0.100 MAP | 0.300 MAP |
+| Priest | Holy Fire DoT | 3 | 16.7592 | 0.180 SP | 0.540 SP |
+| Priest | Shadow Word: Pain | 5 | 20.8 | 0.420 SP | 2.100 SP |
+| Priest | Vampiric Touch | 5 | 17.68 | 0.320 SP | 1.600 SP |
+| Rogue | Rupture | 5 | 20.8 | 0.200 MAP | 1.000 MAP |
+| Rogue | Garrote | 2 | 31.7688 | 0.2224 MAP | 0.4448 MAP |
+| Rogue | Deadly Poison | 5 | 4.16 | 0.030 MAP / stack | 0.150 MAP / stack |
+| Warrior | Rend | 5 | 20.8 | 0.150 MAP | 0.750 MAP |
+| Warrior | Deep Wounds | 3 | 28.1667 | 0.0875 MAP | 0.2625 MAP |
 
-```text
-Spell Power coefficient per tick
-= 0.50 × 0.65 × 1.60
-= 0.52
-```
+### Reference interpretations
 
-Correct result:
+- **Shadow Word: Pain** is a pure active single-target Bonus Action DoT and therefore retains a comparatively large lifetime coefficient.
+- **Fireball**, **Pyroblast**, **Holy Fire**, **Explosive Shot** and **Expurgation** are hybrid spells; their periodic coefficient is deliberately only one part of the total spell budget.
+- **Ignite** and **Deep Wounds** are passive proc DoTs and therefore use much smaller lifetime budgets.
+- **Deadly Poison** is both passive and stacking; evaluate its effective output at realistic/high stacks.
+- **Consecration** is multi-target; its per-target coefficient must be assessed together with its maximum target count.
+- **Garrote** remains at 0.2224 MAP/tick because its two-tick duration, Stealth requirement, Energy cost and Combo Point generation already constrain it.
 
-```text
-20.8 + (Spell Power × 0.52) damage each turn for 5 turns
-```
+## 6.5 Reactive aura damage is not a DoT
 
-The full-duration flat base is 104.
+Damage in `aura.events` that triggers because the owner is hit, blocks, dodges, crits, auto-attacks, casts, or satisfies another event is not an ordinary periodic effect.
 
-The full-duration scaling contribution is five applications of the 0.52 coefficient. This is intentional.
+Examples include retaliation effects, seals, Hunter's Mark-style triggered damage and similar event procs.
 
-## 6.6 Example — 2-turn secondary melee DoT
-
-Two turns, one target, DPS, Melee AP, meaningful secondary effect:
-
-```text
-Total flat base
-= 100 × 0.65 × 1.15 × 0.85
-= 63.5375
-
-Flat base / tick
-= 31.76875
-≈ 31.7688
-```
-
-```text
-Melee AP coefficient / tick
-= 0.35 × 0.65 × 1.15 × 0.85
-= 0.22238125
-≈ 0.2224
-```
-
-## 6.7 Current default periodic reference values
-
-These are useful regression examples of the formula, not special overrides:
-
-| Class | Effect | Duration | Base / turn | Coefficient / turn |
-|---|---|---:|---:|---:|
-| Mage | Fireball DoT | 5 | 17.68 | 0.442 Spell Power |
-| Mage | Pyroblast DoT | 5 | 17.68 | 0.442 Spell Power |
-| Paladin | Expurgation | 3 | 23.9417 | 0.2514 Melee AP |
-| Priest | Renew | 5 | 20.8 | 0.624 Healing Power |
-| Priest | Holy Fire DoT | 3 | 16.7592 | 0.2514 Spell Power |
-| Priest | Shadow Word: Pain | 5 | 20.8 | 0.52 Spell Power |
-| Priest | Vampiric Touch | 5 | 17.68 | 0.442 Spell Power |
-| Priest | Vampiric Regeneration | 5 | 8.84 | 0.221 Spell Power |
-| Rogue | Rupture | 5 | 20.8 | 0.364 Melee AP |
-| Rogue | Garrote | 2 | 31.7688 | 0.2224 Melee AP |
-| Warrior | Rend | 5 | 20.8 | 0.364 Melee AP |
+Do not apply the DoT table or duration-based periodic budget to those effects. Use the explicit design or a current same-mechanic event analogue.
 
 ---
 
@@ -456,7 +442,7 @@ Absorption is a shield pool, not a HoT.
 
 Do **not** divide absorption by aura duration.
 
-For generic absorb effects:
+For a generic absorb effect:
 
 ```text
 Base Absorption / Target
@@ -464,45 +450,84 @@ Base Absorption / Target
 × Cast Modifier
 × Action Power Modifier
 × Per-Target Modifier
-× Cooldown Modifier
+× Balance-Window Modifier
 × Secondary Modifier
 × 1.00
 ```
 
-Generic Spell Power scaling:
+The balance-window modifier is applied **once**:
+
+- if the spell has a meaningful runtime cooldown, use that cooldown;
+- if it has no runtime cooldown but is a persistent shield whose duration is intentionally its balancing window, a current same-mechanic analogue may use aura duration as the cooldown-equivalent;
+- never multiply by both runtime cooldown and aura duration unless the design explicitly calls for two separate power increases.
+
+For stat scaling, absorption is non-damage output:
+
+- conventional protective/healer shields may scale from **Healing Power** using the healing coefficient appropriate to the cast time;
+- Spell Power shields retain the established **non-damage Spell Power** basis rather than using the doubled direct-damage Spell Power coefficients;
+- unusual-stat shields are bespoke and must use an explicit design or current analogue.
+
+## 7.1 Current Power Word: Shield reference
+
+Current Priest **Power Word: Shield** is an instant Bonus Action, five-turn shield with no runtime spell cooldown.
+
+Its current authored balance uses the five-turn aura as the balance window:
 
 ```text
-Absorb Coefficient / Target
-= Spell Power Base Coefficient for the cast time
-× Action Power Modifier
-× Per-Target Modifier
-× Cooldown Modifier
-× Secondary Modifier
-× 1.00
+Base absorption
+= 100 × 0.65 × 1.60
+= 104
+
+Healing Power coefficient
+= 0.60 × 0.65 × 1.60
+= 0.624
 ```
 
-If the task explicitly specifies another scaling stat, use that stat's appropriate coefficient instead.
-
-### Example — instant Bonus Action shield
-
-One target, no cooldown, no secondary effect:
+Current result:
 
 ```text
-Base absorption = 100 × 0.65 = 65
-Spell Power coefficient = 0.50 × 0.65 = 0.325
+104 + (Healing Power × 0.624) absorption
 ```
 
-That matches the generic Power Word: Shield-style budget.
+It costs **15% base Mana**, matching the instant-absorption Mana rule.
 
-Bespoke effects such as shields scaling from unusual stats are not forcibly converted to this generic formula.
+Do not use the obsolete `65 + 0.325 × Spell Power` example as the Power Word: Shield budget.
+
+## 7.2 Current ward reference
+
+Current Mage **Fire Ward** and **Frost Ward** are established Spell Power shield analogues:
+
+```text
+104 base absorption
++ 0.52 × Spell Power
+```
+
+They use a five-turn runtime cooldown and the established non-damage Spell Power basis.
+
+Use these as the reference for a comparable Spell Power ward; do not replace their non-damage scaling with the direct-damage Spell Power coefficient.
+
+## 7.3 Bespoke absorption
+
+Shields based on unusual stats, percent-health values, encounter mechanics or other bespoke sources are not forced into the generic formula.
+
+Use the explicit design or a current same-mechanic analogue, and keep the tooltip tokenized from the actual aura data.
 
 ---
 
 # 8. Resource costs
 
-## 8.1 Power ratio
+Resource handling is deliberately split by resource type.
 
-Resource tiering uses:
+- **Mana** is an RPE-balanced resource and uses the calculator below.
+- **Energy and Rage are not calculator-derived.** For abilities based on a WoW ability with a known Energy/Rage cost, author the actual WoW cost. If the RPE ability is original or materially different and has no authoritative historical cost, use an explicit design value or the closest current same-resource analogue.
+- Do **not** increase or decrease an authentic Energy/Rage cost merely because the generic output formula would place the spell in a different Mana tier.
+- Do **not** back-solve Energy/Rage from target count, cooldown, action type, or role.
+
+Damage/healing output and Energy/Rage cost are therefore separate authoring inputs. When an authentic Energy/Rage cost is unusually cheap or expensive relative to the proposed RPE output, review the output against current same-resource abilities and adjust the output if necessary. Do not apply a universal `actual cost / calculated cost` damage multiplier: the current Warrior/Rogue kits intentionally contain different efficiencies based on mechanics, cooldowns, requirements, target count and role.
+
+## 8.1 Mana power ratio
+
+Mana tiering uses:
 
 ```text
 Power Ratio
@@ -521,7 +546,7 @@ For a standard periodic spell, use:
 - Action = Bonus Action = 0.65;
 - Cooldown = CooldownModifier(Duration).
 
-## 8.2 Resource tiers
+## 8.2 Mana tiers
 
 For damage, weapon attacks, and non-instant healing:
 
@@ -538,65 +563,67 @@ For **instant healing and instant absorption**, there is no Cheap tier:
 | < 1.75 | Standard |
 | >= 1.75 | Expensive |
 
-This rule also applies to an instant HoT spell for mana-cost purposes.
+This rule also applies to an instant HoT spell for Mana-cost purposes.
 
-## 8.3 Base costs
+## 8.3 Base Mana costs
 
-| Tier | Base Mana | Energy | Rage |
-|---|---:|---:|---:|
-| Cheap | 4% | 25 | 12 |
-| Standard | 8% | 40 | 25 |
-| Expensive | 14.5% | 60 | 43 |
+| Tier | Base Mana |
+|---|---:|
+| Cheap | 4% |
+| Standard | 8% |
+| Expensive | 14.5% |
 
 Mana costs use `amountMode = "base_percent"`.
 
-Energy and Rage costs use flat amounts.
-
-## 8.4 Cast/resource modifier
+## 8.4 Mana cast/resource modifier
 
 | Spell type | Modifier |
 |---|---:|
 | Normal instant spell | 1.25 |
 | 1-turn spell | 0.85 |
-| Instant healing/absorption Mana cost | 1.50 |
+| Instant healing/absorption | 1.50 |
 
 For instant healing/absorption Mana, use 1.50 **instead of** the normal instant 1.25.
 
-## 8.5 Action cost modifier
+## 8.5 Mana action-cost modifier
 
-| Balance action | Resource modifier |
+| Balance action | Mana-cost modifier |
 |---|---:|
 | Action | 1.00 |
 | Bonus Action | 1.25 |
 | Spender | 0.75 |
 
-## 8.6 Final resource cost
+## 8.6 Final Mana cost
 
 ```text
-Final Resource Cost
-= Tier Base Cost
+Final Mana Cost
+= Tier Base Mana
 × Cast/Resource Modifier
-× Action Resource Modifier
+× Action Mana-Cost Modifier
 ```
 
-Rounding convention:
+Round Base Mana percentage to the nearest 0.1%.
 
-- Base Mana percentage: round to nearest 0.1%;
-- Energy: round to nearest whole point;
-- Rage: round to nearest whole point.
+Explicit Mana values in the task override calculated Mana cost.
 
-Explicit values in the task always override calculated resource cost.
+## 8.7 Energy and Rage authoring
 
-## 8.7 Existing-spell preservation rules
+For Energy/Rage abilities:
 
-When modifying/rebalancing existing default spells:
+1. Identify the originating WoW ability and verify its actual resource cost from an authoritative reference.
+2. Author that Energy/Rage cost unchanged unless the task explicitly defines an RPE-specific replacement.
+3. Balance damage/healing separately using the normal RPE output model and current same-resource analogues.
+4. If the resulting output is clearly inconsistent with current abilities at a similar cost, adjust the **output**, not the authentic resource cost.
+5. Preserve bespoke mechanics that explain unusual efficiency: cooldowns, target restrictions, combo-point requirements, stealth/form requirements, reaction requirements, conditional availability, threat role, and similar constraints.
+6. Resource-generation abilities and resource-conversion abilities remain outside the direct numerical calculator and require an explicit/current analogue.
 
-- do not automatically replace authored Rogue Energy costs;
-- do not automatically replace authored Warrior Rage costs;
-- Pyroblast retains its intentional **31.8% base Mana** cost;
-- Greater Heal retains its intentional **31.8% base Mana** cost.
+Examples of current same-resource reference points include:
 
-These preservation rules do not prevent using the calculator for a genuinely new Energy/Rage spell when no explicit cost is supplied.
+- Warrior Heroic Strike: 15 Rage;
+- Warrior Cleave: 20 Rage;
+- Warrior Whirlwind: 25 Rage;
+- Warrior Shield Slam: 30 Rage;
+- Rogue/Druid Energy attacks retain their authored WoW Energy costs rather than being converted to generic RPE tiers.
 
 ## 8.8 Example — 5-turn single-target DoT Mana cost
 
@@ -669,7 +696,7 @@ No cooldown, Spell Power, no secondary effect:
 
 ```text
 Base damage = 100
-Spell Power coefficient = 0.50
+Spell Power damage coefficient = 1.00
 Threat coefficient = 1.00
 Power ratio = 1.00
 ```
@@ -686,7 +713,7 @@ No cooldown, Spell Power, no secondary effect:
 
 ```text
 Base damage = 100 × 1.35 = 135
-Spell Power coefficient = 0.70
+Spell Power damage coefficient = 1.40
 Threat coefficient = 1.00
 Power ratio = 1.35 -> Standard
 Mana cost = 8% × 0.85 = 6.8%
@@ -701,9 +728,9 @@ Base damage
 = 100 × 0.65 × 1.60
 = 104
 
-Spell Power coefficient
-= 0.50 × 0.65 × 1.60
-= 0.52
+Spell Power damage coefficient
+= 1.00 × 0.65 × 1.60
+= 1.04
 
 Threat coefficient
 = 1.00 × 0.75
@@ -720,18 +747,18 @@ DPS, Spell Power, no cooldown, no secondary effect:
 
 ```text
 Base damage = 225
-Spell Power coefficient = 1.125
+Spell Power damage coefficient = 2.25
 Threat coefficient = 1.00
 Power ratio = 2.25 -> Expensive
 ```
 
-Calculated costs for a new spell:
+Calculated Mana cost for a new spell:
 
 ```text
-Mana   = 14.5% × 1.25 × 0.75 = 13.59375% -> 13.6%
-Energy = 60 × 1.25 × 0.75 = 56.25 -> 56
-Rage   = 43 × 1.25 × 0.75 = 40.3125 -> 40
+Mana = 14.5% × 1.25 × 0.75 = 13.59375% -> 13.6%
 ```
+
+For an Energy/Rage spender, use the ability's authoritative WoW cost or an explicit RPE design value; do not derive Energy/Rage from this Mana tier.
 
 ## 10.5 Three-target instant healer spell with 2-turn cooldown
 
@@ -766,6 +793,30 @@ Instant healing Mana cost:
 
 ---
 
+## 10.6 Current shipped direct-output exceptions
+
+The generic direct formulas describe the normal authoring baseline. Several current default spells intentionally or historically sit outside that exact formula.
+
+Treat these as **explicit current exceptions**, not as alternative universal formulas. Do not opportunistically normalize them while making unrelated changes.
+
+| Spell | Current authored output | Important constraint |
+|---|---|---|
+| Warrior Cleave | 75 + 0.35 MAP + 1.00 weapon per target; up to 2 targets; 20 Rage | Retains full basic weapon-strike coefficients despite two-target targeting. |
+| Hunter Carve | 75 + 0.35 MAP + 1.00 weapon per target; up to 2 targets | Mirrors the current Cleave output shape. |
+| Hunter Kill Shot | 225 + 1.125 RAP; 13.6% Mana | Execute-style restricted attack; its RAP coefficient is not produced by the normal instant Action table. |
+| Rogue Envenom | 236.25 + 0.826875 MAP; 15 Energy + 5 Combo Points | Restricted finisher requiring the Deadly Poison state; includes an explicit premium over the ordinary spender baseline. |
+| Priest Flash Heal | 100 + 0.60 Healing Power; 1-turn cast; 12% Mana | Current fast-heal exception: its output follows the instant-heal-sized profile despite `castTime = 1`. |
+
+When creating a new spell, use the normal formula unless:
+
+1. the task explicitly names one of these as the analogue;
+2. the mechanic has the same gating and intended balance role; or
+3. the task explicitly defines another exception.
+
+If an existing exception is being edited for an unrelated reason, preserve its current balance unless the task is specifically a rebalance.
+
+---
+
 # 11. Choosing scaling stats
 
 Default conventions:
@@ -795,7 +846,7 @@ These refs are documented here for orientation, but Codex must still verify them
 
 # 12. Mechanics not covered by the numerical calculator
 
-Do not force the direct/periodic formulas onto mechanics for which the model has no frequency/value rule.
+Do not force the direct formulas or ordinary periodic guidance onto mechanics for which the model has no frequency/value rule.
 
 This includes:
 
@@ -891,14 +942,20 @@ Before considering a spell task complete, verify all of the following:
 - [ ] Scaling stat and cast-specific base coefficient are correct.
 - [ ] Stat coefficient was **not** multiplied by the cast base-output modifier twice.
 - [ ] Weapon base/weapon coefficient rules are correct where applicable.
-- [ ] Periodic base was divided by duration.
-- [ ] Periodic stat coefficient was **not** divided by duration.
-- [ ] Periodic balance uses duration as the cooldown-equivalent.
+- [ ] Periodic flat base was divided by duration where the standard periodic archetype applies.
+- [ ] A DoT's authored coefficient is a deliberate **per-tick** value and its lifetime coefficient was checked as `perTick × duration`.
+- [ ] No DoT repeats the old full duration-adjusted direct coefficient on every tick merely because it is periodic.
+- [ ] Pure, hybrid, passive-proc, stacking, spender/restricted, and multi-target DoTs were budgeted against the appropriate current analogue.
+- [ ] HoT coefficients were not mechanically replaced with DoT coefficient rules.
+- [ ] Periodic flat-base balance uses duration as the cooldown-equivalent where applicable.
 - [ ] Absorption was not divided by duration.
-- [ ] Resource power ratio uses total-target, not per-target, modifier.
-- [ ] Instant heal/absorb minimum Standard tier is respected.
-- [ ] Existing Energy/Rage costs were not unintentionally rebalanced.
+- [ ] Absorption uses one balance-window modifier; runtime cooldown and aura duration were not accidentally multiplied together.
+- [ ] Mana power ratio uses total-target, not per-target, modifier.
+- [ ] Instant heal/absorb minimum Standard Mana tier is respected.
+- [ ] Energy/Rage costs were verified against the authoritative WoW ability or an explicit RPE design value.
+- [ ] Damage/healing output was reviewed separately against current same-resource analogues rather than back-solving Energy/Rage from the calculator.
 - [ ] Explicit resource-cost exceptions/overrides were preserved.
+- [ ] Current shipped direct-output exceptions were preserved unless the task explicitly rebalances them.
 - [ ] Group caster buffs use the 10% base-Mana convention where applicable.
 - [ ] No reactive proc was misclassified as a normal DoT/HoT.
 - [ ] Runtime refs exist.

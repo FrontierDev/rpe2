@@ -616,7 +616,13 @@ end
 -- Defaults are stored in SavedVariables. This migration replaces older copies
 -- that were installed from packages whose contents changed without a matching
 -- per-dataset version bump, so all clients converge on this release's data.
-local PACKAGED_DEFAULT_SYNC_REVISION = 1
+-- Revision 2 installs the role-gated profession loot-table requisitions into
+-- the saved Core dataset, including installations with stale per-dataset
+-- version metadata from earlier Core package updates.
+-- Revision 3 also refreshes packaged defaults after the Core NPC spell and
+-- Human-unit additions, including clients whose Core version metadata was
+-- recorded during an intermediate package build.
+local PACKAGED_DEFAULT_SYNC_REVISION = 3
 
 local function logInstallDiagnostic(message)
     local debug = Addon.Debug or nil
@@ -692,24 +698,15 @@ local function syncDefaultDatasets()
     local _, skippedDefinitions = Database.SyncDefaultDatasets(DefaultDatasets.Definitions, {
         force = forceSync,
     })
-    if skippedDefinitions == 0 then
-        savedRoot.defaultDatasetSyncRevision = PACKAGED_DEFAULT_SYNC_REVISION
+    if skippedDefinitions ~= 0 then
+        logInstallDiagnostic(("%d packaged default dataset definition(s) failed validation."):format(skippedDefinitions))
+        return false
     end
+
+    savedRoot.defaultDatasetSyncRevision = PACKAGED_DEFAULT_SYNC_REVISION
     return true
 end
 
-local installer = CreateFrame and CreateFrame("Frame")
-if not installer then
-    logInstallDiagnostic("ADDON_LOADED event frame is unavailable")
-    return
-end
-
-installer:RegisterEvent("ADDON_LOADED")
-installer:SetScript("OnEvent", function(self, event, loadedAddonName)
-    if event ~= "ADDON_LOADED" or loadedAddonName ~= addonName then
-        return
-    end
-
-    self:UnregisterEvent("ADDON_LOADED")
-    syncDefaultDatasets()
-end)
+-- Runtime owns ADDON_LOADED sequencing. Expose the canonical installer there
+-- so it rebinds SavedVariables and synchronizes defaults before Manager work.
+Addon.Data.SyncDefaultDatasets = syncDefaultDatasets

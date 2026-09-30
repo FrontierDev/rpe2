@@ -351,8 +351,10 @@ loadAddonFile("client/autopilot/AuraEvaluator.lua")
 loadAddonFile("client/autopilot/AuraEvaluatorPerformance.lua")
 loadAddonFile("client/combat/Helpers.lua")
 loadAddonFile("client/autopilot/SpellEvaluator.lua")
+loadAddonFile("client/autopilot/ActionEconomy.lua")
 local AutoAura = Addon.Client.AutopilotAuraEvaluator
 local AutoSpell = Addon.Client.AutopilotSpellEvaluator
+local ActionEconomy = Addon.Client.AutopilotActionEconomy
 local rankedSpell = {
     id = "ranked-spell",
     components = {
@@ -501,5 +503,123 @@ assertEqual(AutoAura.GetProjectedAuraState(nextLedger, {
     casterEventId = caster.eventID,
     targetEventId = target.eventID,
 }).rankMultiplier, 1.4, "performance ledger clone preserves refreshed Aura rank")
+
+local refreshLedger = AutoAura.CreateProjectedAuraLedger({
+    {
+        auraRef = "ranktest:ward",
+        datasetId = "ranktest",
+        casterEventId = caster.eventID,
+        targetEventId = target.eventID,
+        stacks = 1,
+        turnsRemaining = 4,
+        powerLevel = 20,
+        rankMultiplier = 1,
+    },
+})
+local refreshApplication = {
+    auraRef = "ranktest:ward",
+    datasetId = "ranktest",
+    duration = 4,
+    stacks = 1,
+    powerLevel = 20,
+    rankMultiplier = 1,
+}
+local suppressedLedger, _, suppressedState = AutoAura.ReserveProjectedAura(
+    refreshLedger,
+    refreshApplication,
+    caster.eventID,
+    target.eventID,
+    { datasetId = "ranktest" }
+)
+assertEqual(suppressedState.turnsRemaining, 4, "full non-stacking refresh keeps the existing projected duration")
+assertEqual(suppressedLedger, refreshLedger, "redundant Aura refresh does not create a projected ledger branch")
+
+local expiringLedger = AutoAura.CreateProjectedAuraLedger({
+    {
+        auraRef = "ranktest:ward",
+        datasetId = "ranktest",
+        casterEventId = caster.eventID,
+        targetEventId = target.eventID,
+        stacks = 1,
+        turnsRemaining = 1,
+        powerLevel = 20,
+        rankMultiplier = 1,
+    },
+})
+local refreshedLedger, _, expiringState = AutoAura.ReserveProjectedAura(
+    expiringLedger,
+    refreshApplication,
+    caster.eventID,
+    target.eventID,
+    { datasetId = "ranktest" }
+)
+assertEqual(expiringState.turnsRemaining, 4, "near-expiry non-stacking Aura refresh remains eligible")
+assert(refreshedLedger ~= expiringLedger, "eligible Aura refresh creates a projected ledger branch")
+
+local shieldSpell = {
+    cooldownGroup = "interrupt",
+    components = {},
+}
+local shieldProfile = {
+    spellRef = "ranktest:shield-bash",
+    spell = shieldSpell,
+    casterUnit = caster,
+    eventState = eventState,
+    rankContext = { multiplier = 1 },
+    hasDamage = true,
+    hasImmediateDamage = true,
+    hasInterrupt = true,
+    isSituationalInterrupt = true,
+    hasHeal = false,
+    hasControl = false,
+    immediateDamage = 25,
+    immediateHealing = 0,
+    resourceBurden = 0,
+    cooldownCommitment = 0,
+    chargeCommitment = 0,
+    auraApplications = {},
+}
+local shieldActivation = {
+    canCast = true,
+    spell = shieldSpell,
+    spellRef = shieldProfile.spellRef,
+    casterUnit = caster,
+    eventState = eventState,
+}
+local shieldWithoutCast = AutoSpell.EvaluateCandidate(shieldActivation, target, {
+    profile = shieldProfile,
+    isHostileTarget = true,
+    activeCastsByEventId = {},
+})
+assertEqual(shieldWithoutCast.totalUtility, 0, "situational interrupt damage is suppressed without an active cast")
+local shieldWithCast = AutoSpell.EvaluateCandidate(shieldActivation, target, {
+    profile = shieldProfile,
+    isHostileTarget = true,
+    activeCastsByEventId = { [target.eventID] = { turnsRemaining = 1 } },
+})
+assertEqual(shieldWithCast.hasUsefulInterrupt, true, "interrupt utility is available for an active cast")
+assertEqual(shieldWithCast.urgentInterrupt, true, "active interrupt opportunity is urgent")
+
+local function buildActionInput(spellRef, utility, channelId, triggersGCD)
+    return {
+        candidate = { spellRef = spellRef, totalUtility = utility },
+        spellRef = spellRef,
+        canCast = true,
+        cooldownChannelId = channelId,
+        cooldownChannelTriggersGCD = triggersGCD,
+        cooldownChannelConfigured = true,
+        cooldownChannelName = "test",
+    }
+end
+local mixedChannelSequence = ActionEconomy.BuildSequence({
+    buildActionInput("main-one", 30, 1, true),
+    buildActionInput("main-two", 20, 1, true),
+    buildActionInput("free-one", 10, 4, false),
+    buildActionInput("free-two", 9, 4, false),
+    buildActionInput("unused-reaction", 0, 5, true),
+}, { availableResources = {} })
+assertEqual(#mixedChannelSequence.actions, 3, "free actions can follow a GCD-triggering action")
+assertEqual(mixedChannelSequence.selectedByChannel[1], "main-one", "a GCD channel remains limited to one action")
+assertEqual(mixedChannelSequence.selectedByChannel[4], nil, "non-GCD channels are not treated as action slots")
 
 print("Spell rank Aura tests passed")

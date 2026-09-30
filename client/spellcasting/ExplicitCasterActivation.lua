@@ -215,73 +215,6 @@ function Client:ListEventUnitResolvedSpellRefs(casterEventId, eventStateOverride
     return Spellcasting.ListEventUnitResolvedSpellRefs(self, eventState, casterEventId)
 end
 
-local function buildExplicitCasterProxy(client, eventState, casterUnit)
-    local proxy = {
-        ResolveActiveSpellcasterUnit = function(_, requestedEventState)
-            if requestedEventState ~= eventState then
-                return nil
-            end
-            return casterUnit
-        end,
-        GetActionBarControlContext = function(_, requestedEventState)
-            if requestedEventState ~= eventState then
-                return nil
-            end
-            return {
-                isControlled = true,
-                controlledUnit = casterUnit,
-                controlledEventId = tonumber(casterUnit.eventID),
-            }
-        end,
-    }
-
-    return setmetatable(proxy, {
-        __index = client,
-    })
-end
-
-local function resolveExplicitCasterContext(client, options)
-    local casterEventId = normalizeEventUnitId(type(options) == "table" and options.casterEventId or nil)
-    if not casterEventId then
-        return nil, nil
-    end
-
-    local eventState = client.GetEventState and client:GetEventState() or nil
-    if type(eventState) ~= "table" or eventState.active ~= true then
-        return nil, nil
-    end
-
-    local casterUnit = findEventUnitById(eventState.units, casterEventId)
-    if not isActiveNpcUnit(casterUnit) then
-        return eventState, nil
-    end
-
-    return eventState, casterUnit
-end
-
-local function buildActivationSnapshot(self, spellRef, options)
-    local resolvedOptions = type(options) == "table" and options or nil
-    local hasExplicitCaster = resolvedOptions ~= nil and resolvedOptions.casterEventId ~= nil
-    if not hasExplicitCaster then
-        return baseBuildSpellActivationSnapshot(self, spellRef, options)
-    end
-
-    if normalizeEventUnitId(resolvedOptions.casterEventId) == nil then
-        return nil
-    end
-
-    local eventState, casterUnit = resolveExplicitCasterContext(self, resolvedOptions)
-    if type(eventState) ~= "table" or type(casterUnit) ~= "table" then
-        return nil
-    end
-    if not hasResolvedSpellRef(casterUnit, spellRef) then
-        return nil
-    end
-
-    local proxy = buildExplicitCasterProxy(self, eventState, casterUnit)
-    return baseBuildSpellActivationSnapshot(proxy, spellRef, resolvedOptions)
-end
-
 local function applyBasicAttackTypeRestriction(self, snapshot)
     if type(snapshot) ~= "table" or snapshot.canCast ~= true then
         return snapshot
@@ -302,12 +235,9 @@ local function applyBasicAttackTypeRestriction(self, snapshot)
 end
 
 function Spellcasting.BuildSpellActivationSnapshot(self, spellRef, options)
-    local snapshot = buildActivationSnapshot(self, spellRef, options)
+    local snapshot = baseBuildSpellActivationSnapshot(self, spellRef, options)
 
     snapshot = applyBasicAttackTypeRestriction(self, snapshot)
-    if self ~= Client and type(snapshot) == "table" and snapshot.canCast ~= true then
-        return nil
-    end
     return snapshot
 end
 

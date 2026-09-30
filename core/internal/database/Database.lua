@@ -618,13 +618,13 @@ local function resolveCurrentCharacterIdentity()
     if UnitFullName then
         local name, realm = UnitFullName("player")
         if name and name ~= "" then
-            realm = realm or (GetRealmName and GetRealmName()) or ""
+            if realm == nil or realm == "" then
+                realm = GetRealmName and GetRealmName() or ""
+            end
             if realm ~= "" then
                 local characterKey = ("%s-%s"):format(name, realm)
-                return characterKey, characterKey, true
+                return characterKey, characterKey, true, name
             end
-
-            return name, name, true
         end
     end
 
@@ -634,14 +634,12 @@ local function resolveCurrentCharacterIdentity()
             local realm = (GetRealmName and GetRealmName()) or ""
             if realm ~= "" then
                 local characterKey = ("%s-%s"):format(name, realm)
-                return characterKey, characterKey, true
+                return characterKey, characterKey, true, name
             end
-
-            return name, name, true
         end
     end
 
-    return "unknown-player", "Unknown Author", false
+    return "unknown-player", "Unknown Author", false, nil
 end
 
 local function getCharacterKey()
@@ -656,10 +654,23 @@ end
 
 local function resolveCharacterScopedActiveId(root, fieldName)
     local entries = root and ensureTable(root[fieldName]) or {}
-    local characterKey = getCharacterKey()
+    local characterKey, _, isStable, bareName = resolveCurrentCharacterIdentity()
     local exactValue = entries[characterKey]
     if exactValue ~= nil then
         return exactValue, characterKey, false
+    end
+
+    if isStable == true
+        and type(bareName) == "string"
+        and bareName ~= ""
+        and bareName ~= characterKey
+        and entries[bareName] ~= nil
+    then
+        local migratedValue = entries[bareName]
+        entries[characterKey] = migratedValue
+        entries[bareName] = nil
+        root[fieldName] = entries
+        return migratedValue, characterKey, true
     end
 
     if characterKey ~= "unknown-player" and entries["unknown-player"] ~= nil then
@@ -1537,6 +1548,172 @@ local function isDefaultProfileRecord(record)
         and isEmptyProfileGuildState(profile.guild)
 end
 
+local PROFILE_SEQUENCE_FIELDS = {
+    ["spellbook"] = true,
+    ["recipebook"] = true,
+    ["traits"] = true,
+    ["activeTraits"] = true,
+    ["inactiveTraits"] = true,
+    ["selectedClassTalentTraits"] = true,
+    ["preferredConsumables"] = true,
+    ["setupWizard.startingItemRefs"] = true,
+    ["recipeKnowledge.knownRecipeRefs"] = true,
+    ["recipeKnowledge.unknownTrainerRecipeRefs"] = true,
+}
+
+local function isProfileSequenceField(path)
+    return PROFILE_SEQUENCE_FIELDS[path] == true
+end
+
+local function areProfileValuesEqual(left, right)
+    if type(left) ~= type(right) then
+        return false
+    end
+
+    if type(left) ~= "table" then
+        return left == right
+    end
+
+    for key, leftValue in pairs(left) do
+        if not areProfileValuesEqual(leftValue, right[key]) then
+            return false
+        end
+    end
+
+    for key in pairs(right) do
+        if left[key] == nil then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function isDefaultProfileMergeValue(path, value)
+    if value == nil then
+        return true
+    end
+
+    if path == "level" then
+        return tonumber(value) == getRulesetStartingLevel()
+    end
+
+    if path == "widgets.actionBarMode" then
+        return ensureString(value, "spells") == "spells"
+    end
+
+    if string.match(path, "%.rewardState%.status$") then
+        return ensureString(value, "pending") == "pending"
+    end
+
+    local valueType = type(value)
+    if valueType == "boolean" then
+        return value ~= true
+    end
+
+    if valueType == "number" then
+        return value == 0
+    end
+
+    if valueType == "string" then
+        return value == ""
+    end
+
+    if valueType ~= "table" then
+        return false
+    end
+
+    if next(value) == nil then
+        return true
+    end
+
+    for key, nestedValue in pairs(value) do
+        local nestedPath = path ~= ""
+            and (path .. "." .. tostring(key))
+            or tostring(key)
+        if not isDefaultProfileMergeValue(nestedPath, nestedValue) then
+            return false
+        end
+    end
+
+    return true
+end
+
+local function reportDuplicateProfileConflict(characterKey, path)
+    local debug = Addon.Debug
+    if debug and type(debug.Internal) == "function" then
+        debug.Internal(
+            "Duplicate profile conflict for %s at %s; canonical value preserved.",
+            tostring(characterKey),
+            tostring(path)
+        )
+    end
+end
+
+local function mergeDuplicateProfileValue(canonicalValue, legacyValue, path, characterKey)
+    local canonicalIsDefault = isDefaultProfileMergeValue(path, canonicalValue)
+    local legacyIsDefault = isDefaultProfileMergeValue(path, legacyValue)
+
+    if canonicalIsDefault and not legacyIsDefault then
+        return deepCopy(legacyValue)
+    end
+
+    if legacyIsDefault or areProfileValuesEqual(canonicalValue, legacyValue) then
+        return canonicalValue
+    end
+
+    if type(canonicalValue) ~= "table" or type(legacyValue) ~= "table" then
+        reportDuplicateProfileConflict(characterKey, path)
+        return canonicalValue
+    end
+
+    if isProfileSequenceField(path) then
+        reportDuplicateProfileConflict(characterKey, path)
+        return canonicalValue
+    end
+
+    local keys = {}
+    for key in pairs(legacyValue) do
+        keys[#keys + 1] = key
+    end
+    table.sort(keys, compareSerializedTableKeys)
+
+    for index = 1, #keys do
+        local key = keys[index]
+        local nestedPath = path ~= ""
+            and (path .. "." .. tostring(key))
+            or tostring(key)
+        canonicalValue[key] = mergeDuplicateProfileValue(
+            canonicalValue[key],
+            legacyValue[key],
+            nestedPath,
+            characterKey
+        )
+    end
+
+    return canonicalValue
+end
+
+local function mergeDuplicateProfileRecords(canonicalProfile, legacyProfile, characterKey)
+    local keys = {}
+    for key in pairs(legacyProfile) do
+        if key ~= "characterKey" and key ~= "name" then
+            keys[#keys + 1] = key
+        end
+    end
+    table.sort(keys, compareSerializedTableKeys)
+
+    for index = 1, #keys do
+        local key = keys[index]
+        canonicalProfile[key] = mergeDuplicateProfileValue(
+            canonicalProfile[key],
+            legacyProfile[key],
+            tostring(key),
+            characterKey
+        )
+    end
+end
+
 local function migrateUnknownPlayerProfile(root, normalizedProfiles)
     if type(root) ~= "table" then
         return false, false
@@ -1571,6 +1748,52 @@ local function migrateUnknownPlayerProfile(root, normalizedProfiles)
     migratedProfile.name = displayName ~= "" and displayName or ensureString(migratedProfile.name, displayName)
     profiles[characterKey] = migratedProfile
     profiles["unknown-player"] = nil
+    return true, true
+end
+
+local function migrateBareNameProfile(root, normalizedProfiles)
+    if type(root) ~= "table" then
+        return false, false
+    end
+
+    local profiles = normalizedProfiles
+    if type(profiles) ~= "table" then
+        profiles = normalizeProfilesCollection(root)
+    end
+
+    local characterKey, displayName, isStable, bareName = resolveCurrentCharacterIdentity()
+    if isStable ~= true
+        or characterKey == ""
+        or characterKey == "unknown-player"
+        or type(bareName) ~= "string"
+        or bareName == ""
+        or bareName == characterKey
+    then
+        return false, false
+    end
+
+    local legacyProfile = profiles[bareName]
+    local authoritativeProfile = profiles[characterKey]
+    if type(authoritativeProfile) == "table" then
+        if type(legacyProfile) == "table" then
+            mergeDuplicateProfileRecords(authoritativeProfile, legacyProfile, characterKey)
+            authoritativeProfile.characterKey = characterKey
+            authoritativeProfile.name = displayName ~= "" and displayName or ensureString(authoritativeProfile.name, characterKey)
+            profiles[bareName] = nil
+            return false, true
+        end
+
+        return false, false
+    end
+
+    if type(legacyProfile) ~= "table" then
+        return false, false
+    end
+
+    legacyProfile.characterKey = characterKey
+    legacyProfile.name = displayName ~= "" and displayName or characterKey
+    profiles[characterKey] = legacyProfile
+    profiles[bareName] = nil
     return true, true
 end
 
@@ -1691,7 +1914,44 @@ local function getDatasetEntryClassObject(collectionKey)
     return classes and classes[definition.className] or nil
 end
 
-local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId)
+local function prepareSpellComponentsForCompatibility(sourceData)
+    -- Spell's normal persistence path assigns keys to legacy components with
+    -- randomness. Compatibility must supply stable keys first, without
+    -- changing that normal authoring/persistence behaviour.
+    local components = type(sourceData.components) == "table"
+        and sourceData.components
+        or sourceData.effects
+    if type(components) ~= "table" then
+        return
+    end
+
+    local usedKeys = {}
+    for index = 1, #components do
+        local component = components[index]
+        if type(component) == "table" then
+            local key = ensureString(component.key, "")
+            if key ~= "" then
+                usedKeys[key] = true
+            end
+        end
+    end
+
+    for index = 1, #components do
+        local component = components[index]
+        if type(component) == "table" and ensureString(component.key, "") == "" then
+            local key = ("__rpe_compat_component_%d"):format(index)
+            local suffix = 1
+            while usedKeys[key] do
+                suffix = suffix + 1
+                key = ("__rpe_compat_component_%d_%d"):format(index, suffix)
+            end
+            component.key = key
+            usedKeys[key] = true
+        end
+    end
+end
+
+local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId, options)
     local definition = DATASET_ENTRY_DEFINITIONS[collectionKey]
     if not definition then
         return nil
@@ -1699,6 +1959,9 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
 
     local classObject = getDatasetEntryClassObject(collectionKey)
     local sourceData = deepCopy(type(data) == "table" and data or {})
+    if collectionKey == "spells" and type(options) == "table" and options.compatibility == true then
+        prepareSpellComponentsForCompatibility(sourceData)
+    end
     if collectionKey == "classes" and type(sourceData.traitRefs) == "table" then
         sourceData.passiveTraitRefs = type(sourceData.passiveTraitRefs) == "table" and sourceData.passiveTraitRefs or {}
         sourceData.talentTraitRefs = type(sourceData.talentTraitRefs) == "table" and sourceData.talentTraitRefs or {}
@@ -1757,6 +2020,119 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
 
     return normalized
 end
+
+-- Compatibility is deliberately a projection of the current executable
+-- schema, rather than a lossless SavedVariables export.  Keep this separate
+-- from normalizeDatasetRecord: normal dataset import/export must retain
+-- historical fields so that users do not lose data when upgrading.
+local function buildDatasetCompatibilityRecord(dataset)
+    local data = ensureTable(dataset)
+    local compatibility = {
+        id = ensureString(data.id, ""),
+        datasetType = normalizeDatasetState(data.datasetType, DATASET_TYPE_VALUES, "general"),
+        dependencies = {},
+    }
+
+    local dependencyIds = {}
+    for index = 1, #(type(data.dependencies) == "table" and data.dependencies or {}) do
+        local dependencyId = ensureString(data.dependencies[index], "")
+        if dependencyId ~= "" then
+            dependencyIds[dependencyId] = true
+        end
+    end
+    for dependencyId in pairs(dependencyIds) do
+        compatibility.dependencies[#compatibility.dependencies + 1] = dependencyId
+    end
+    table.sort(compatibility.dependencies)
+
+    for collectionKey, definition in pairs(DATASET_ENTRY_DEFINITIONS) do
+        local classObject = getDatasetEntryClassObject(collectionKey)
+        if not classObject
+            or type(classObject.FromTable) ~= "function"
+            or type(classObject.ToTable) ~= "function"
+        then
+            error(("Cannot build dataset compatibility data: current %s schema is unavailable.")
+                :format(definition.className or collectionKey), 2)
+        end
+
+        local entries = type(data[collectionKey]) == "table" and data[collectionKey] or {}
+        local canonicalEntries = {}
+        for index = 1, #entries do
+            local entry = entries[index]
+            local entryId = type(entry) == "table" and entry.id or nil
+            local normalized = normalizeDatasetEntryRecord(data, collectionKey, entry, entryId, {
+                compatibility = true,
+            })
+            if type(normalized) ~= "table" then
+                error(("Cannot build dataset compatibility data: invalid %s entry at index %d.")
+                    :format(collectionKey, index), 2)
+            end
+
+            local canonicalEntry = copyAuthoredConfiguration(normalized)
+            -- Loot.items is intentionally retained by Loot for lossless
+            -- persistence of an obsolete shape. Current runtime Loot uses
+            -- entries exclusively, so it cannot participate in compatibility.
+            if collectionKey == "loot" then
+                canonicalEntry.items = nil
+            end
+            canonicalEntries[#canonicalEntries + 1] = canonicalEntry
+        end
+
+        table.sort(canonicalEntries, function(left, right)
+            local leftId = ensureString(left and left.id, "")
+            local rightId = ensureString(right and right.id, "")
+            if leftId == rightId then
+                return serializeLuaValue(left) < serializeLuaValue(right)
+            end
+            return leftId < rightId
+        end)
+        compatibility[collectionKey] = canonicalEntries
+    end
+
+    return compatibility
+end
+
+Database.BuildDatasetCompatibilityRecord = buildDatasetCompatibilityRecord
+
+local function buildRulesetCompatibilityRecord(ruleset)
+    local data = ensureTable(ruleset)
+    local compatibility = {
+        id = ensureString(data.id, ""),
+        rules = {},
+    }
+
+    local rulesetLogic = Addon.Internal and Addon.Internal.Ruleset or nil
+    local rules = type(rulesetLogic) == "table" and rulesetLogic.Rules or nil
+    local definitions = type(rules) == "table" and rules.Definitions or nil
+    if type(rulesetLogic) ~= "table"
+        or type(rulesetLogic.GetRulesetRuleValue) ~= "function"
+        or type(definitions) ~= "table"
+    then
+        error("Cannot build ruleset compatibility data: current ruleset schema is unavailable.", 2)
+    end
+
+    for categoryIndex = 1, #definitions do
+        local categoryDefinition = definitions[categoryIndex]
+        local categoryKey = type(categoryDefinition) == "table" and categoryDefinition.key or nil
+        if type(categoryKey) == "string" and categoryKey ~= "" then
+            local categoryRules = {}
+            for ruleIndex = 1, #(categoryDefinition.rules or {}) do
+                local ruleDefinition = categoryDefinition.rules[ruleIndex]
+                local ruleKey = type(ruleDefinition) == "table" and ruleDefinition.key or nil
+                if type(ruleKey) == "string" and ruleKey ~= "" then
+                    categoryRules[ruleKey] = deepCopy(
+                        rulesetLogic.GetRulesetRuleValue(data, categoryKey, ruleDefinition)
+                    )
+                end
+            end
+            compatibility.rules[categoryKey] = categoryRules
+        end
+    end
+
+    return compatibility
+end
+
+Database.BuildRulesetCompatibilityRecord = buildRulesetCompatibilityRecord
 
 local function findDatasetEntry(dataset, collectionKey, entryIdOrIndex)
     local definition = DATASET_ENTRY_DEFINITIONS[collectionKey]
@@ -2166,6 +2542,7 @@ function Database.EnsureProfiles()
     if Database.Profiles ~= profiles then
         normalizeProfilesCollection(profiles, previousSchema < SCHEMA.profiles)
     end
+    migrateBareNameProfile(profiles, profiles.profiles)
     migrateUnknownPlayerProfile(profiles, profiles.profiles)
 
     Database.Profiles = profiles
@@ -4110,6 +4487,19 @@ function Database.ExportRuleset(rulesetId)
     return "RPE_RULESET_V2\n" .. serializeLuaValue(payload)
 end
 
+function Database.ExportRulesetForCompatibilityHash(rulesetId)
+    local ruleset = Database.GetRulesetByID(rulesetId)
+    if not ruleset then
+        return nil
+    end
+
+    return "RPE_RULESET_V1\n" .. serializeLuaValue({
+        format = "rpe-ruleset",
+        version = 1,
+        ruleset = buildRulesetCompatibilityRecord(ruleset),
+    })
+end
+
 function Database.ImportRuleset(text, options)
     local normalizedText = ensureString(text, "")
     normalizedText = normalizedText:gsub("^%s+", ""):gsub("%s+$", "")
@@ -4515,14 +4905,10 @@ function Database.ExportDatasetForCompatibilityHash(datasetId)
         return nil
     end
 
-    local normalized = normalizeDatasetRecord(copyAuthoredConfiguration(dataset), dataset.id, dataset.name)
-    normalized.lifetime = nil
-    normalized.expiresAt = nil
-
     return "RPE_DATASET_V1\n" .. serializeLuaValue({
         format = "rpe-dataset",
         version = 1,
-        dataset = normalized,
+        dataset = buildDatasetCompatibilityRecord(dataset),
     })
 end
 

@@ -109,6 +109,8 @@ local function ensureFinalizeState(state)
         actorKey = state.actorKey,
         actorKeys = copyArray(state.actorKeys),
         scheduleRevision = state.scheduleRevision,
+        configurationRevision = source.configurationRevision,
+        activeRulesetId = source.activeRulesetId,
         members = {},
         -- These structures are already frozen planner-owned copies. Transfer
         -- ownership instead of recursively copying them a second time.
@@ -237,6 +239,11 @@ local function runCustomPlannerPhase(state, deadlineMs)
     elseif state.phase == "solve-actors" then
         return Performance.StepSolveActors(state, deadlineMs)
     elseif state.phase == "revalidate" then
+        if type(Planner.IsConfigurationSnapshotStale) == "function"
+            and Planner.IsConfigurationSnapshotStale(state) == true
+        then
+            state.failureReason = "configuration-changed"
+        end
         state.phase = "finalize"
         return false
     elseif state.phase == "finalize" then
@@ -247,6 +254,14 @@ end
 
 function Planner.Step(state, deadlineMs)
     if type(state) ~= "table" then return true end
+    if type(Planner.IsConfigurationSnapshotStale) == "function"
+        and Planner.IsConfigurationSnapshotStale(state) == true
+    then
+        state.failureReason = "configuration-changed"
+        state.phase = "complete"
+        state.result = nil
+        return true
+    end
     state.metrics = type(state.metrics) == "table" and state.metrics or {}
     local entryPhase = tostring(state.phase or "")
     local isCustom = entryPhase == "targets" or entryPhase == "solve-actors"

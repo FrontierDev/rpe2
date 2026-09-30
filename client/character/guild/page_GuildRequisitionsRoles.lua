@@ -25,11 +25,10 @@ local SHOP_PAGE_TEXT_WIDTH = 96
 local SHOP_PAGE_NAV_SPACING = 4
 local SHOP_PAGINATION_WIDTH = (SHOP_PAGE_BUTTON_WIDTH * 2) + SHOP_PAGE_TEXT_WIDTH + (SHOP_PAGE_NAV_SPACING * 2)
 local CATEGORY_NAV_HEIGHT = 20
-local CATEGORY_BUTTON_WIDTH = 68
-local CATEGORY_OVERFLOW_WIDTH = 104
 local CATEGORY_NAV_SPACING = 4
-local MAX_VISIBLE_CATEGORY_BUTTONS = 5
+local CATEGORY_NAV_BUTTON_WIDTH = 22
 local TOOLBAR_HEIGHT = 22
+local SHOP_PAGINATION_TOP_PADDING = 6
 local AVAILABILITY_ITEMS = {
     { label = "All Items", value = "all" },
     { label = "Available", value = "available" },
@@ -137,22 +136,6 @@ local function collapseLayoutChild(element)
         element.options.expandHeight = false
         element.options.fillHeight = false
         element.options.weight = 0
-    end
-end
-
-local function setHorizontalNavElementShown(element, shown, width)
-    if not element then return end
-    if type(element.options) == "table" then element.options.width = shown and width or 0 end
-    setFrameShown(element, shown)
-end
-
-local function setCategoryButtonState(button, category, selected)
-    if not button then return end
-    local name = category and category.name or ""
-    button:SetText(selected and ("[ %s ]"):format(name) or name)
-    local color = UI.ResolveColor(nil, selected and "text.primary" or "text.secondary")
-    if button.SetLabelColor and color then
-        button:SetLabelColor(color.r or 1, color.g or 1, color.b or 1, color.a or 1)
     end
 end
 
@@ -300,35 +283,22 @@ end
 function Page:RefreshCategoryList()
     local rows = self.ShopCategoryRows or {}
     local selected = self.SelectedShopCategory or "__all"
-    local buttons = self.ShopCategoryButtons or {}
-    for index = 1, MAX_VISIBLE_CATEGORY_BUTTONS do
-        local button = buttons[index]
+    local selectedIndex = 1
+    local items = {}
+    for index = 1, #rows do
         local category = rows[index]
-        if button and category then
-            button._categoryId = category.id
-            setCategoryButtonState(button, category, category.id == selected)
-            setHorizontalNavElementShown(button, true, CATEGORY_BUTTON_WIDTH)
-        elseif button then
-            button._categoryId = nil
-            setHorizontalNavElementShown(button, false, CATEGORY_BUTTON_WIDTH)
-        end
+        items[#items + 1] = { label = category.name, value = category.id }
+        if category.id == selected then selectedIndex = index end
     end
 
-    local overflowItems = { { label = "More...", value = "" } }
-    local selectedOverflow = ""
-    for index = MAX_VISIBLE_CATEGORY_BUTTONS + 1, #rows do
-        local category = rows[index]
-        overflowItems[#overflowItems + 1] = { label = category.name, value = category.id }
-        if category.id == selected then selectedOverflow = category.id end
+    if self.ShopCategoryDropdown then
+        self._refreshingShopCategorySelector = true
+        self.ShopCategoryDropdown:SetItems(items)
+        self.ShopCategoryDropdown:SetSelectedValue((rows[selectedIndex] or {}).id, true)
+        self._refreshingShopCategorySelector = false
     end
-    if self.ShopCategoryOverflowDropdown then
-        local hasOverflow = #overflowItems > 1
-        self._refreshingShopCategoryOverflow = true
-        self.ShopCategoryOverflowDropdown:SetItems(overflowItems)
-        self.ShopCategoryOverflowDropdown:SetSelectedValue(selectedOverflow, true)
-        self._refreshingShopCategoryOverflow = false
-        setHorizontalNavElementShown(self.ShopCategoryOverflowDropdown, hasOverflow, CATEGORY_OVERFLOW_WIDTH)
-    end
+    if self.ShopCategoryPreviousButton then self.ShopCategoryPreviousButton:SetEnabled(selectedIndex > 1) end
+    if self.ShopCategoryNextButton then self.ShopCategoryNextButton:SetEnabled(selectedIndex < #rows) end
     if self.ShopCategoryNav and self.ShopCategoryNav.RefreshLayout then self.ShopCategoryNav:RefreshLayout() end
 end
 
@@ -336,6 +306,21 @@ function Page:SelectShopCategory(categoryId)
     self.SelectedShopCategory = categoryId or "__all"
     self:RefreshCategoryList()
     self:ApplyShopFilters(true)
+end
+
+function Page:SelectAdjacentShopCategory(offset)
+    local rows = self.ShopCategoryRows or {}
+    local selected = self.SelectedShopCategory or "__all"
+    local selectedIndex = 1
+    for index = 1, #rows do
+        if rows[index].id == selected then
+            selectedIndex = index
+            break
+        end
+    end
+
+    local target = rows[selectedIndex + offset]
+    if target then self:SelectShopCategory(target.id) end
 end
 
 function Page:BuildShopBrowser()
@@ -355,26 +340,23 @@ function Page:BuildShopBrowser()
         fitChildrenWidth = true, fitChildrenHeight = false,
     })
     self.ShopBrowseLayout:AddChild(self.ShopCategoryNav)
-    self.ShopCategoryButtons = {}
-    for index = 1, MAX_VISIBLE_CATEGORY_BUTTONS do
-        local button
-        button = UI.CreateButton(self.ShopCategoryNav:GetFrame(), "RPEGuildShopCategoryButton" .. index, "", CATEGORY_BUTTON_WIDTH, function()
-            local categoryId = button and button._categoryId or nil
-            if categoryId then self:SelectShopCategory(categoryId) end
-        end, { height = CATEGORY_NAV_HEIGHT, fontSize = 8 })
-        self.ShopCategoryButtons[index] = button
-        self.ShopCategoryNav:AddChild(button)
-    end
-    self.ShopCategoryOverflowDropdown = UI.CreateDropdown(self.ShopCategoryNav:GetFrame(), "RPEGuildShopCategoryOverflowDropdown", {
-        width = CATEGORY_OVERFLOW_WIDTH, height = CATEGORY_NAV_HEIGHT,
-        items = { { label = "More...", value = "" } }, selectedValue = "",
+    self.ShopCategoryPreviousButton = UI.CreateButton(self.ShopCategoryNav:GetFrame(), "RPEGuildShopCategoryPreviousButton", "<", CATEGORY_NAV_BUTTON_WIDTH, function()
+        self:SelectAdjacentShopCategory(-1)
+    end, { height = CATEGORY_NAV_HEIGHT, fontSize = 8 })
+    self.ShopCategoryNav:AddChild(self.ShopCategoryPreviousButton)
+    self.ShopCategoryDropdown = UI.CreateDropdown(self.ShopCategoryNav:GetFrame(), "RPEGuildShopCategoryDropdown", {
+        width = 118, height = CATEGORY_NAV_HEIGHT, expandWidth = true, weight = 1,
+        items = { { label = "All", value = "__all" } }, selectedValue = "__all",
         onValueChanged = function(value)
-            if self._refreshingShopCategoryOverflow or not value or value == "" then return end
+            if self._refreshingShopCategorySelector or not value or value == "" then return end
             self:SelectShopCategory(value)
         end,
     })
-    self.ShopCategoryNav:AddChild(self.ShopCategoryOverflowDropdown)
-    setHorizontalNavElementShown(self.ShopCategoryOverflowDropdown, false, CATEGORY_OVERFLOW_WIDTH)
+    self.ShopCategoryNav:AddChild(self.ShopCategoryDropdown)
+    self.ShopCategoryNextButton = UI.CreateButton(self.ShopCategoryNav:GetFrame(), "RPEGuildShopCategoryNextButton", ">", CATEGORY_NAV_BUTTON_WIDTH, function()
+        self:SelectAdjacentShopCategory(1)
+    end, { height = CATEGORY_NAV_HEIGHT, fontSize = 8 })
+    self.ShopCategoryNav:AddChild(self.ShopCategoryNextButton)
 
     self.ShopToolbar = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ShopBrowseLayout:GetFrame(), "RPEGuildShopToolbar", {
         height = TOOLBAR_HEIGHT, expandWidth = true, spacing = 4, fitChildrenWidth = true, fitChildrenHeight = false,
@@ -399,7 +381,7 @@ function Page:BuildShopBrowser()
     self.ShopToolbar:AddChild(self.ShopAvailabilityDropdown)
 
     self.ShopResultsLayout = UI.CreateLayout(UI.VerticalLayoutGroup, self.ShopBrowseLayout:GetFrame(), "RPEGuildShopResultsLayout", {
-        expandWidth = true, expandHeight = true, weight = 1, spacing = 4,
+        expandWidth = true, expandHeight = true, weight = 1, spacing = SHOP_PAGINATION_TOP_PADDING,
         fitChildrenWidth = true, fitChildrenHeight = true,
     })
     self.ShopBrowseLayout:AddChild(self.ShopResultsLayout)

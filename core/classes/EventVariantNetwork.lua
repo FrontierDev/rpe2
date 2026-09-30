@@ -473,8 +473,9 @@ local function applyVariantIdentity(unit, unitRecord)
     end
 
     local fields = splitPreservingEmpty(unitRecord, UNIT_FIELD_SEPARATOR)
-    local presetIndex = #fields >= PRESET_INDEX_FIELD and fields[PRESET_INDEX_FIELD] or 0
-    local appearanceIndex = #fields >= APPEARANCE_INDEX_FIELD and fields[APPEARANCE_INDEX_FIELD] or 0
+    unit._networkVariantIdentityPresent = #fields >= APPEARANCE_INDEX_FIELD
+    local presetIndex = unit._networkVariantIdentityPresent and fields[PRESET_INDEX_FIELD] or 0
+    local appearanceIndex = unit._networkVariantIdentityPresent and fields[APPEARANCE_INDEX_FIELD] or 0
     unit.presetIndex = normalizeVariantIndex(presetIndex)
     unit.appearanceIndex = normalizeVariantIndex(appearanceIndex)
     return unit

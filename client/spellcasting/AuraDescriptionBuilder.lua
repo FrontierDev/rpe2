@@ -1190,15 +1190,16 @@ end
 local function buildPassiveStatSentenceTemplate(effect, effectIndex, state)
     local statName = resolveStatName(effect and effect.statRef or nil)
     local verb = (tonumber(effect and effect.baseAmount) or 0) >= 0 and "Increases" or "Reduces"
-    if tostring(effect and effect.operation or "flat") == "percent" or isPercentDisplayStat(effect and effect.statRef or nil) then
-        return ("%s %s by %s%%."):format(verb, statName, tostring(math.abs(tonumber(effect and effect.baseAmount) or 0)))
-    end
     local amountToken = buildAuraAmountToken(state, "AURA_STAT", {
         effectIndex = effectIndex,
         baseField = "baseAmount",
         applyMode = "stat_amount",
     })
-    return ("%s %s by %s."):format(verb, statName, amountToken)
+    local percentSuffix = (
+        tostring(effect and effect.operation or "flat") == "percent"
+        or isPercentDisplayStat(effect and effect.statRef or nil)
+    ) and "%" or ""
+    return ("%s %s by %s%s."):format(verb, statName, amountToken, percentSuffix)
 end
 
 local function buildPassiveSkillSentenceTemplate(effect, effectIndex, targetContext, state)
@@ -1409,9 +1410,11 @@ local function resolveAuraTemplateToken(auraDefinition, token, options)
                 and math.abs(tonumber(effect[token.baseField or "baseAmount"]) or 0)
                 or numericAmount
         )
-        if applyMode == "stat_amount" and (tostring(effect.operation or "flat") == "percent" or isPercentDisplayStat(effect.statRef)) then
-            amountText = amountText .. "%"
-        end
+        -- Percentage-valued stat tokens are rendered as the numeric value only.
+        -- Authored tooltip templates own their punctuation (for example, the
+        -- common `{AURA_STAT_1}%` form), while generated sentences append the
+        -- suffix themselves. Keeping the token value punctuation-free avoids
+        -- duplicated percent signs when a template includes the suffix.
         return amountText
     end
 

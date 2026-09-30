@@ -539,13 +539,25 @@ function Profile.IncrementGuildRequisitionUsage(guildKey, guildSettingRef, requi
     return Profile.SetGuildRequisitionUsage(guildKey, guildSettingRef, requisitionId, currentUsage + 1)
 end
 
-function Profile.GetDailyRewardClaim(guildKey)
+function Profile.GetDailyRewardClaim(guildKey, guildSettingRef, dailyRewardId)
     local normalizedGuildKey = normalizeGuildKey(guildKey)
     if normalizedGuildKey == "" then
         return nil, nil
     end
 
     local bucket = Profile.GetGuildBucket(normalizedGuildKey)
+    local normalizedSettingRef = normalizeReference(guildSettingRef)
+    local normalizedRewardId = normalizeRequisitionId(dailyRewardId)
+    if normalizedSettingRef ~= "" and normalizedRewardId ~= "" then
+        local claims = type(bucket.dailyRewardClaims) == "table" and bucket.dailyRewardClaims or {}
+        local dateKey = normalizeDailyRewardDate(type(claims[normalizedSettingRef]) == "table" and claims[normalizedSettingRef][normalizedRewardId])
+        -- A pre-role ledger represented a claim for the whole setting. Keep it
+        -- authoritative for its recorded cycle, preventing upgrade duplicates.
+        if dateKey == "" and normalizeReference(bucket.dailyRewardSettingRef) == normalizedSettingRef then
+            dateKey = normalizeDailyRewardDate(bucket.dailyRewardDate)
+        end
+        return dateKey ~= "" and dateKey or nil, normalizedSettingRef, DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE
+    end
     local dateKey = normalizeDailyRewardDate(bucket and bucket.dailyRewardDate)
     local settingRef = normalizeReference(bucket and (bucket.dailyRewardSettingRef or bucket.dailyRewardRankRef))
     local claimSemantics = normalizeDailyRewardClaimSemantics(bucket and bucket.dailyRewardClaimSemantics)
@@ -556,10 +568,11 @@ function Profile.GetDailyRewardClaim(guildKey)
     return dateKey, settingRef ~= "" and settingRef or nil, claimSemantics
 end
 
-function Profile.SetDailyRewardClaim(guildKey, dateKey, guildSettingRef, claimSemantics)
+function Profile.SetDailyRewardClaim(guildKey, dateKey, guildSettingRef, claimSemantics, dailyRewardId)
     local normalizedGuildKey = normalizeGuildKey(guildKey)
     local normalizedDateKey = normalizeDailyRewardDate(dateKey)
     local normalizedSettingRef = normalizeReference(guildSettingRef)
+    local normalizedRewardId = normalizeRequisitionId(dailyRewardId)
     if normalizedGuildKey == "" or normalizedDateKey == "" or normalizedSettingRef == "" then
         return nil
     end
@@ -569,6 +582,14 @@ function Profile.SetDailyRewardClaim(guildKey, dateKey, guildSettingRef, claimSe
     local bucket = type(state.byGuild[normalizedGuildKey]) == "table"
         and state.byGuild[normalizedGuildKey]
         or {}
+    if normalizedRewardId ~= "" then
+        bucket.dailyRewardClaims = type(bucket.dailyRewardClaims) == "table" and bucket.dailyRewardClaims or {}
+        bucket.dailyRewardClaims[normalizedSettingRef] = type(bucket.dailyRewardClaims[normalizedSettingRef]) == "table" and bucket.dailyRewardClaims[normalizedSettingRef] or {}
+        bucket.dailyRewardClaims[normalizedSettingRef][normalizedRewardId] = normalizedDateKey
+        state.byGuild[normalizedGuildKey] = bucket
+        local persisted = Profile.SetGuildState(state)
+        return type(persisted) == "table" and persisted.byGuild and persisted.byGuild[normalizedGuildKey] or nil
+    end
     local normalizedClaimSemantics = claimSemantics == nil
         and normalizeDailyRewardClaimSemantics(bucket.dailyRewardClaimSemantics)
         or normalizeDailyRewardClaimSemantics(claimSemantics)

@@ -199,8 +199,10 @@ local unrankedBelowLearnLevel = Spellcasting.ResolveSpellRankContext(Spell:New({
     casterUnit = { isPlayer = false, level = 9 },
     eventState = eventState,
 })
-assertEqual(unrankedBelowLearnLevel.eligible, false, "unranked Spell still enforces learn level")
-assertEqual(unrankedBelowLearnLevel.learnLevel, 10, "unranked Spell still reports learn level")
+assertEqual(unrankedBelowLearnLevel.eligible, true, "NPC rank context bypasses player learn level")
+assertEqual(unrankedBelowLearnLevel.rank, 1, "below-level NPC uses the lowest rank")
+assertEqual(unrankedBelowLearnLevel.multiplier, 1, "unranked NPC keeps baseline multiplier")
+assertEqual(unrankedBelowLearnLevel.learnLevel, 10, "unranked Spell retains its learn level")
 
 local npc = Spellcasting.ResolveSpellRankContext(spell, {
     casterUnit = { isPlayer = false, stats = { level = 25 } },
@@ -237,12 +239,23 @@ local negativeGain = Spellcasting.ResolveSpellRankContext(spell, {
 })
 assertEqual(negativeGain.multiplier, 1, "negative percentage is normalized to zero")
 
+activeRuleset.rules.character.spell_rank_effect_gain_percent = "5"
 local belowLearnLevel = Spellcasting.ResolveSpellRankContext(Spell:New({ learnLevel = 10 }), {
     casterUnit = { isPlayer = false, level = 9 },
     eventState = eventState,
 })
-assertEqual(belowLearnLevel.eligible, false, "level eligibility")
-assertEqual(belowLearnLevel.rank, nil, "below-level result has no Rank 0")
+assertEqual(belowLearnLevel.eligible, true, "NPCs are eligible below player learn level")
+assertEqual(belowLearnLevel.rank, 1, "below-level NPC uses rank one")
+assertEqual(belowLearnLevel.multiplier, 1.05, "below-level NPC uses the lowest effective scaling")
+assertEqual(belowLearnLevel.casterLevel, 9, "NPC context retains the actual caster level")
+assertEqual(belowLearnLevel.rankResolutionLevel, 10, "NPC rank resolution clamps to the learn level")
+
+local playerBelowLearnLevel = Spellcasting.ResolveSpellRankContext(Spell:New({ learnLevel = 10 }), {
+    casterUnit = { isPlayer = true, level = 9 },
+    eventState = eventState,
+})
+assertEqual(playerBelowLearnLevel.eligible, false, "players remain ineligible below learn level")
+assertEqual(playerBelowLearnLevel.rank, nil, "below-level player has no rank")
 
 profileLevel = 21
 local profileFallback = Spellcasting.ResolveSpellRankContext(spell)
@@ -267,15 +280,24 @@ assertEqual(castSnapshot.spellRankMultiplier, 1.5, "cast multiplier snapshot rem
 local manualSpell = Spell:New({ id = "manual", name = "Manual Spell", learnMode = "book", learnLevel = 10 })
 local alwaysLearnedSpell = Spell:New({ id = "always", name = "Always Spell", learnMode = "always_learned", learnLevel = 10 })
 local bookSpell = Spell:New({ id = "book", name = "Book Spell", learnMode = "book", learnLevel = 10 })
-registryDataset.spells = { manualSpell, alwaysLearnedSpell, bookSpell }
+local shieldBashSpell = Spell:New({
+    id = "shield-bash",
+    name = "Shield Bash",
+    learnMode = "always_learned",
+    learnLevel = 12,
+    rankInterval = 8,
+})
+registryDataset.spells = { manualSpell, alwaysLearnedSpell, bookSpell, shieldBashSpell }
 spellsByRef = {
     ["ranktest:manual"] = manualSpell,
     ["ranktest:always"] = alwaysLearnedSpell,
     ["ranktest:book"] = bookSpell,
+    ["ranktest:shield-bash"] = shieldBashSpell,
 }
 
 loadAddonFile("core/internal/profile/Profile.lua")
 loadAddonFile("client/spellcasting/Cooldowns.lua")
+loadAddonFile("client/spellcasting/ExplicitCasterActivation.lua")
 local Profile = Addon.Internal.Profile
 profileLevel = 9
 Addon.Internal.ConfigurationRevision = 1
@@ -307,7 +329,7 @@ assertEqual(spellbookWrites, 0, "level threshold does not write Profile spellboo
 assertEqual(Profile.AddKnownSpell("ranktest:book"), true, "book acquisition succeeds at learn level")
 assertEqual(spellbookWrites, 1, "eligible acquisition writes once")
 
-runtimeCasterUnit = { eventID = 1, isPlayer = false, level = 9, resources = {} }
+runtimeCasterUnit = { eventID = 1, isPlayer = true, level = 9, resources = {} }
 runtimeEventState = {
     active = true,
     id = "ranktest-event",
@@ -316,17 +338,57 @@ runtimeEventState = {
     totalTicks = 1,
     units = { runtimeCasterUnit },
 }
-local belowLevelActivation = Spellcasting.BuildSpellActivationSnapshot(Addon.Client, "ranktest:always")
-assertEqual(belowLevelActivation.canCast, false, "live activation rejects below-level cast")
-assertEqual(belowLevelActivation.reason, "level-required", "live activation reports level requirement")
+local belowLevelPlayerActivation = Spellcasting.BuildSpellActivationSnapshot(Addon.Client, "ranktest:always")
+assertEqual(belowLevelPlayerActivation.canCast, false, "live activation rejects below-level player cast")
+assertEqual(belowLevelPlayerActivation.reason, "level-required", "live activation reports player level requirement")
 
 runtimeCasterUnit.level = 18
 activeRuleset.rules.character.spell_rank_effect_gain_percent = "25"
 Addon.Internal.ConfigurationRevision = 3
+local playerActiveCastSnapshot = Spellcasting.BuildSpellActivationSnapshot(Addon.Client, "ranktest:always")
+assertEqual(playerActiveCastSnapshot.canCast, true, "live activation accepts eligible player cast")
+assertEqual(playerActiveCastSnapshot.spellRank, 2, "player activation snapshot contains rank")
+assertEqual(playerActiveCastSnapshot.spellRankMultiplier, 1.5, "player activation snapshot contains offset-adjusted multiplier")
+
+runtimeCasterUnit.isPlayer = false
+runtimeCasterUnit.name = "Human Militant"
+runtimeCasterUnit.level = 9
+runtimeCasterUnit.spells = { "ranktest:always", "ranktest:shield-bash" }
+activeRuleset.rules.character.spell_rank_effect_gain_percent = "5"
+Addon.Internal.ConfigurationRevision = 4
+local npcBelowLearnLevelActivation = Spellcasting.BuildSpellActivationSnapshot(Addon.Client, "ranktest:always")
+assertEqual(npcBelowLearnLevelActivation.canCast, true, "assigned NPC spell bypasses player learn level")
+assertEqual(npcBelowLearnLevelActivation.spellRank, 1, "below-level NPC activation uses rank one")
+assertEqual(npcBelowLearnLevelActivation.spellRankMultiplier, 1.05, "below-level NPC activation uses baseline scaling")
+
+local plannerProxy = setmetatable({}, { __index = Addon.Client })
+local autopilotNpcActivation = Spellcasting.BuildSpellActivationSnapshot(plannerProxy, "ranktest:always", {
+    casterEventId = runtimeCasterUnit.eventID,
+})
+assertEqual(autopilotNpcActivation.canCast, true, "autopilot NPC activation matches controlled NPC legality")
+assertEqual(autopilotNpcActivation.spellRank, npcBelowLearnLevelActivation.spellRank, "autopilot keeps NPC rank")
+assertEqual(autopilotNpcActivation.spellRankMultiplier, npcBelowLearnLevelActivation.spellRankMultiplier, "autopilot keeps NPC scaling")
+
+runtimeCasterUnit.level = 1
+local humanMilitantShieldBash = Spellcasting.BuildSpellActivationSnapshot(Addon.Client, "ranktest:shield-bash")
+assertEqual(humanMilitantShieldBash.canCast, true, "Human Militant Shield Bash ignores player learn level")
+assertEqual(humanMilitantShieldBash.reason, "ready", "Human Militant Shield Bash has no level-required rejection")
+assertEqual(humanMilitantShieldBash.spellRank, 1, "Human Militant Shield Bash uses the lowest rank")
+assertEqual(humanMilitantShieldBash.spellRankMultiplier, 1.05, "Human Militant Shield Bash uses the lowest scaling")
+local autopilotShieldBash = Spellcasting.BuildSpellActivationSnapshot(plannerProxy, "ranktest:shield-bash", {
+    casterEventId = runtimeCasterUnit.eventID,
+})
+assertEqual(autopilotShieldBash.canCast, true, "autopilot Human Militant Shield Bash is not level-gated")
+assertEqual(autopilotShieldBash.spellRank, humanMilitantShieldBash.spellRank, "autopilot Shield Bash keeps the NPC rank")
+assertEqual(autopilotShieldBash.spellRankMultiplier, humanMilitantShieldBash.spellRankMultiplier, "autopilot Shield Bash keeps the NPC scaling")
+
+runtimeCasterUnit.level = 18
+activeRuleset.rules.character.spell_rank_effect_gain_percent = "25"
+Addon.Internal.ConfigurationRevision = 5
 local activeCastSnapshot = Spellcasting.BuildSpellActivationSnapshot(Addon.Client, "ranktest:always")
-assertEqual(activeCastSnapshot.canCast, true, "live activation accepts eligible cast")
-assertEqual(activeCastSnapshot.spellRank, 2, "activation snapshot contains rank")
-assertEqual(activeCastSnapshot.spellRankMultiplier, 1.5, "activation snapshot contains offset-adjusted multiplier")
+assertEqual(activeCastSnapshot.canCast, true, "live activation accepts assigned NPC cast")
+assertEqual(activeCastSnapshot.spellRank, 2, "NPC activation uses its level for rank")
+assertEqual(activeCastSnapshot.spellRankMultiplier, 1.5, "NPC activation uses its level for scaling")
 
 local unrankedAlwaysLearned = Spell:New({
     id = "unranked",
@@ -337,7 +399,7 @@ local unrankedAlwaysLearned = Spell:New({
 })
 spellsByRef["ranktest:unranked"] = unrankedAlwaysLearned
 registryDataset.spells[#registryDataset.spells + 1] = unrankedAlwaysLearned
-Addon.Internal.ConfigurationRevision = 4
+Addon.Internal.ConfigurationRevision = 6
 runtimeCasterUnit.level = 60
 local unrankedActivation = Spellcasting.BuildSpellActivationSnapshot(Addon.Client, "ranktest:unranked")
 assertEqual(unrankedActivation.canCast, true, "unranked Spell can be activated above learn level")
@@ -346,7 +408,7 @@ assertEqual(unrankedActivation.spellRankMultiplier, 1, "unranked activation snap
 
 runtimeCasterUnit.level = 26
 activeRuleset.rules.character.spell_rank_effect_gain_percent = "90"
-Addon.Internal.ConfigurationRevision = 5
+Addon.Internal.ConfigurationRevision = 7
 assertEqual(activeCastSnapshot.spellRank, 2, "cast rank snapshot remains stable after state change")
 assertEqual(activeCastSnapshot.spellRankMultiplier, 1.5, "cast multiplier snapshot remains stable after state change")
 

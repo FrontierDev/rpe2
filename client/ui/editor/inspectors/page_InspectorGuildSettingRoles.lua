@@ -594,7 +594,7 @@ function DataEditor:BuildGuildSettingInspectorPage(parent)
     self.GuildSettingInspectorRequisitionsPage = createPage("RPEDataEditorGuildSettingInspectorRequisitionsPage")
     self:BuildGuildSettingInspectorRequisitionsPage(self.GuildSettingInspectorRequisitionsPage)
     self.GuildSettingInspectorDailyRewardsPage = createPage("RPEDataEditorGuildSettingInspectorDailyRewardsPage")
-    OldBuildDailyRewardsPage(self, self.GuildSettingInspectorDailyRewardsPage)
+    self:BuildGuildSettingInspectorDailyRewardsPage(self.GuildSettingInspectorDailyRewardsPage)
 
     self.GuildSettingInspectorEmptyText = createLabel(self.GuildSettingInspectorPage, "RPEDataEditorGuildSettingInspectorEmptyText", "")
     self.GuildSettingInspectorEmptyText:GetFrame():SetPoint("BOTTOMLEFT", self.GuildSettingInspectorPage, "BOTTOMLEFT", 0, 0)
@@ -974,6 +974,15 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     local root = shell and shell.root or nil
     if not root then return end
 
+    local _, accessSection = InspectorShared.createInspectorSection(
+        root,
+        "RPEDataEditorGuildSettingInspectorRequisitionAccessPanel",
+        "Access & Shop Placement",
+        126
+    )
+    self.GuildSettingInspectorRequisitionAccessSection = accessSection
+    root = accessSection
+
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorAllowedRolesLabel", "Allowed Roles"))
     self.GuildSettingInspectorAllowedRolesHint = UI.CreateText(root:GetFrame(), "RPEDataEditorGuildSettingInspectorAllowedRolesHint",
         "No Roles selected = unrestricted. If one or more Roles are selected, any selected Role grants access.", {
@@ -1012,6 +1021,31 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
     })
     categoryGroup:AddChild(self.GuildSettingInspectorRequisitionCategoryDropdown)
     self.GuildSettingInspectorRequisitionCategoryGroup = categoryGroup
+    if accessSection.UpdateHeight then accessSection:UpdateHeight() end
+    refreshPageScroll(parent)
+end
+
+function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
+    OldBuildDailyRewardsPage(self, parent)
+    local shell = parent and parent._guildSettingPageScrollShell or nil
+    local root = shell and shell.root or nil
+    if not root then return end
+    root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardRolesLabel", "Allowed Roles"))
+    self.GuildSettingInspectorDailyRewardRolesDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardRolesDropdown", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT, multiSelect = true, showSelectionActions = true, items = {},
+        onValueChanged = function(values)
+            if self._refreshingGuildSettingInspector then return end
+            local selectedIndex = tonumber(self.SelectedGuildSettingDailyRewardIndex)
+            local roleIds = {}
+            for index = 1, #(values or {}) do roleIds[#roleIds + 1] = trim(values[index]) end
+            self:CommitSelectedGuildSetting(function(setting)
+                local reward = setting.dailyRewards and setting.dailyRewards[selectedIndex]
+                if reward then reward.roleIds = roleIds end
+            end)
+            self:RefreshGuildSettingDailyRewardsPage()
+        end,
+    })
+    root:AddChild(self.GuildSettingInspectorDailyRewardRolesDropdown)
     refreshPageScroll(parent)
 end
 
@@ -1130,7 +1164,22 @@ function DataEditor:RefreshGuildSettingRequisitionsPage()
         setDropdownEnabled(self.GuildSettingInspectorRequisitionCategoryDropdown, unlimited)
         setElementGroupVisible(self.GuildSettingInspectorRequisitionCategoryGroup, unlimited)
     end
+    if self.GuildSettingInspectorRequisitionAccessSection and self.GuildSettingInspectorRequisitionAccessSection.UpdateHeight then
+        self.GuildSettingInspectorRequisitionAccessSection:UpdateHeight()
+    end
     refreshPageScroll(self.GuildSettingInspectorRequisitionsPage)
+end
+
+function DataEditor:RefreshGuildSettingDailyRewardsPage()
+    OldRefreshDailyRewardsPage(self)
+    local setting = self:GetSelectedGuildSetting()
+    local reward = setting and setting.dailyRewards and setting.dailyRewards[tonumber(self.SelectedGuildSettingDailyRewardIndex)] or nil
+    if self.GuildSettingInspectorDailyRewardRolesDropdown then
+        local roleIds = type(reward and reward.roleIds) == "table" and reward.roleIds or {}
+        self.GuildSettingInspectorDailyRewardRolesDropdown:SetItems(buildRoleDropdownItems(setting, roleIds))
+        self.GuildSettingInspectorDailyRewardRolesDropdown:SetSelectedValues(roleIds, true)
+        setDropdownEnabled(self.GuildSettingInspectorDailyRewardRolesDropdown, reward ~= nil)
+    end
 end
 
 function DataEditor:RefreshGuildSettingInspectorPage()

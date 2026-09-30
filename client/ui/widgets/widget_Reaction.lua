@@ -65,6 +65,7 @@ function ReactionWidget:Build()
         frameStrata = "DIALOG",
         frameLevel = 85,
         movable = false,
+        showCloseButton = false,
         hidden = true,
         contentInsetLeft = 10,
         contentInsetRight = 10,

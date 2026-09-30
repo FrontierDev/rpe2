@@ -89,6 +89,22 @@ for index = 1, #(core.units or {}) do
 end
 assert(human, "Human Unit exists in Core")
 
+local felguard
+for index = 1, #(core.units or {}) do
+    if core.units[index].id == "felgrd01" then
+        felguard = core.units[index]
+        break
+    end
+end
+assert(felguard, "Felguard Unit exists in Core")
+assertEqual(felguard.name, "Felguard", "Felguard unit name")
+assertEqual(felguard.creatureType, "demon", "Felguard creature type")
+assertEqual(felguard.creatureSize, "large", "Felguard creature size")
+assertEqual(felguard.challengeLevel, "normal", "Felguard challenge level")
+assertEqual(#felguard.presets, 3, "Felguard has three role presets")
+assertEqual(felguard.resources[1].initialValue, 208, "Felguard base Health")
+assertEqual(felguard.resources[2].resourceRef, "f82db71a:e2tfklq7", "Felguard uses Rage")
+
 local expected = {
     Footman = {
         resources = { ["f82db71a:q2ktkztt"] = { 15, 0 } },

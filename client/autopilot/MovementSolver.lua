@@ -910,8 +910,13 @@ local function copyMovementDetailsByMember(source)
                 available = details.available == true,
                 reason = details.reason,
                 statRef = details.statRef,
+                baseStatFound = details.baseStatFound == true,
                 baseValue = details.baseValue,
                 movementRangeOverride = details.movementRangeOverride,
+                usedMissingStatFallback = details.usedMissingStatFallback == true
+                    or (details.baseStatFound ~= true and details.movementRangeOverride == nil),
+                missingStatFallbackValue = details.missingStatFallbackValue
+                    or (details.baseStatFound ~= true and details.movementRangeOverride == nil and 30 or nil),
                 effectiveValue = details.effectiveValue,
             }
         end

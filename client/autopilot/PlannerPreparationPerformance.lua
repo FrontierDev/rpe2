@@ -68,9 +68,11 @@ local function getCollectionCache(dataset, collectionKey)
     local caches = type(dataset.__entryCacheByCollection) == "table" and dataset.__entryCacheByCollection or nil
     local cache = caches and caches[collectionKey] or nil
     local entries = dataset[collectionKey]
+    local entryCount = #(entries or {})
     if type(cache) == "table"
         and cache.revision == configurationRevision()
         and cache.entries == entries
+        and cache.entryCount == entryCount
         and type(cache.byId) == "table"
     then
         return cache
@@ -87,24 +89,14 @@ local function cacheDatasetEntry(dataset, collectionKey, entryId)
 end
 
 -- EventUnit's historical resolver scans every activated dataset and every unit
--- on each miss. Planner preparation builds the same id maps incrementally; use
--- them when present, while preserving the original resolver as the fallback.
+-- on each miss. Planner preparation builds the same raw id maps incrementally;
+-- Registry consumes those maps internally, while EventUnit remains on the
+-- canonical inheritance-resolving contract.
 if type(EventUnit) == "table" and EventUnit._autopilotPreparedResolutionInstalled ~= true then
     local baseResolveUnitDefinition = EventUnit.ResolveUnitDefinition
     local baseResolvePetDefinition = EventUnit.ResolvePetDefinition
 
     function EventUnit:ResolveUnitDefinition()
-        local datasetId, unitId = parseQualifiedRef(self and self.registryID)
-        if datasetId and unitId
-            and type(Registry.IsDatasetActivated) == "function"
-            and Registry:IsDatasetActivated(datasetId) == true
-        then
-            local dataset = type(Database.GetDatasetByID) == "function" and Database.GetDatasetByID(datasetId) or nil
-            local unit, cached = cacheDatasetEntry(dataset, "units", unitId)
-            if cached then
-                return unit and dataset or nil, unit
-            end
-        end
         if type(baseResolveUnitDefinition) == "function" then
             return baseResolveUnitDefinition(self)
         end
@@ -168,23 +160,6 @@ then
         return baseResolveAuraDefinition(self, auraRef, context)
     end
     AuraManager._autopilotPreparedAuraResolutionInstalled = true
-end
-
--- ResolveSpellActivation historically discovers an initial target, then the
--- canonical activation snapshot immediately rebuilds the complete candidate
--- set. A frozen planner proxy needs the latter but not the redundant first
--- discovery. Normal spellcasts retain the original behavior.
-if type(Client.ResolveSpellActivationTargetUnit) == "function"
-    and Client._autopilotDeferredInitialTargetInstalled ~= true
-then
-    local baseResolveSpellActivationTargetUnit = Client.ResolveSpellActivationTargetUnit
-    function Client:ResolveSpellActivationTargetUnit(activation, targetGroup)
-        if rawget(self, "__autopilotPlannerProxy") == true then
-            return nil
-        end
-        return baseResolveSpellActivationTargetUnit(self, activation, targetGroup)
-    end
-    Client._autopilotDeferredInitialTargetInstalled = true
 end
 
 local function normalizeEventId(value)
@@ -400,6 +375,7 @@ local function stepIndexBuild(build, deadlineMs)
             job.dataset.__entryCacheByCollection[job.collectionKey] = {
                 revision = build.revision,
                 entries = job.dataset[job.collectionKey],
+                entryCount = #(job.dataset[job.collectionKey] or {}),
                 byId = job.byId,
             }
             job.complete = true
@@ -483,6 +459,14 @@ end
 
 function Planner.Step(state, deadlineMs)
     if type(state) ~= "table" then
+        return true
+    end
+    if type(Planner.IsConfigurationSnapshotStale) == "function"
+        and Planner.IsConfigurationSnapshotStale(state) == true
+    then
+        state.failureReason = "configuration-changed"
+        state.phase = "complete"
+        state.result = nil
         return true
     end
 

@@ -7,7 +7,6 @@ local Client = Addon.Client
 local Planner = Client.AutopilotPlanner or {}
 local Tasks = Addon.Internal.Tasks or {}
 local Debug = Addon.Debug or {}
-local Database = Addon.Internal.Database or {}
 local Event = Addon.Internal
     and Addon.Internal.Database
     and Addon.Internal.Database.Classes
@@ -22,154 +21,6 @@ end
 local basePlannerStep = Planner.Step
 if type(basePlannerStep) ~= "function" then
     return
-end
-
-local baseGetDatasetByID = Database.GetDatasetByID
-local baseListActivatedDatasetIds = Database.ListActivatedDatasetIds
-local baseGetRulesetByID = Database.GetRulesetByID
-local baseGetActiveRulesetId = Database.GetActiveRulesetId
-local activePlannerState = nil
-
-local function plannerScopeActive()
-    return type(activePlannerState) == "table"
-end
-
-local function getStableDatasetRoot()
-    local root = Database.Datasets
-    if type(root) ~= "table"
-        or root ~= rawget(_G, "RPEngineDatasetDB")
-        or type(root.datasets) ~= "table"
-    then
-        return nil
-    end
-    return root
-end
-
-local function getStableRulesetRoot()
-    local root = Database.Rulesets
-    if type(root) ~= "table"
-        or root ~= rawget(_G, "RPEngineRulesetDB")
-        or type(root.rulesets) ~= "table"
-        or type(root.activeByChar) ~= "table"
-    then
-        return nil
-    end
-    return root
-end
-
-local function getCurrentCharacterKey()
-    if type(UnitFullName) == "function" then
-        local name, realm = UnitFullName("player")
-        if type(name) == "string" and name ~= "" then
-            realm = realm or (type(GetRealmName) == "function" and GetRealmName()) or ""
-            if realm ~= "" then
-                return ("%s-%s"):format(name, realm)
-            end
-            return name
-        end
-    end
-
-    if type(UnitName) == "function" then
-        local name = UnitName("player")
-        if type(name) == "string" and name ~= "" then
-            local realm = type(GetRealmName) == "function" and GetRealmName() or ""
-            if realm ~= "" then
-                return ("%s-%s"):format(name, realm)
-            end
-            return name
-        end
-    end
-
-    return "unknown-player"
-end
-
--- Database.GetDatasetByID normally routes through EnsureDatasets(), which
--- canonicalizes the complete dataset root and recomputes dependencies on each
--- read. Planner preparation, Aura resolution, activation, and movement perform
--- many such reads against a root that is already initialized and stable for the
--- duration of one Planner.Step slice. Bypass only that repeated normalization
--- while the planner is on-stack; every other caller retains the canonical API.
-if type(baseGetDatasetByID) == "function" then
-    function Database.GetDatasetByID(datasetId)
-        if plannerScopeActive() and datasetId ~= nil and datasetId ~= "" then
-            local root = getStableDatasetRoot()
-            if root then
-                return root.datasets[tostring(datasetId)]
-            end
-        end
-        return baseGetDatasetByID(datasetId)
-    end
-end
-
-if type(baseListActivatedDatasetIds) == "function" then
-    function Database.ListActivatedDatasetIds()
-        if plannerScopeActive() then
-            local root = getStableDatasetRoot()
-            if root and type(root.activatedDatasets) == "table" then
-                return root.activatedDatasets
-            end
-        end
-        return baseListActivatedDatasetIds()
-    end
-end
-
--- Ruleset reads have the same repeated-normalization path through
--- EnsureRulesets(). The fast path is used only for a stable initialized root and
--- an exact current-character active entry. Legacy unknown-player migration and
--- replaced roots deliberately fall back to the canonical database functions.
-if type(baseGetRulesetByID) == "function" then
-    function Database.GetRulesetByID(rulesetId)
-        if plannerScopeActive() and rulesetId ~= nil and rulesetId ~= "" then
-            local root = getStableRulesetRoot()
-            if root then
-                return root.rulesets[tostring(rulesetId)]
-            end
-        end
-        return baseGetRulesetByID(rulesetId)
-    end
-end
-
-if type(baseGetActiveRulesetId) == "function" then
-    function Database.GetActiveRulesetId()
-        if plannerScopeActive() then
-            local root = getStableRulesetRoot()
-            if root then
-                local characterKey = getCurrentCharacterKey()
-                local exactValue = root.activeByChar[characterKey]
-                if exactValue ~= nil then
-                    return exactValue
-                end
-                if characterKey == "unknown-player" or root.activeByChar["unknown-player"] == nil then
-                    return nil
-                end
-            end
-        end
-        return baseGetActiveRulesetId()
-    end
-end
-
--- PlannerPreparationPerformance temporarily skipped the canonical initial-target
--- resolver for frozen planner proxies. That shortcut changes the condition
--- context because spell conditions are evaluated before the later candidate
--- collection pass. Preserve the canonical resolver exactly for planner proxies;
--- the prepared registry caches still remove the expensive first-use scans.
-local preparedResolveSpellActivationTargetUnit = Client.ResolveSpellActivationTargetUnit
-if type(preparedResolveSpellActivationTargetUnit) == "function"
-    and Client._autopilotCanonicalInitialTargetRestored ~= true
-then
-    function Client:ResolveSpellActivationTargetUnit(activation, targetGroup)
-        if rawget(self, "__autopilotPlannerProxy") == true then
-            rawset(self, "__autopilotPlannerProxy", nil)
-            local results = { pcall(preparedResolveSpellActivationTargetUnit, self, activation, targetGroup) }
-            rawset(self, "__autopilotPlannerProxy", true)
-            if results[1] ~= true then
-                error(results[2], 0)
-            end
-            return results[2]
-        end
-        return preparedResolveSpellActivationTargetUnit(self, activation, targetGroup)
-    end
-    Client._autopilotCanonicalInitialTargetRestored = true
 end
 
 local function nowMilliseconds()
@@ -456,6 +307,14 @@ local function logSnapshotBreakdown(state)
 end
 
 local function runPlannerStep(state, deadlineMs)
+    if type(Planner.IsConfigurationSnapshotStale) == "function"
+        and Planner.IsConfigurationSnapshotStale(state) == true
+    then
+        state.failureReason = "configuration-changed"
+        state.phase = "complete"
+        state.result = nil
+        return true
+    end
     local entryPhase = tostring(state.phase or "")
     if entryPhase == "snapshot-units" then
         local startedAt = nowMilliseconds()
@@ -487,10 +346,7 @@ function Planner.Step(state, deadlineMs)
         return true
     end
 
-    local previousState = activePlannerState
-    activePlannerState = state
     local results = { pcall(runPlannerStep, state, deadlineMs) }
-    activePlannerState = previousState
 
     if results[1] ~= true then
         error(results[2], 0)

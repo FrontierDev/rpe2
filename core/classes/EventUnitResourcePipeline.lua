@@ -181,6 +181,7 @@ end
 local function buildSeedValues(baseUnit, preset, policy)
     local values = {}
     local ratioByRef = {}
+    local explicitByRef = {}
     local seen = {}
     local progressionValues = {}
     if type(UnitClass.ResolveResourceValues) == "function" then
@@ -204,6 +205,7 @@ local function buildSeedValues(baseUnit, preset, policy)
             local ratio = 1
 
             if explicitCurrent ~= nil or explicitMax ~= nil then
+                explicitByRef[resourceRef] = true
                 local baseMax = explicitMax ~= nil and explicitMax or (explicitCurrent or 0)
                 local baseCurrent = explicitCurrent ~= nil and explicitCurrent or baseMax
                 if baseMax > 0 then
@@ -249,7 +251,7 @@ local function buildSeedValues(baseUnit, preset, policy)
         end
     end
 
-    return values, ratioByRef
+    return values, ratioByRef, explicitByRef
 end
 
 function EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, options)
@@ -291,7 +293,7 @@ function EventUnit.BuildUnitDerivedResources(baseUnit, presetIndex, playerCount,
     local policyOptions = deepCopy(type(options) == "table" and options or {})
     policyOptions.presetIndex = normalizedPresetIndex
     local policy = EventUnit.ResolveNpcResourcePolicy(baseUnit, playerCount, policyOptions)
-    local seedValues, ratioByRef = buildSeedValues(baseUnit, preset, policy)
+    local seedValues, ratioByRef, explicitByRef = buildSeedValues(baseUnit, preset, policy)
     local modifiedValues = applyPresetResourceModifiers(seedValues, preset)
     local resources = {}
 
@@ -301,6 +303,12 @@ function EventUnit.BuildUnitDerivedResources(baseUnit, presetIndex, playerCount,
         if resourceRef then
             local maxValue = math.max(0, tonumber(entry.value) or 0)
             local currentValue = maxValue * (ratioByRef[resourceRef] ~= nil and ratioByRef[resourceRef] or 1)
+            if not explicitByRef[resourceRef]
+                and type(EventUnit.IsResourceStartsAtZero) == "function"
+                and EventUnit.IsResourceStartsAtZero(resourceRef)
+            then
+                currentValue = 0
+            end
 
             if policy.healthResourceRef ~= nil and resourceRef == policy.healthResourceRef and policy.healthPercent ~= 0 then
                 local multiplier = 1 + (policy.healthPercent / 100)

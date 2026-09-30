@@ -2551,6 +2551,11 @@ function Server:AdvanceEventStep()
         return false
     end
 
+    -- Advancing the authoritative event state must wait for the host's local
+    -- pending changes to flush, but it must not wait for every connected
+    -- client to acknowledge a separate barrier.  That barrier can be left
+    -- unresolved by a client that does not receive the request (or has not
+    -- finished startup), leaving the advance button as a silent no-op.
     self.EventAdvanceRequestGeneration = math.max(0, math.floor(tonumber(self.EventAdvanceRequestGeneration) or 0)) + 1
     local commit = Client:BeginPendingTurnCommit(
         Client.GetState and Client:GetState() or nil,

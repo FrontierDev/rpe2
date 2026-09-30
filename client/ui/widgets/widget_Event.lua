@@ -681,7 +681,11 @@ local function addPortraitAbsorptionState(healthState, eventUnit, eventState)
 end
 
 local function buildPortraitResourceStates(actionBarWidget, eventUnit, eventState, resourceContext)
+    local strictHealthResource = type(resourceContext) == "table" and resourceContext.strictHealthResource == true
     if type(eventUnit) ~= "table" then
+        if strictHealthResource then
+            return nil, nil
+        end
         if type(actionBarWidget) ~= "table" or type(actionBarWidget.BuildActionBarResourceStates) ~= "function" then
             return nil, nil
         end
@@ -706,7 +710,16 @@ local function buildPortraitResourceStates(actionBarWidget, eventUnit, eventStat
             return nil, nil
         end
 
-        return addPortraitAbsorptionState(fallbackStates.health, eventUnit, eventState), fallbackStates.primary
+        local fallbackHealth = addPortraitAbsorptionState(fallbackStates.health, eventUnit, eventState)
+        if strictHealthResource then
+            local expectedHealthRef = normalizeResourceRef(type(resourceContext) == "table" and resourceContext.healthResourceRef or nil)
+                or normalizeResourceRef(type(eventState) == "table" and eventState.healthResourceRef or nil)
+                or normalizeResourceRef(type(Profile.GetHealthResourceRef) == "function" and Profile.GetHealthResourceRef() or nil)
+            if not expectedHealthRef or type(fallbackHealth) ~= "table" or fallbackHealth.resourceRef ~= expectedHealthRef then
+                return nil, nil
+            end
+        end
+        return fallbackHealth, fallbackStates.primary
     end
 
     local resolvedByRef = type(resourceContext) == "table" and type(resourceContext.resolvedByRef) == "table" and resourceContext.resolvedByRef or {}
@@ -745,7 +758,7 @@ local function buildPortraitResourceStates(actionBarWidget, eventUnit, eventStat
         end
     end
 
-    if not healthState then
+    if not healthState and not strictHealthResource then
         healthState = firstFallbackState
     end
     if primaryState and primaryState.resourceRef == (healthState and healthState.resourceRef or nil) then
@@ -769,7 +782,10 @@ local function buildPortraitResourceStates(actionBarWidget, eventUnit, eventStat
         return healthState, primaryState
     end
 
-    if type(actionBarWidget) ~= "table" or type(actionBarWidget.BuildActionBarResourceStates) ~= "function" then
+    if strictHealthResource
+        or type(actionBarWidget) ~= "table"
+        or type(actionBarWidget.BuildActionBarResourceStates) ~= "function"
+    then
         return nil, nil
     end
 
@@ -1100,6 +1116,37 @@ function EventWidget:BuildPortraitTooltip(eventUnit, eventState)
     local healthState, primaryState = buildPortraitResourceStates(actionBarWidget, eventUnit, resolvedEventState, resourceContext)
     local tooltip = buildEventPortraitTooltip(eventUnit, resolvedEventState, healthState, primaryState)
     return appendPlayerPetTooltipLines(tooltip, eventUnit, resolvedEventState, actionBarWidget, resourceContext)
+end
+
+-- Shared read-only data helpers for auxiliary event views. These deliberately
+-- reuse the portrait masking and resource resolution rules without exposing
+-- the mutable portrait implementation to those views.
+function EventWidget:BuildWidgetDisplayUnit(eventUnit, eventState, isHost)
+    if isHost == nil then
+        isHost = isLocalHostForEvent(eventState)
+    end
+
+    return buildWidgetDisplayUnit(eventUnit, isHost == true)
+end
+
+function EventWidget:IsEventUnitActive(eventUnit)
+    return isEventUnitActive(eventUnit)
+end
+
+function EventWidget:ResolveEventUnitHealthState(eventUnit, eventState)
+    if type(eventUnit) ~= "table" or type(eventState) ~= "table" then
+        return nil
+    end
+
+    local actionBarWidget = getActionBarWidget()
+    local resourceContext = type(actionBarWidget) == "table"
+        and type(actionBarWidget.BuildActionBarResourceContext) == "function"
+        and actionBarWidget:BuildActionBarResourceContext(eventState)
+        or {}
+    resourceContext.strictHealthResource = true
+
+    local healthState = buildPortraitResourceStates(actionBarWidget, eventUnit, eventState, resourceContext)
+    return healthState
 end
 
 function EventWidget:Get()

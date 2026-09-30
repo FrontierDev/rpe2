@@ -12,6 +12,7 @@ local Event = Addon.Internal
     or nil
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local Spatial = Client.AutopilotSpatial or {}
 
 Client.AutopilotExecution = Client.AutopilotExecution or {}
 local Execution = Client.AutopilotExecution
@@ -257,8 +258,9 @@ local function normalizeRaidMarker(value)
     return marker >= 1 and marker <= 8 and marker or 0
 end
 
-local function validateSelectionForPolicy(ids, candidates, policy)
+local function validateSelectionForPolicy(ids, candidates, policy, context)
     policy = type(policy) == "table" and policy or {}
+    context = type(context) == "table" and context or {}
     local minTargets = normalizePolicyCount(policy.minTargets)
     local maxTargets = normalizePolicyCount(policy.maxTargets)
     local targetType = tostring(policy.type or "single")
@@ -289,24 +291,57 @@ local function validateSelectionForPolicy(ids, candidates, policy)
         end
     elseif targetType == "raid_marker" then
         local anchor = candidatesByEventId[ids[1]]
-        local anchorMarker = normalizeRaidMarker(anchor and anchor.raidMarker)
-        if anchorMarker <= 0 then
-            return false, "target-marker-invalid"
-        end
-        for index = 2, #ids do
-            if normalizeRaidMarker(candidatesByEventId[ids[index]] and candidatesByEventId[ids[index]].raidMarker) ~= anchorMarker then
-                return false, "target-marker-mismatch"
+        if context.isNpcCaster == true then
+            if #ids > 1 then
+                if type(Spatial.IsWithinRaidMarkerNpcAoeRadius) ~= "function" then
+                    return false, "target-spatial-unavailable"
+                end
+                for index = 2, #ids do
+                    local withinRadius = Spatial.IsWithinRaidMarkerNpcAoeRadius(
+                        context.spatialRuntime,
+                        context.eventState,
+                        anchor,
+                        candidatesByEventId[ids[index]]
+                    )
+                    if withinRadius ~= true then
+                        return false, "target-distance-invalid"
+                    end
+                end
+            end
+        else
+            local anchorMarker = normalizeRaidMarker(anchor and anchor.raidMarker)
+            if anchorMarker <= 0 then
+                if #ids ~= 1 then
+                    return false, #ids == 0 and "target-marker-invalid" or "target-marker-mismatch"
+                end
+            else
+                for index = 2, #ids do
+                    if normalizeRaidMarker(candidatesByEventId[ids[index]] and candidatesByEventId[ids[index]].raidMarker) ~= anchorMarker then
+                        return false, "target-marker-mismatch"
+                    end
+                end
             end
         end
     end
     return true
 end
 
-local function buildValidatedTargetSelection(action, snapshot)
+local function buildValidatedTargetSelection(action, snapshot, spatialRuntimeOverride)
     local groups = type(snapshot.targetGroups) == "table" and snapshot.targetGroups or {}
     local selections = {}
     local order = {}
     local knownGroups = {}
+    local spatialRuntime = type(spatialRuntimeOverride) == "table"
+        and spatialRuntimeOverride
+        or type(snapshot.spatialRuntime) == "table"
+        and snapshot.spatialRuntime
+        or getRuntime(snapshot.eventState)
+    local validationContext = {
+        casterUnit = snapshot.casterUnit,
+        eventState = snapshot.eventState,
+        isNpcCaster = type(snapshot.casterUnit) == "table" and snapshot.casterUnit.isPlayer ~= true,
+        spatialRuntime = spatialRuntime,
+    }
 
     if #groups > 0 then
         for index = 1, #groups do
@@ -320,7 +355,7 @@ local function buildValidatedTargetSelection(action, snapshot)
             local candidates = type(snapshot.targetCandidatesByGroup) == "table"
                 and snapshot.targetCandidatesByGroup[key]
                 or {}
-            local valid, reason = validateSelectionForPolicy(ids, candidates, group.policy)
+            local valid, reason = validateSelectionForPolicy(ids, candidates, group.policy, validationContext)
             if not valid then
                 return nil, nil, reason
             end
@@ -351,7 +386,7 @@ local function buildValidatedTargetSelection(action, snapshot)
         local fallback = { targetSelections = { default = action.targetEventIds } }
         ids = extractSelectionIds(fallback, key)
     end
-    local valid, reason = validateSelectionForPolicy(ids, snapshot.targetCandidates or {}, snapshot.policy)
+    local valid, reason = validateSelectionForPolicy(ids, snapshot.targetCandidates or {}, snapshot.policy, validationContext)
     if not valid then
         return nil, nil, reason
     end
@@ -482,7 +517,11 @@ function Client:ExecuteEventUnitSpell(request)
     end
 
     local selectionSource = type(action) == "table" and action or request
-    local targetSelections, targetSelectionOrder, targetReason = buildValidatedTargetSelection(selectionSource, snapshot)
+    local targetSelections, targetSelectionOrder, targetReason = buildValidatedTargetSelection(
+        selectionSource,
+        snapshot,
+        type(plan.spatialRuntime) == "table" and plan.spatialRuntime or nil
+    )
     if not targetSelections then
         return false, targetReason, "stale"
     end

@@ -43,7 +43,14 @@ function Addon.Internal.DispatchEvent(event, ...)
             return
         end
 
+        local previousCharacterStartupState = Addon.Internal.CharacterScopedStartupInProgress == true
+        Addon.Internal.CharacterScopedStartupInProgress = true
+
         local data = Addon.Data or nil
+        if data and type(data.SyncDefaultDatasets) == "function" then
+            safeCall(data.SyncDefaultDatasets)
+        end
+
         if data and type(data.SyncDefaultRuleset) == "function" then
             safeCall(data.SyncDefaultRuleset)
         end
@@ -66,6 +73,8 @@ function Addon.Internal.DispatchEvent(event, ...)
         if Achievements and Achievements.Initialize then
             safeCall(Achievements.Initialize, Achievements)
         end
+
+        Addon.Internal.CharacterScopedStartupInProgress = previousCharacterStartupState
         return
     end
 

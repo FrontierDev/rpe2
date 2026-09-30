@@ -1,7 +1,7 @@
 ## Interface: 120100
-## Title: RPEngine 2.0.alpha6
+## Title: RPEngine 2.0.alpha21
 ## Notes: Fully-integrated roll system and associated RP tools.
-## Version: 2.0.alpha6
+## Version: 2.0.alpha21
 ## Author: Ortellus @ Argent Dawn (Discord: ortellus)
 ## SavedVariables: RPEngineProfilesDB, RPEngineRulesetDB, RPEngineDatasetDB, RPEngineGlobalSettingsDB, RPEngineInventoryDB, RPEngineManagerDB
 
@@ -17,11 +17,14 @@ data/ModelData.lua
 data/default/Datasets.lua
 data/default/core.lua
 data/default/core_guild_settings.lua
+data/default/classes/druid.lua
 data/default/classes/hunter.lua
 data/default/classes/mage.lua
 data/default/classes/paladin.lua
 data/default/classes/priest.lua
 data/default/classes/rogue.lua
+data/default/classes/shaman.lua
+data/default/classes/warlock.lua
 data/default/classes/warrior.lua
 data/default/professions/fishing.lua
 data/default/professions/alchemy.lua
@@ -323,6 +326,7 @@ client/ui/widgets/widget_EventPrimaryResource.lua
 client/ui/widgets/widget_EventAutopilotSchedule.lua
 client/ui/widgets/widget_Event_CombatLogHistory.lua
 client/ui/widgets/widget_Event_Meters.lua
+client/ui/widgets/widget_Event_AllUnits.lua
 client/ui/widgets/widget_Event_DMHelper.lua
 client/autopilot/Helper.lua
 client/autopilot/EmoteCues.lua
@@ -346,6 +350,7 @@ client/ui/tooltips/tooltip_Skill.lua
 client/ui/tooltips/tooltip_Trait.lua
 client/ui/tooltips/tooltip_Player.lua
 client/ui/tooltips/tooltip_Item.lua
+client/ui/tooltips/tooltip_Loot.lua
 client/ui/tooltips/tooltip_Achievement.lua
 client/ui/windows/window_IconFinder.lua
 client/ui/windows/window_ModelFinder.lua

@@ -14,8 +14,50 @@ permissions:
   contents: write
 
 jobs:
+  first-run-bootstrap:
+    name: Validate first-run bootstrap
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@v4
+
+      - name: Install Lua 5.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes lua5.1
+          lua5.1 -v
+
+      - name: Run first-run bootstrap regression suite
+        shell: bash
+        run: |
+          set -euo pipefail
+          lua5.1 tests/CharacterIdentityTest.lua
+          lua5.1 tests/DefaultRulesetImportTest.lua
+          lua5.1 tests/SetupStartupOrderingTest.lua
+          lua5.1 tests/DefaultDatasetStartupTest.lua
+          lua5.1 tests/DruidDatasetTest.lua
+          lua5.1 tests/ClassBaseStatsDatasetTest.lua
+          lua5.1 tests/TooltipBuilderRegressionTest.lua
+          lua5.1 tests/PeriodicAuraAuthoringTest.lua
+          lua5.1 tests/ClassSetRestrictionTest.lua
+          lua5.1 tests/RuntimeExternalManagerStartupTest.lua
+          lua5.1 tests/CompatibilityHashCanonicalizationTest.lua
+          lua5.1 tests/AutoAttackCooldownTest.lua
+          lua5.1 tests/NpcEquipmentConditionTest.lua
+          lua5.1 tests/MovementAllowanceFallbackTest.lua
+          lua5.1 tests/EventCompletionAchievementDistributionTest.lua
+          lua5.1 tests/EventUnitNetworkBaselineTest.lua
+          lua5.1 tests/DeferredThreatResourceFlushTest.lua
+          lua5.1 tests/EventUtilityWindowModeTest.lua
+          lua5.1 tests/GuildSettingLootTableTest.lua
+
   release-package:
     name: Validate release package
+    needs:
+      - first-run-bootstrap
     runs-on: ubuntu-latest
 
     steps:
@@ -43,7 +85,7 @@ jobs:
 
           toc_version="$(sed -nE 's/^##[[:space:]]*Version:[[:space:]]*(.+)[[:space:]]*$/\1/p' RPEngine2.toc | head -n 1)"
           if [[ -z "$toc_version" ]]; then
-            echo "::error::RPEngine2.toc does not contain a usable Version field."
+            echo "::error::RPEngine2.toc does not contain a usable ## Version field."
             exit 1
           fi
 
