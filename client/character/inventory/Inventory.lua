@@ -84,32 +84,18 @@ local function deepCopy(value, seen)
     return copy
 end
 
+local function getCharacterIdentity()
+    if type(Database) == "table" and type(Database.ResolveCurrentCharacterIdentity) == "function" then
+        local key, _, stable, bareName = Database.ResolveCurrentCharacterIdentity()
+        return tostring(key or "unknown-player"), stable == true, tostring(bareName or "")
+    end
+
+    return "unknown-player", false, ""
+end
+
 local function getCharacterKey()
-    if UnitFullName then
-        local name, realm = UnitFullName("player")
-        if name and name ~= "" then
-            realm = realm or (GetRealmName and GetRealmName()) or ""
-            if realm ~= "" then
-                return ("%s-%s"):format(name, realm)
-            end
-
-            return name
-        end
-    end
-
-    if UnitName then
-        local name = UnitName("player")
-        if name and name ~= "" then
-            local realm = (GetRealmName and GetRealmName()) or ""
-            if realm ~= "" then
-                return ("%s-%s"):format(name, realm)
-            end
-
-            return name
-        end
-    end
-
-    return "unknown-player"
+    local key = getCharacterIdentity()
+    return key
 end
 
 function Inventory.EnsureRoot()
@@ -280,7 +266,19 @@ end
 
 local function getRawCharacterInventory()
     local root = Inventory.EnsureRoot()
-    local characterKey = getCharacterKey()
+    local characterKey, stable, bareName = getCharacterIdentity()
+    if stable == true
+        and characterKey ~= "unknown-player"
+        and type(root.inventoriesByChar[characterKey]) ~= "table"
+    then
+        if bareName ~= "" and type(root.inventoriesByChar[bareName]) == "table" then
+            root.inventoriesByChar[characterKey] = root.inventoriesByChar[bareName]
+            root.inventoriesByChar[bareName] = nil
+        elseif type(root.inventoriesByChar["unknown-player"]) == "table" then
+            root.inventoriesByChar[characterKey] = root.inventoriesByChar["unknown-player"]
+            root.inventoriesByChar["unknown-player"] = nil
+        end
+    end
     local inventory = root.inventoriesByChar[characterKey]
     if type(inventory) ~= "table" then
         inventory = {}

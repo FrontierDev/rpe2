@@ -81,13 +81,13 @@ end
 
 local function resolveCharacterKey()
     if type(Database.ResolveCurrentCharacterIdentity) == "function" then
-        local key, _, stable = Database.ResolveCurrentCharacterIdentity()
+        local key, _, stable, bareName = Database.ResolveCurrentCharacterIdentity()
         key = trim(key)
         if key ~= "" then
-            return key, stable == true
+            return key, stable == true, trim(bareName)
         end
     end
-    return "unknown-player", false
+    return "unknown-player", false, ""
 end
 
 local function ensureRoot()
@@ -108,11 +108,17 @@ local function ensureBucket(create)
         return nil
     end
 
-    local key, stable = resolveCharacterKey()
+    local key, stable, bareName = resolveCharacterKey()
     local buckets = root[ROOT_FIELD]
-    if stable and key ~= "unknown-player" and type(buckets["unknown-player"]) == "table" and buckets[key] == nil then
-        buckets[key] = buckets["unknown-player"]
-        buckets["unknown-player"] = nil
+    if stable and key ~= "unknown-player" and buckets[key] == nil then
+        local legacyKey = type(bareName) == "string" and bareName ~= "" and bareName or nil
+        if legacyKey and type(buckets[legacyKey]) == "table" then
+            buckets[key] = buckets[legacyKey]
+            buckets[legacyKey] = nil
+        elseif type(buckets["unknown-player"]) == "table" then
+            buckets[key] = buckets["unknown-player"]
+            buckets["unknown-player"] = nil
+        end
     end
 
     local bucket = buckets[key]

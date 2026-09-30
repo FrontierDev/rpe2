@@ -26,6 +26,7 @@ Client.ClientConnectRefreshQueued = Client.ClientConnectRefreshQueued or false
 Client.LocalConfigurationRefreshQueued = Client.LocalConfigurationRefreshQueued or false
 Client.PendingLocalConfigurationRefreshReason = Client.PendingLocalConfigurationRefreshReason or nil
 Client.LocalConfigurationRefreshInProgress = Client.LocalConfigurationRefreshInProgress == true
+Client.CharacterScopedStartupInProgress = Client.CharacterScopedStartupInProgress == true
 
 local SETUP_REQUIRED_MESSAGE = "Complete character setup before using RPE features."
 
@@ -67,15 +68,29 @@ end
 
 local function synchronizeDefaultRulesetForCurrentCharacter()
     local data = Addon.Data or nil
-    if type(data) ~= "table" or type(data.SyncDefaultRuleset) ~= "function" then
+    local database = Addon.Internal and Addon.Internal.Database or nil
+    if type(data) ~= "table"
+        or type(data.SyncDefaultRuleset) ~= "function"
+        or type(data.ActivateDefaultRulesetForCurrentCharacter) ~= "function"
+        or type(database) ~= "table"
+        or type(database.IsCurrentCharacterIdentityStable) ~= "function"
+        or database.IsCurrentCharacterIdentityStable() ~= true
+    then
         return false
     end
 
     -- PLAYER_ENTERING_WORLD is the first point where character-scoped
-    -- SavedVariables identity is guaranteed to be stable.  Run the idempotent
-    -- Core synchronizer here before setup checks so its activation is stored
-    -- against this character, rather than an early unknown-player identity.
-    return data.SyncDefaultRuleset() == true
+    -- SavedVariables identity is guaranteed to be stable. Install packaged
+    -- data and activate Core here before setup checks so both operations use
+    -- this character rather than an early unknown-player identity.
+    Client.CharacterScopedStartupInProgress = true
+    local syncOk, synchronized = pcall(data.SyncDefaultRuleset)
+    local activateOk, activated = false, false
+    if syncOk and synchronized == true then
+        activateOk, activated = pcall(data.ActivateDefaultRulesetForCurrentCharacter)
+    end
+    Client.CharacterScopedStartupInProgress = false
+    return syncOk and synchronized == true and activateOk and activated == true
 end
 
 local function notifySetupRequired()
@@ -664,6 +679,16 @@ function Client:HandleLocalConfigurationChanged(reason)
     if isRuntimeOnlyConfigurationReason(normalizedReason) then
         logSessionInternal(
             "Runtime-only Profile reason %s reached HandleLocalConfigurationChanged.",
+            tostring(normalizedReason or "")
+        )
+        return false
+    end
+
+    if self.CharacterScopedStartupInProgress == true
+        or (Addon.Internal and Addon.Internal.CharacterScopedStartupInProgress == true)
+    then
+        logSessionInternal(
+            "Character-scoped startup deferred configuration refresh reason=%s.",
             tostring(normalizedReason or "")
         )
         return false

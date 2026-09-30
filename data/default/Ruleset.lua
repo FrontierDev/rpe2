@@ -50,8 +50,6 @@ local function syncDefaultRuleset()
     if type(Database.EnsureRulesets) ~= "function"
         or type(Database.GetRulesetByID) ~= "function"
         or type(Database.ImportRuleset) ~= "function"
-        or type(Database.GetActiveRulesetId) ~= "function"
-        or type(Database.SetActiveRulesetId) ~= "function"
     then
         logInstallDiagnostic("ruleset synchronization API is unavailable")
         return false
@@ -96,23 +94,45 @@ local function syncDefaultRuleset()
         existing = imported
     end
 
-    -- The packaged Core ruleset is the fallback for any character without a
-    -- valid active ruleset. A stale character-scoped ID must not prevent the
-    -- fallback, while a valid user-selected ruleset remains untouched.
+    return true
+end
+
+local function activateDefaultRulesetForCurrentCharacter()
+    local Database = Addon.Internal and Addon.Internal.Database or nil
+    if type(Database) ~= "table"
+        or type(Database.IsCurrentCharacterIdentityStable) ~= "function"
+        or type(Database.GetActiveRulesetId) ~= "function"
+        or type(Database.GetRulesetByID) ~= "function"
+        or type(Database.SetActiveRulesetId) ~= "function"
+    then
+        logInstallDiagnostic("character-scoped ruleset activation API is unavailable")
+        return false
+    end
+
+    if Database.IsCurrentCharacterIdentityStable() ~= true then
+        logInstallDiagnostic("character identity is not stable")
+        return false
+    end
+
+    -- Character-scoped activation is deliberately separate from packaged
+    -- installation. This function is called only after PLAYER_ENTERING_WORLD.
     local activeRulesetId = Database.GetActiveRulesetId()
     local activeRuleset = activeRulesetId and Database.GetRulesetByID(activeRulesetId) or nil
-    if not activeRuleset then
-        local activatedRulesetId = Database.SetActiveRulesetId(DefaultRuleset.id)
-        if activatedRulesetId ~= DefaultRuleset.id then
-            logInstallDiagnostic("Core ruleset could not be activated for the current character")
-            return false
-        end
+    if activeRuleset then
+        return true
+    end
+
+    local activatedRulesetId = Database.SetActiveRulesetId(DefaultRuleset.id)
+    if activatedRulesetId ~= DefaultRuleset.id then
+        logInstallDiagnostic("Core ruleset could not be activated for the current character")
+        return false
     end
 
     return true
 end
 
--- Runtime owns the ADDON_LOADED sequence.  Register this synchronizer there
--- so ruleset installation and character-scoped activation complete before any
--- first-login session or setup-wizard work runs.
+-- Runtime owns the ADDON_LOADED sequence. Packaged synchronization is safe
+-- there; character-scoped activation is exposed separately for the stable
+-- PLAYER_ENTERING_WORLD boundary.
 Addon.Data.SyncDefaultRuleset = syncDefaultRuleset
+Addon.Data.ActivateDefaultRulesetForCurrentCharacter = activateDefaultRulesetForCurrentCharacter

@@ -69,6 +69,49 @@ loadAddonFile("client/ui/widgets/widget_Event_CombatLogHistory.lua")
 loadAddonFile("client/ui/widgets/widget_Event_Meters.lua")
 loadAddonFile("client/ui/widgets/widget_Event_AllUnits.lua")
 
+-- Threat rows must come from the synchronized NPC threat table, not from the
+-- local-only EventMeters ledger. This models a remote player's contribution.
+local actualRefreshMetersPanel = EventWidget.RefreshMetersPanel
+local metersScrollFrame = newFrame()
+metersScrollFrame.ClearAllPoints = function() end
+metersScrollFrame.SetPoint = function() end
+EventWidget.metersPanel.GetContentFrame = function() return metersFrame end
+EventWidget.metersTitle = { SetText = function(self, text) self.text = text end }
+EventWidget.metersScopeTabs = newElement(newFrame())
+EventWidget.metersThreatLabel = newElement(newFrame())
+EventWidget.metersThreatDropdown = newElement(newFrame())
+EventWidget.metersThreatDropdown.SetItems = function(self, items) self.items = items end
+EventWidget.metersThreatDropdown.SetSelectedValue = function(self, value) self.selectedValue = value end
+EventWidget.metersScroll = {
+    GetFrame = function() return metersScrollFrame end,
+    SetItems = function(self, items) self.items = items end,
+}
+EventWidget.metersEmptyText = newElement(newFrame())
+EventWidget.metersEmptyText.SetText = function(self, text) self.text = text end
+EventWidget.metersEventId = "threat-sync-test"
+EventWidget.metersViewType = "threat"
+EventWidget.metersScope = "total"
+EventWidget.metersThreatEventId = "202"
+Addon.Client.EventState = {
+    active = true,
+    ending = false,
+    id = "threat-sync-test",
+    units = {
+        { eventID = 101, isPlayer = true, name = "Alice", team = 1 },
+        { eventID = 102, isPlayer = true, name = "Bob", team = 1 },
+        { eventID = 202, isPlayer = false, name = "Goblin", active = true, threatTable = { [101] = 50, [102] = 30 } },
+    },
+}
+Addon.Client.EventMeters = {
+    GetRows = function()
+        return { { eventId = 101, name = "Alice", team = 1, amount = 50 } }
+    end,
+}
+assertTrue(actualRefreshMetersPanel(EventWidget), "threat meter refreshes from an event state")
+assertEqual(#EventWidget.metersScroll.items, 2, "threat meter includes remote synchronized threat")
+assertEqual(EventWidget.metersScroll.items[1].name, "Alice", "threat meter ranks the local contributor first")
+assertEqual(EventWidget.metersScroll.items[2].name, "Bob", "threat meter renders the remote contributor")
+
 local function assertMode(mode, title, selectedFrames, message)
     assertEqual(EventWidget.eventUtilityMode, mode, message .. " mode")
     assertEqual(EventWidget.eventUtilityWindow.title, title, message .. " title")

@@ -618,13 +618,13 @@ local function resolveCurrentCharacterIdentity()
     if UnitFullName then
         local name, realm = UnitFullName("player")
         if name and name ~= "" then
-            realm = realm or (GetRealmName and GetRealmName()) or ""
+            if realm == nil or realm == "" then
+                realm = GetRealmName and GetRealmName() or ""
+            end
             if realm ~= "" then
                 local characterKey = ("%s-%s"):format(name, realm)
-                return characterKey, characterKey, true
+                return characterKey, characterKey, true, name
             end
-
-            return name, name, true
         end
     end
 
@@ -634,14 +634,12 @@ local function resolveCurrentCharacterIdentity()
             local realm = (GetRealmName and GetRealmName()) or ""
             if realm ~= "" then
                 local characterKey = ("%s-%s"):format(name, realm)
-                return characterKey, characterKey, true
+                return characterKey, characterKey, true, name
             end
-
-            return name, name, true
         end
     end
 
-    return "unknown-player", "Unknown Author", false
+    return "unknown-player", "Unknown Author", false, nil
 end
 
 local function getCharacterKey()
@@ -656,10 +654,23 @@ end
 
 local function resolveCharacterScopedActiveId(root, fieldName)
     local entries = root and ensureTable(root[fieldName]) or {}
-    local characterKey = getCharacterKey()
+    local characterKey, _, isStable, bareName = resolveCurrentCharacterIdentity()
     local exactValue = entries[characterKey]
     if exactValue ~= nil then
         return exactValue, characterKey, false
+    end
+
+    if isStable == true
+        and type(bareName) == "string"
+        and bareName ~= ""
+        and bareName ~= characterKey
+        and entries[bareName] ~= nil
+    then
+        local migratedValue = entries[bareName]
+        entries[characterKey] = migratedValue
+        entries[bareName] = nil
+        root[fieldName] = entries
+        return migratedValue, characterKey, true
     end
 
     if characterKey ~= "unknown-player" and entries["unknown-player"] ~= nil then
@@ -1574,6 +1585,49 @@ local function migrateUnknownPlayerProfile(root, normalizedProfiles)
     return true, true
 end
 
+local function migrateBareNameProfile(root, normalizedProfiles)
+    if type(root) ~= "table" then
+        return false, false
+    end
+
+    local profiles = normalizedProfiles
+    if type(profiles) ~= "table" then
+        profiles = normalizeProfilesCollection(root)
+    end
+
+    local characterKey, displayName, isStable, bareName = resolveCurrentCharacterIdentity()
+    if isStable ~= true
+        or characterKey == ""
+        or characterKey == "unknown-player"
+        or type(bareName) ~= "string"
+        or bareName == ""
+        or bareName == characterKey
+    then
+        return false, false
+    end
+
+    local legacyProfile = profiles[bareName]
+    local authoritativeProfile = profiles[characterKey]
+    if type(authoritativeProfile) == "table" then
+        if type(legacyProfile) == "table" and isDefaultProfileRecord(legacyProfile) then
+            profiles[bareName] = nil
+            return false, true
+        end
+
+        return false, false
+    end
+
+    if type(legacyProfile) ~= "table" then
+        return false, false
+    end
+
+    legacyProfile.characterKey = characterKey
+    legacyProfile.name = displayName ~= "" and displayName or characterKey
+    profiles[characterKey] = legacyProfile
+    profiles[bareName] = nil
+    return true, true
+end
+
 local function nextDatasetEntryId(entries, collectionKey, definition)
     local alphabet = "abcdefghijklmnopqrstuvwxyz0123456789"
     local seen = {}
@@ -2319,6 +2373,7 @@ function Database.EnsureProfiles()
     if Database.Profiles ~= profiles then
         normalizeProfilesCollection(profiles, previousSchema < SCHEMA.profiles)
     end
+    migrateBareNameProfile(profiles, profiles.profiles)
     migrateUnknownPlayerProfile(profiles, profiles.profiles)
 
     Database.Profiles = profiles

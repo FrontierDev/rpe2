@@ -197,23 +197,16 @@ local function hasPositiveThreat(threatTable)
     return false
 end
 
-local function buildThreatTargets(eventState, scope)
+local function buildThreatTargets(eventState)
     local targets = {}
-    local eventMeters = Client.EventMeters
     for index = 1, #((eventState and eventState.units) or {}) do
         local unit = eventState.units[index]
         if type(unit) == "table" and unit.isPlayer ~= true and isUnitActive(unit) then
-            local ledgerRows = type(eventMeters) == "table" and type(eventMeters.GetRows) == "function"
-                and eventMeters:GetRows(eventState.id, "threat", scope, {
-                    targetEventId = unit.eventID,
-                    turnNumber = eventState.turnNumber,
-                })
-                or {}
             targets[#targets + 1] = {
                 eventId = tonumber(unit.eventID) or 0,
                 name = tostring(unit.name or "Unknown"),
                 boss = isUnitBoss(unit),
-                hasThreat = hasPositiveThreat(unit.threatTable) or #ledgerRows > 0,
+                hasThreat = hasPositiveThreat(unit.threatTable),
                 order = index,
             }
         end
@@ -232,6 +225,36 @@ local function buildThreatTargets(eventState, scope)
         return left.eventId < right.eventId
     end)
     return targets
+end
+
+local function buildAuthoritativeThreatRows(eventState, targetEventId)
+    local targetUnit = findEventUnit(eventState, targetEventId)
+    local rows = {}
+    if type(targetUnit) ~= "table" or type(targetUnit.threatTable) ~= "table" then
+        return rows
+    end
+
+    for sourceEventId, value in pairs(targetUnit.threatTable) do
+        local numericSourceEventId = tonumber(sourceEventId) or 0
+        local amount = tonumber(value) or 0
+        local sourceUnit = findEventUnit(eventState, numericSourceEventId)
+        if numericSourceEventId > 0 and amount > 0 and type(sourceUnit) == "table" then
+            rows[#rows + 1] = {
+                eventId = numericSourceEventId,
+                name = tostring(sourceUnit.name or "Unknown"),
+                team = tonumber(sourceUnit.team) or 0,
+                amount = amount,
+            }
+        end
+    end
+
+    table.sort(rows, function(left, right)
+        if left.amount ~= right.amount then
+            return left.amount > right.amount
+        end
+        return left.eventId < right.eventId
+    end)
+    return rows
 end
 
 local function ensureMeterRowTextures(row)
@@ -378,13 +401,17 @@ end
 local function buildMeterRows(eventState, eventId, meterType, scope, threatEventId)
     local rows = {}
     local largest = 0
-    local eventMeters = Client.EventMeters
-    local sourceRows = type(eventMeters) == "table" and type(eventMeters.GetRows) == "function"
-        and eventMeters:GetRows(eventId, meterType, scope, {
-            targetEventId = threatEventId,
-            turnNumber = eventState and eventState.turnNumber,
-        })
-        or {}
+    local sourceRows = {}
+    if meterType == "threat" then
+        sourceRows = buildAuthoritativeThreatRows(eventState, threatEventId)
+    else
+        local eventMeters = Client.EventMeters
+        sourceRows = type(eventMeters) == "table" and type(eventMeters.GetRows) == "function"
+            and eventMeters:GetRows(eventId, meterType, scope, {
+                turnNumber = eventState and eventState.turnNumber,
+            })
+            or {}
+    end
     local total = 0
     for index = 1, #sourceRows do
         total = total + math.max(0, tonumber(sourceRows[index].amount) or 0)
@@ -398,7 +425,9 @@ local function buildMeterRows(eventState, eventId, meterType, scope, threatEvent
             eventId = source.eventId,
             name = source.name,
             amount = source.amount,
-            percentage = total > 0 and (source.amount / total) * 100 or 0,
+            percentage = meterType == "threat"
+                    and (largest > 0 and (source.amount / largest) * 100 or 0)
+                or (total > 0 and (source.amount / total) * 100 or 0),
             color = color,
         }
     end
@@ -440,7 +469,7 @@ function EventWidget:RefreshMetersThreatTargets(eventState)
         return
     end
 
-    local targets = buildThreatTargets(eventState, self.metersScope)
+    local targets = buildThreatTargets(eventState)
     local items = {}
     for index = 1, #targets do
         local target = targets[index]
