@@ -396,7 +396,11 @@ local function executeSummonComponents(self, payload)
             summoned = self:SummonEventControlledUnit(
                 payload.casterUnit,
                 effect and effect.unitRef or nil,
-                { ownerID = payload.sender }
+                {
+                    ownerID = payload.sender,
+                    asPet = effect and effect.summonAsPet == true or false,
+                    replacePet = effect and effect.summonAsPet == true or false,
+                }
             ) ~= nil or summoned
         end
     end
