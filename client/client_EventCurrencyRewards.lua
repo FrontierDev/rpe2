@@ -52,7 +52,7 @@ if type(baseHandleEventEnd) == "function" then
             or (distributionFlag ~= false and tostring(distributionFlag) ~= "false" and tostring(distributionFlag) ~= "0")
         local result = baseHandleEventEnd(self, ...)
         if result == true and distributeEndRewards and type(endingState) == "table" then
-            self:GrantConfiguredEventCurrency("justice", "event_end_justice_currency", 100, endingState, "event-end-justice")
+            self:GrantConfiguredEventCurrency("justice", "event_end_justice_currency", 125, endingState, "event-end-justice")
         end
         return result
     end
