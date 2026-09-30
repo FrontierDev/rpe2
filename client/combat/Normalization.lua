@@ -463,6 +463,7 @@ local function normalizeSummonUnitEffect(value)
     return {
         type = "summon_unit",
         unitRef = normalizeQualifiedUnitRef(data.unitRef),
+        summonAsPet = Normalization.NormalizeBool(data.summonAsPet, false),
         targetEvents = normalizeEventList(data.targetEvents),
     }
 end
