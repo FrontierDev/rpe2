@@ -7,11 +7,11 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for a base Felhunter unit in the C
 | Stat | Initial | Per level | Level 60 |
 |---|---:|---:|---:|
 | Health | 160 | 39.661017 | 2,500 |
-| Mana | 120 | 28.474576 | 1,800 |
-| Armor | 75 | 29.237288 | 1,800 |
-| Melee Attack Power | 55 | 6.694915 | 450 |
+| Mana | 120 | 33.559322 | 2,100 |
+| Armor | 75 | 24.152542 | 1,500 |
+| Melee Attack Power | 55 | 5.423729 | 375 |
 | Ranged Attack Power | 0 | 0 | 0 |
-| Spell Power | 25 | 2.966102 | 200 |
+| Spell Power | 25 | 2.542373 | 175 |
 | Healing Power | 0 | 0 | 0 |
 | Melee Hit Chance | 0 | 0 | 0 |
 | Ranged Hit Chance | 0 | 0 | 0 |
@@ -22,21 +22,21 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for a base Felhunter unit in the C
 | Parry Chance | 0 | 0 | 0 |
 | Dodge Chance | 3 | 0 | 3 |
 | Block Chance | 0 | 0 | 0 |
-| Magic Resistance | 5 | 0 | 5 |
-| Fire Resistance | 1.333333 | 1.333333 | 80 |
-| Frost Resistance | 1.333333 | 1.333333 | 80 |
-| Nature Resistance | 1.333333 | 1.333333 | 80 |
-| Arcane Resistance | 1.333333 | 1.333333 | 80 |
-| Shadow Resistance | 1.333333 | 1.333333 | 80 |
+| Magic Resistance | 10 | 0 | 10 |
+| Fire Resistance | 1.666667 | 1.666667 | 100 |
+| Frost Resistance | 1.666667 | 1.666667 | 100 |
+| Nature Resistance | 1.666667 | 1.666667 | 100 |
+| Arcane Resistance | 1.666667 | 1.666667 | 100 |
+| Shadow Resistance | 1.666667 | 1.666667 | 100 |
 | Holy Resistance | 0 | 0 | 0 |
 | Resource Regeneration | 0 | 0 | 0 |
 | Movement Speed | 30 | 0 | 30 |
 
-Under the current Core `level_scaled_percent` mitigation model, a school-resistance rating of approximately `1.333333 × level` corresponds to approximately **20% damage mitigation**. Fire, Frost, Nature, Arcane and Shadow therefore remain at approximately 20% mitigation from level 1 through level 60.
+Under the current Core `level_scaled_percent` mitigation model, a school-resistance rating of approximately `1.666667 × level` corresponds to approximately **25% damage mitigation**. Fire, Frost, Nature, Arcane and Shadow therefore remain at approximately 25% mitigation from level 1 through level 60.
 
 Holy Resistance remains 0 because Holy currently uses direct mitigation rather than the percentage-reference model.
 
-The Felhunter also has **5 Magic Resistance**. Unlike the elemental school-resistance ratings, Magic Resistance participates directly in the active percent-based spell defence check, so it is intentionally not level-scaled.
+The Felhunter also has **10 Magic Resistance**. Unlike the elemental school-resistance ratings, Magic Resistance participates directly in the active percent-based spell defence check, so it is intentionally not level-scaled.
 
 ## Base appearance
 
@@ -50,10 +50,11 @@ No FileDataID is authored because one has not been verified for the current clie
 
 The base Felhunter is an anti-magic melee/spell hybrid:
 
-- tougher than the Imp and Sayaad, but less durable than the Voidwalker or Felguard;
-- stronger melee pressure than the Sayaad;
-- enough Spell Power to support dispels, interrupts and other magical pet abilities;
-- modest innate Magic Resistance to reinforce its anti-caster role.
+- tougher than the Imp and broadly comparable to the Sayaad in raw durability, but less durable than the Voidwalker or Felguard;
+- lower raw melee and spell offence than the Sayaad, because its strength is utility rather than damage;
+- enough Melee Attack Power to remain a credible melee attacker;
+- enough Spell Power to support magical pet abilities;
+- substantially stronger innate anti-magic defence than the other demons.
 
 ## Presets
 
@@ -101,7 +102,7 @@ RPE_DATASET_ENTRY_V1
             },
             {
                 initialValue = 120,
-                perLevelValue = 28.474576,
+                perLevelValue = 33.559322,
                 resourceRef = "f82db71a:4c8mfm99",
             },
         },
@@ -109,7 +110,7 @@ RPE_DATASET_ENTRY_V1
         stats = {
             {
                 initialValue = 75,
-                perLevelValue = 29.237288,
+                perLevelValue = 24.152542,
                 statRef = "f82db71a:v42albuv",
             },
             {
@@ -143,13 +144,13 @@ RPE_DATASET_ENTRY_V1
                 statRef = "f82db71a:p8syz5ba",
             },
             {
-                initialValue = 5,
+                initialValue = 10,
                 perLevelValue = 0,
                 statRef = "f82db71a:zs1nbz13",
             },
             {
                 initialValue = 55,
-                perLevelValue = 6.694915,
+                perLevelValue = 5.423729,
                 statRef = "f82db71a:u7b49vs9",
             },
             {
@@ -159,7 +160,7 @@ RPE_DATASET_ENTRY_V1
             },
             {
                 initialValue = 25,
-                perLevelValue = 2.966102,
+                perLevelValue = 2.542373,
                 statRef = "f82db71a:7t7xgzcx",
             },
             {
@@ -178,8 +179,8 @@ RPE_DATASET_ENTRY_V1
                 statRef = "f82db71a:69hfqhne",
             },
             {
-                initialValue = 1.333333,
-                perLevelValue = 1.333333,
+                initialValue = 1.666667,
+                perLevelValue = 1.666667,
                 statRef = "f82db71a:0w7c7p09",
             },
             {
@@ -188,23 +189,23 @@ RPE_DATASET_ENTRY_V1
                 statRef = "f82db71a:hj6d4kvy",
             },
             {
-                initialValue = 1.333333,
-                perLevelValue = 1.333333,
+                initialValue = 1.666667,
+                perLevelValue = 1.666667,
                 statRef = "f82db71a:jjn0my8k",
             },
             {
-                initialValue = 1.333333,
-                perLevelValue = 1.333333,
+                initialValue = 1.666667,
+                perLevelValue = 1.666667,
                 statRef = "f82db71a:pg0ytacb",
             },
             {
-                initialValue = 1.333333,
-                perLevelValue = 1.333333,
+                initialValue = 1.666667,
+                perLevelValue = 1.666667,
                 statRef = "f82db71a:954yunb9",
             },
             {
-                initialValue = 1.333333,
-                perLevelValue = 1.333333,
+                initialValue = 1.666667,
+                perLevelValue = 1.666667,
                 statRef = "f82db71a:itpo751d",
             },
             {
