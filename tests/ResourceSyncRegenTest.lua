@@ -144,15 +144,13 @@ local function run()
     }, { resourceRegenerationStatRef = "regen" })
     assertEqual(directApplied[1].delta, 20, "direct resource restoration")
 
-    for _, unitType in ipairs({ "player", "npc" }) do
-        statValues = { regen = 5 }
-        local eventUnit = build(
-            { { resourceRef = "mana", currentValue = 0, maxValue = 100 } },
-            { resourceRow("mana", fixedResource(20)) },
-            { resourceRegenerationStatRef = "regen", resolveStatValue = resolver }
-        )
-        assertClose(findDelta(eventUnit, "mana").delta, 21, unitType .. " EventUnit stat resolution")
-    end
+    statValues = { regen = 5 }
+    local playerEventUnit = build(
+        { { resourceRef = "mana", currentValue = 0, maxValue = 100 } },
+        { resourceRow("mana", fixedResource(20)) },
+        { resourceRegenerationStatRef = "regen", resolveStatValue = resolver }
+    )
+    assertClose(findDelta(playerEventUnit, "mana").delta, 21, "player EventUnit stat resolution")
 
     return true
 end

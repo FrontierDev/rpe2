@@ -1676,15 +1676,15 @@ function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStat
         return false
     end
 
-    local activeEventUnit, controlContext = nil, nil
+    local activeEventUnit = nil
     if type(self.ResolveActiveSpellcasterUnit) == "function" then
-        activeEventUnit, _, controlContext = self:ResolveActiveSpellcasterUnit(eventState)
+        activeEventUnit = self:ResolveActiveSpellcasterUnit(eventState)
     end
     local activeEventId = tonumber(activeEventUnit and activeEventUnit.eventID) or 0
     if activeEventId <= 0 then
         return false
     end
-    if activeEventUnit.isPlayer ~= true and not (type(controlContext) == "table" and controlContext.isControlled == true) then
+    if activeEventUnit.isPlayer ~= true then
         return false
     end
 
