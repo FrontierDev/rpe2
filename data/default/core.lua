@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 45,
+    version = 46,
     dataset = {
         achievements = {},
         auras = {},
@@ -5616,8 +5616,8 @@ units = {
                 statRef = "f82db71a:69hfqhne",
             },
             {
-                initialValue = 0,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:0w7c7p09",
             },
             {
@@ -5626,23 +5626,23 @@ units = {
                 statRef = "f82db71a:hj6d4kvy",
             },
             {
-                initialValue = 0,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:jjn0my8k",
             },
             {
-                initialValue = 0,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:pg0ytacb",
             },
             {
-                initialValue = 0,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:954yunb9",
             },
             {
-                initialValue = 0,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:itpo751d",
             },
             {
@@ -5872,8 +5872,8 @@ units = {
                 statRef = "f82db71a:69hfqhne",
             },
             {
-                initialValue = 20,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:0w7c7p09",
             },
             {
@@ -5882,23 +5882,23 @@ units = {
                 statRef = "f82db71a:hj6d4kvy",
             },
             {
-                initialValue = 0,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:jjn0my8k",
             },
             {
-                initialValue = 0,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:pg0ytacb",
             },
             {
-                initialValue = 0,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:954yunb9",
             },
             {
-                initialValue = 0,
-                perLevelValue = 0,
+                initialValue = 1.333333,
+                perLevelValue = 1.333333,
                 statRef = "f82db71a:itpo751d",
             },
             {
