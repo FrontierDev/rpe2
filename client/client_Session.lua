@@ -103,12 +103,31 @@ end
 
 function Client:CanAccessPostSetupFeatures()
     local profile = getProfileLogic()
-    if type(profile) ~= "table" or type(profile.IsSetupComplete) ~= "function" then
+    if type(profile) ~= "table" then
         return false, "setup-state-unavailable"
     end
 
-    if profile.IsSetupComplete() == true then
-        return true
+    if type(profile.GetSetupAccessState) == "function" then
+        local setupState = profile.GetSetupAccessState()
+        if setupState == "setup-complete" then
+            return true, setupState
+        end
+        if setupState == "setup-incomplete" then
+            return false, setupState
+        end
+        return false, "setup-state-unavailable"
+    end
+
+    if type(profile.IsSetupComplete) ~= "function" then
+        return false, "setup-state-unavailable"
+    end
+
+    local setupComplete, setupState = profile.IsSetupComplete()
+    if setupComplete == true then
+        return true, "setup-complete"
+    end
+    if setupState == "setup-state-unavailable" or setupComplete == nil then
+        return false, "setup-state-unavailable"
     end
 
     return false, "setup-incomplete"
@@ -129,7 +148,9 @@ function Client:RequireSetupCompletion(reason)
         self.SetupGateRedirectInProgress = false
     end
 
-    notifySetupRequired()
+    if accessReason ~= "setup-state-unavailable" then
+        notifySetupRequired()
+    end
     return false, accessReason or tostring(reason or "setup-required")
 end
 

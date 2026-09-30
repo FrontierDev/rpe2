@@ -1742,9 +1742,6 @@ if initializer then
         if Client.BuildActionBarWidget then
             Client:BuildActionBarWidget()
         end
-        if Client.ShowActionBarWidget then
-            Client:ShowActionBarWidget()
-        end
         if Client.RefreshActionBarWidget then
             Client:RefreshActionBarWidget("addon-loaded")
         end
