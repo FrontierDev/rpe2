@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 44,
+    version = 45,
     dataset = {
         achievements = {},
         auras = {},
@@ -2141,7 +2141,29 @@ Addon.Data.DefaultDatasets:Register({
             }
         },
         name = "_Core",
-        pets = {},
+        pets = {
+            {
+                equipmentSlotRefs = {},
+                id = "smnfelgd",
+                name = "Summoned Felguard",
+                spells = {
+                    "f82db71a:6uix049h",
+                    "7bbb4cb9:e0mooybr",
+                },
+                unitRef = "f82db71a:felgrd01",
+            },
+            {
+                equipmentSlotRefs = {},
+                id = "smnimp01",
+                name = "Summoned Imp",
+                spells = {
+                    "f82db71a:6uix049h",
+                    "d7c874c4:68dy7na1",
+                    "d7c874c4:fireward",
+                },
+                unitRef = "f82db71a:imp00001",
+            },
+        },
         races = {
             {
                 description = "The humans are the most populous and the youngest race in Azeroth. The humans have become the de facto leaders of the Alliance, with their youthful ambitions and resilience. The humans are the founders of the Alliance. Their diplomacy skills go back to the Second War, where the seven kingdoms joined together to defeat the Horde.",
@@ -5277,7 +5299,29 @@ units = {
         tags = {  },
     },
     {
-        appearances = {  },
+        appearances = {
+            {
+                displayId = 79677,
+                fileDataId = 1711518,
+                cam = 0.45,
+                rot = 0.01,
+                z = -0.35,
+            },
+            {
+                displayId = 79678,
+                fileDataId = 1711518,
+                cam = 0.45,
+                rot = 0.01,
+                z = -0.35,
+            },
+            {
+                displayId = 18193,
+                fileDataId = 1100490,
+                cam = 0.45,
+                rot = 0.01,
+                z = -0.35,
+            },
+        },
         attributes = {  },
         challengeLevel = "normal",
         creatureSize = "large",
@@ -5620,7 +5664,29 @@ units = {
         tags = {  },
     },
 {
-        appearances = {  },
+        appearances = {
+            {
+                displayId = 66827,
+                fileDataId = 1138493,
+                cam = 0.60,
+                rot = 0.01,
+                z = -0.35,
+            },
+            {
+                displayId = 67920,
+                fileDataId = 1138493,
+                cam = 0.60,
+                rot = 0.01,
+                z = -0.35,
+            },
+            {
+                displayId = 67906,
+                fileDataId = 1138493,
+                cam = 0.60,
+                rot = 0.01,
+                z = -0.35,
+            },
+        },
         attributes = {  },
         challengeLevel = "minor",
         creatureSize = "small",
