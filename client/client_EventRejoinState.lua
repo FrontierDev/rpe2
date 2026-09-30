@@ -4,10 +4,6 @@ Addon.Client = Addon.Client or {}
 
 local Client = Addon.Client
 local Common = Addon.Utils and Addon.Utils.Common or {}
-local EventTransactions = Addon.Internal
-    and Addon.Internal.Comms
-    and Addon.Internal.Comms.EventTransactions
-    or nil
 local EventRejoinState = Addon.Internal
     and Addon.Internal.Comms
     and Addon.Internal.Comms.EventRejoinState
@@ -261,59 +257,6 @@ function Client:HandleEventRejoinState(arguments, sender)
             Debug.Error("Event rejoin state rejected: %s.", tostring(reason or "invalid-payload"))
         end
         return false
-    end
-
-    local function clearRejoinTransientState()
-        if EventTransactions and type(EventTransactions.Client) == "table"
-            and type(EventTransactions.Client.EndEvent) == "function"
-        then
-            EventTransactions.Client:EndEvent(eventId, "event-rejoin")
-            if type(EventTransactions.Client.StartEvent) == "function" then
-                EventTransactions.Client:StartEvent(eventId)
-            end
-        end
-        if type(self.ClearCombatReactionRuntime) == "function" then
-            self:ClearCombatReactionRuntime(eventId, "event-rejoin")
-        end
-        if type(self.CancelPendingTurnCommit) == "function" then
-            self:CancelPendingTurnCommit("event-rejoin", eventId)
-        end
-        if type(self.ResetEventResourceDeltas) == "function" then
-            self:ResetEventResourceDeltas(eventId)
-        end
-        if type(self.ClearAutopilotBatch) == "function" then
-            self:ClearAutopilotBatch(eventId, "event-rejoin")
-        end
-        self.EventSnapshotRepair = nil
-        self.EventSnapshotRepairRequestedRevision = nil
-        self.EventSnapshotRepairReason = nil
-        self.EventSnapshotRepairTimerActive = nil
-        self.EventSnapshotRepairTimerEventId = nil
-    end
-
-    local snapshotRevision = math.max(0, math.floor(tonumber(arguments and arguments[5]) or 0))
-    local serializedUnits = arguments and arguments[6] or ""
-    local localRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
-    if snapshotRevision < localRevision then
-        return false
-    end
-    clearRejoinTransientState()
-    if type(serializedUnits) == "string" and serializedUnits ~= "" then
-        if type(self.HandleEventUnits) ~= "function" then
-            if type(Debug.Error) == "function" then
-                Debug.Error("Event rejoin state cannot install authoritative units: EVENT_UNITS handler unavailable.")
-            end
-            return false
-        end
-        local applied = self:HandleEventUnits({
-            channelName,
-            eventId,
-            serializedUnits,
-            snapshotRevision,
-        })
-        if applied ~= true then
-            return false
-        end
     end
 
     snapshot.replaceExisting = tostring(arguments and arguments[4] or "") == "replace"

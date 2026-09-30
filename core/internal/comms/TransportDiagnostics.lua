@@ -637,8 +637,7 @@ local function buildPhysicalPlan(comms, argumentsText, opcode)
     then
         return 0, 0
     end
-    local messageId = "ffffffffffffff"
-    local chunkLength, partCount = comms:ResolveChunkPlan(argumentsText or "", opcode, messageId)
+    local chunkLength, partCount = comms:ResolveChunkPlan(argumentsText or "", opcode)
     if not chunkLength or not partCount then
         return 0, 0
     end
@@ -647,7 +646,7 @@ local function buildPhysicalPlan(comms, argumentsText, opcode)
         local rangeStart = ((partIndex - 1) * chunkLength) + 1
         local rangeEnd = partIndex * chunkLength
         local chunk = string.sub(argumentsText or "", rangeStart, rangeEnd)
-        local token = Serialization:BuildChunkToken(partIndex, partCount, messageId)
+        local token = Serialization:BuildChunkToken(partIndex, partCount)
         local packet = Serialization:SerializePacket(comms.Prefix, token, opcode, chunk)
         totalBytes = totalBytes + #packet
     end

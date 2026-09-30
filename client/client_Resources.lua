@@ -12,17 +12,19 @@ local Profile = Addon.Internal.Profile or {}
 local Ruleset = Addon.Internal.Ruleset or {}
 local Operations = Comms.Operations or {}
 local ResourceSync = Comms.ResourceSync or {}
-local EventTransactions = Comms.EventTransactions
 
 local RESOURCE_OPCODE = Operations:GetOpcode("RESOURCE")
+local RESOURCE_DELTA_OPCODE = Operations:GetOpcode("RESOURCE_DELTA")
+local RESOURCE_DELTA_BATCH_OPCODE = Operations:GetOpcode("RESOURCE_DELTA_BATCH")
 local NativeJoinChannel = Comms and Comms.JoinChannel or nil
 local NativeResolveChannelId = Comms and Comms.ResolveChannelId or nil
+local THREAT_UPDATE_RECORD_SEPARATOR = string.char(30)
+local THREAT_UPDATE_FIELD_SEPARATOR = string.char(31)
 
 Client.ResourceSyncQueued = Client.ResourceSyncQueued or false
 Client.LastResourceSyncSignature = Client.LastResourceSyncSignature or nil
 Client.PendingResourceDeltaFlushQueued = Client.PendingResourceDeltaFlushQueued or false
 Client.PendingResourceDeltaFlushQueuedByScope = Client.PendingResourceDeltaFlushQueuedByScope or {}
-Client.PendingResourceDeltaFlushQueuedEventIdByScope = Client.PendingResourceDeltaFlushQueuedEventIdByScope or {}
 Client.PendingResourceDeltaBatches = Client.PendingResourceDeltaBatches or {}
 Client.LastAppliedTurnRegenKey = Client.LastAppliedTurnRegenKey or nil
 
@@ -247,6 +249,63 @@ local function coalesceThreatUpdates(threatUpdates, additionalThreatUpdates)
     end
 
     return merged
+end
+
+local function serializeThreatUpdates(threatUpdates)
+    local records = {}
+    local normalized = normalizeThreatUpdates(threatUpdates)
+    for index = 1, #normalized do
+        local entry = normalized[index]
+        records[#records + 1] = table.concat({
+            tostring(entry.targetEventId),
+            tostring(entry.sourceEventId),
+            tostring(entry.amount),
+            tostring(entry.turnNumber or 0),
+        }, THREAT_UPDATE_FIELD_SEPARATOR)
+    end
+    return table.concat(records, THREAT_UPDATE_RECORD_SEPARATOR)
+end
+
+local function deserializeThreatUpdates(payload)
+    local normalized = {}
+    if type(payload) ~= "string" or payload == "" then return normalized end
+    local records = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(payload, THREAT_UPDATE_RECORD_SEPARATOR) or {}
+    for index = 1, #records do
+        local values = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(records[index], THREAT_UPDATE_FIELD_SEPARATOR) or {}
+        local targetEventId = math.floor(tonumber(values[1]) or 0)
+        local sourceEventId = math.floor(tonumber(values[2]) or 0)
+        local amount = math.max(0, tonumber(values[3]) or 0)
+        local turnNumber = math.floor(tonumber(values[4]) or 0)
+        if targetEventId > 0 and sourceEventId > 0 and amount > 0 then
+            normalized[#normalized + 1] = {
+                targetEventId = targetEventId,
+                sourceEventId = sourceEventId,
+                amount = amount,
+                turnNumber = turnNumber > 0 and turnNumber or nil,
+            }
+        end
+    end
+    return normalized
+end
+
+local function recordThreatUpdates(client, eventState, threatUpdates)
+    local meters = type(client) == "table" and client.EventMeters or nil
+    if type(meters) ~= "table" or type(meters.RecordThreatUpdate) ~= "function" then return end
+    for index = 1, #(threatUpdates or {}) do
+        meters:RecordThreatUpdate(eventState, threatUpdates[index])
+    end
+end
+
+local function refreshThreatMeterWidget(client)
+    local namespace = type(client) == "table" and client.UI and client.UI.EventWidget or nil
+    local widget = type(namespace) == "table" and type(namespace.Get) == "function" and namespace:Get() or nil
+    if type(widget) == "table"
+        and type(widget.IsMetersPanelShown) == "function"
+        and widget:IsMetersPanelShown() == true
+        and type(widget.RefreshMetersPanel) == "function"
+    then
+        widget:RefreshMetersPanel()
+    end
 end
 
 local function getPlayerNameForState(state)
@@ -567,11 +626,272 @@ local function notifyRPEHealthAchievement(targetClient, eventState, actionOwnerN
     end
 end
 
-local function normalizePendingScope(value)
+local function getTrustedTransportActionOwner(arguments, sender)
+    local claimedPlayerName = Common.NormalizeName(arguments and arguments[2])
+    local transportSenderName = Common.NormalizeName(sender)
+    if claimedPlayerName == ""
+        or transportSenderName == ""
+        or claimedPlayerName ~= transportSenderName
+    then
+        return nil
+    end
+
+    return transportSenderName
+end
+
+local normalizePendingScope
+
+local function queueRPEKillAchievement(targetClient, eventState, actionOwnerName, result, options)
+    if type(targetClient) ~= "table" or type(result and result.kill) ~= "table" then
+        return false
+    end
+
+    targetClient.PendingRPEKillAchievements = targetClient.PendingRPEKillAchievements or {}
+    targetClient.PendingRPEKillAchievements[#targetClient.PendingRPEKillAchievements + 1] = {
+        eventState = eventState,
+        actionOwnerName = actionOwnerName,
+        result = result,
+        allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true,
+        scope = normalizePendingScope(type(options) == "table" and options.scope or nil),
+    }
+    return true
+end
+
+local function resolveQueuedRPEHealthResult(queued)
+    local result = queued and queued.result
+    if type(result) ~= "table" then
+        return nil
+    end
+
+    local healthBefore = tonumber(queued.healthBefore)
+    local healthAfter = healthBefore
+    local eventState = queued.eventState
+    local healthResourceRef = eventState and eventState.healthResourceRef or nil
+    if healthBefore ~= nil
+        and type(healthResourceRef) == "string"
+        and healthResourceRef ~= ""
+        and ResourceSync.ApplyResourceDeltasToResources
+    then
+        local healthMaxValue = tonumber(queued.healthMaxBefore)
+            or tonumber(result.healthMaxValue)
+            or healthBefore
+        local simulatedResources = {
+            {
+                resourceRef = healthResourceRef,
+                currentValue = healthBefore,
+                maxValue = healthMaxValue,
+            },
+        }
+        ResourceSync.ApplyResourceDeltasToResources(
+            simulatedResources,
+            queued.resourceDeltas,
+            { healthResourceRef = healthResourceRef }
+        )
+        healthAfter = tonumber(simulatedResources[1].currentValue) or healthBefore
+    end
+
+    result.healthBefore = healthBefore
+    result.healthAfter = healthAfter
+    result.actualDamage = healthBefore ~= nil and math.max(0, healthBefore - healthAfter) or 0
+    result.actualHealing = healthBefore ~= nil and math.max(0, healthAfter - healthBefore) or 0
+    return result
+end
+
+local function queueRPEHealthAchievement(targetClient, eventState, actionOwnerName, result, resourceDeltas, options)
+    if type(targetClient) ~= "table"
+        or type(result) ~= "table"
+        or type(result.targetUnit) ~= "table"
+        or type(options) ~= "table"
+        or options.allowLocalEchoApply ~= true
+    then
+        return false
+    end
+
+    local healthBefore = tonumber(result.healthBefore)
+    local targetEventId = tonumber(result.targetEventId) or 0
+    if healthBefore == nil or targetEventId <= 0 then
+        return false
+    end
+
+    local scope = normalizePendingScope(options.scope)
+    local coalescedResourceDeltas = ResourceSync.CoalesceResourceDeltas
+        and ResourceSync.CoalesceResourceDeltas(resourceDeltas)
+        or resourceDeltas
+    if type(coalescedResourceDeltas) ~= "table" then
+        coalescedResourceDeltas = {}
+    end
+    targetClient.PendingRPEHealthAchievements = targetClient.PendingRPEHealthAchievements or {}
+    local pending = targetClient.PendingRPEHealthAchievements
+    for index = #pending, 1, -1 do
+        local queued = pending[index]
+        if queued
+            and queued.eventState == eventState
+            and queued.targetEventId == targetEventId
+            and queued.allowLocalEchoApply == true
+            and queued.scope == scope
+        then
+            queued.resourceDeltas = ResourceSync.CoalesceResourceDeltas
+                and ResourceSync.CoalesceResourceDeltas(queued.resourceDeltas, coalescedResourceDeltas)
+                or queued.resourceDeltas
+            queued.actionOwnerName = actionOwnerName
+            queued.result = result
+            resolveQueuedRPEHealthResult(queued)
+            return true
+        end
+    end
+
+    local healthAfter = tonumber(result.healthAfter)
+    if healthAfter == nil then
+        return false
+    end
+    local actualDamage = math.max(0, healthBefore - healthAfter)
+    local actualHealing = math.max(0, healthAfter - healthBefore)
+    if actualDamage <= 0 and actualHealing <= 0 then
+        return false
+    end
+
+    result.healthBefore = healthBefore
+    result.healthAfter = healthAfter
+    result.actualDamage = actualDamage
+    result.actualHealing = actualHealing
+    local queued = {
+        eventState = eventState,
+        actionOwnerName = actionOwnerName,
+        healthBefore = healthBefore,
+        healthMaxBefore = tonumber(result.healthMaxValue),
+        resourceDeltas = coalescedResourceDeltas,
+        result = result,
+        targetEventId = targetEventId,
+        allowLocalEchoApply = true,
+        scope = scope,
+    }
+    pending[#pending + 1] = queued
+    resolveQueuedRPEHealthResult(queued)
+    return true
+end
+
+local function settleQueuedRPEKillAchievements(targetClient, expectedState, aggregate, committed)
+    if type(targetClient) ~= "table"
+        or type(expectedState) ~= "table"
+        or type(aggregate) ~= "table"
+        or aggregate.allowLocalEchoApply ~= true
+    then
+        return 0
+    end
+
+    local pending = targetClient.PendingRPEKillAchievements
+    if type(pending) ~= "table" or #pending == 0 then
+        return 0
+    end
+
+    local targetEventIds = {}
+    for index = 1, #(aggregate.targetedResourceDeltas or {}) do
+        local targetEventId = tonumber(aggregate.targetedResourceDeltas[index].targetEventId) or 0
+        if targetEventId > 0 then
+            targetEventIds[targetEventId] = true
+        end
+    end
+
+    local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
+    local processed = 0
+    for index = #pending, 1, -1 do
+        local queued = pending[index]
+        local targetEventId = tonumber(queued and queued.result and queued.result.kill and queued.result.kill.targetEventId) or 0
+        if queued
+            and queued.eventState == currentEventState
+            and queued.eventState
+            and queued.allowLocalEchoApply == true
+            and queued.scope == normalizePendingScope(aggregate.scope)
+            and targetEventIds[targetEventId]
+        then
+            if committed == true then
+                notifyRPEKillAchievement(targetClient, queued.eventState, queued.actionOwnerName, queued.result)
+            end
+            table.remove(pending, index)
+            processed = processed + 1
+        end
+    end
+
+    return processed
+end
+
+local function settleQueuedRPEHealthAchievements(targetClient, expectedState, aggregate, committed)
+    if type(targetClient) ~= "table"
+        or type(expectedState) ~= "table"
+        or type(aggregate) ~= "table"
+        or aggregate.allowLocalEchoApply ~= true
+    then
+        return 0
+    end
+
+    local pending = targetClient.PendingRPEHealthAchievements
+    if type(pending) ~= "table" or #pending == 0 then
+        return 0
+    end
+
+    local targetEventIds = {}
+    for targetEventId in pairs(aggregate.targetEventIds or {}) do
+        targetEventId = tonumber(targetEventId) or 0
+        if targetEventId > 0 then
+            targetEventIds[targetEventId] = true
+        end
+    end
+    for index = 1, #(aggregate.targetedResourceDeltas or {}) do
+        local targetEventId = tonumber(aggregate.targetedResourceDeltas[index].targetEventId) or 0
+        if targetEventId > 0 then
+            targetEventIds[targetEventId] = true
+        end
+    end
+
+    local currentEventState = targetClient.GetEventState and targetClient:GetEventState() or nil
+    local processed = 0
+    for index = #pending, 1, -1 do
+        local queued = pending[index]
+        local targetEventId = tonumber(queued and queued.result and queued.result.targetEventId) or 0
+        if queued
+            and queued.eventState == currentEventState
+            and queued.eventState
+            and queued.allowLocalEchoApply == true
+            and queued.scope == normalizePendingScope(aggregate.scope)
+            and targetEventIds[targetEventId]
+        then
+            local settledResult = committed == true and resolveQueuedRPEHealthResult(queued) or nil
+            if settledResult
+                and ((tonumber(settledResult.actualDamage) or 0) > 0
+                    or (tonumber(settledResult.actualHealing) or 0) > 0)
+            then
+                notifyRPEHealthAchievement(targetClient, queued.eventState, queued.actionOwnerName, settledResult)
+            end
+            table.remove(pending, index)
+            processed = processed + 1
+        end
+    end
+
+    return processed
+end
+
+local function buildResourceDeltaSignature(channelName, playerName, payload, targetEventId)
+    return table.concat({
+        tostring(channelName or ""),
+        tostring(playerName or ""),
+        tostring(targetEventId or 0),
+        tostring(payload or ""),
+    }, "\31")
+end
+
+local function buildResourceDeltaBatchSignature(channelName, playerName, payload)
+    return table.concat({
+        tostring(channelName or ""),
+        tostring(playerName or ""),
+        tostring(payload or ""),
+    }, "\31")
+end
+
+normalizePendingScope = function(value)
     return tostring(value or "turn") == "reaction" and "reaction" or "turn"
 end
 
-local function buildResourceDeltaBatchKey(channelName, eventId, sourceTurnNumber, sourceTickNumber, targetEventId, scope)
+local function buildResourceDeltaBatchKey(channelName, eventId, sourceTurnNumber, sourceTickNumber, targetEventId, allowLocalEchoApply, scope)
     return table.concat({
         normalizePendingScope(scope),
         tostring(channelName or ""),
@@ -579,6 +899,7 @@ local function buildResourceDeltaBatchKey(channelName, eventId, sourceTurnNumber
         tostring(sourceTurnNumber or ""),
         tostring(sourceTickNumber or ""),
         tostring(targetEventId or 0),
+        allowLocalEchoApply == true and "1" or "0",
     }, "\31")
 end
 
@@ -593,6 +914,70 @@ local function mergeReasons(currentReason, nextReason)
     end
 
     return ("%s,%s"):format(currentText, nextText)
+end
+
+local function incrementPendingSignature(signatureTable, signature)
+    if type(signatureTable) ~= "table" or type(signature) ~= "string" or signature == "" then
+        return false
+    end
+
+    signatureTable[signature] = (tonumber(signatureTable[signature]) or 0) + 1
+    return true
+end
+
+local function decrementPendingSignature(signatureTable, signature)
+    if type(signatureTable) ~= "table" or type(signature) ~= "string" or signature == "" then
+        return 0
+    end
+
+    local pendingCount = (tonumber(signatureTable[signature]) or 0) - 1
+    if pendingCount > 0 then
+        signatureTable[signature] = pendingCount
+        return pendingCount
+    end
+
+    signatureTable[signature] = nil
+    return 0
+end
+
+local function consumePendingSignature(signatureTable, signature)
+    if type(signatureTable) ~= "table" or type(signature) ~= "string" or signature == "" then
+        return false
+    end
+
+    local pendingCount = tonumber(signatureTable[signature]) or 0
+    if pendingCount <= 0 then
+        return false
+    end
+
+    decrementPendingSignature(signatureTable, signature)
+    return true
+end
+
+local function buildTargetedResourceDeltaGroups(targetedResourceDeltas)
+    local order = {}
+    local deltasByTargetEventId = {}
+    local normalized = ResourceSync.CoalesceTargetedResourceDeltas and ResourceSync.CoalesceTargetedResourceDeltas(targetedResourceDeltas) or {}
+    for index = 1, #normalized do
+        local entry = normalized[index]
+        local targetEventId = tonumber(entry and entry.targetEventId) or 0
+        if targetEventId > 0 then
+            if not deltasByTargetEventId[targetEventId] then
+                deltasByTargetEventId[targetEventId] = {}
+                order[#order + 1] = targetEventId
+            end
+
+            local deltas = deltasByTargetEventId[targetEventId]
+            deltas[#deltas + 1] = {
+                resourceRef = entry.resourceRef,
+                delta = entry.delta,
+                maxValue = entry.maxValue,
+                currentValue = entry.currentValue,
+            }
+        end
+    end
+
+    return order, deltasByTargetEventId
 end
 
 local function syncSuppressedLocalResourceDeltaCache(targetClient, state, playerName, targetEventId)
@@ -781,6 +1166,106 @@ local function shouldRefreshActionBarSlotsForTarget(targetClient, eventState, ta
     return true
 end
 
+local function applyInboundResourceDeltasForTarget(targetClient, state, eventState, playerName, sender, targetEventId, resourceDeltas)
+    local targetUnit = tonumber(targetEventId) and tonumber(targetEventId) > 0
+        and findEventUnitById(eventState and eventState.units, targetEventId)
+        or nil
+    local healthBefore = getEventUnitHealthValue(targetUnit, eventState)
+    local wasAlive = healthBefore ~= nil and healthBefore > 0
+    local targetUnitIsPlayer = targetUnit and targetUnit.isPlayer == true or false
+    local targetOwnerName = Common.NormalizeName(targetUnit and (targetUnit.ownerID or targetUnit.controllerID or targetUnit.name) or nil)
+    local resourceOwnerName = targetUnit and tostring(targetUnit.name or playerName) or playerName
+    local cachePlayerName = targetUnitIsPlayer == true and (targetOwnerName ~= "" and targetOwnerName or playerName) or playerName
+
+    local member = nil
+    if targetEventId <= 0 or targetUnitIsPlayer == true then
+        member = state.membersByName and state.membersByName[cachePlayerName] or nil
+        if not member then
+            addMember(state, cachePlayerName)
+            member = state.membersByName and state.membersByName[cachePlayerName] or nil
+        end
+    end
+
+    local eventUpdated = false
+    local appliedDeltas = {}
+    if eventState and targetEventId > 0 and ResourceSync.ApplyResourceDeltasToEventUnitByEventID then
+        eventUpdated, targetUnit, appliedDeltas = ResourceSync.ApplyResourceDeltasToEventUnitByEventID(eventState.units, targetEventId, resourceDeltas, {
+            healthResourceRef = eventState.healthResourceRef,
+        })
+        targetUnitIsPlayer = targetUnit and targetUnit.isPlayer == true or false
+        targetOwnerName = Common.NormalizeName(targetUnit and (targetUnit.ownerID or targetUnit.controllerID or targetUnit.name) or nil)
+        resourceOwnerName = targetUnit and tostring(targetUnit.name or playerName) or resourceOwnerName
+        local combat = getCombat()
+        if eventUpdated
+            and targetUnit
+            and combat
+            and type(combat.IsUnitDead) == "function"
+            and combat:IsUnitDead(targetUnit, { eventState = eventState })
+            and type(combat.HandleUnitDeath) == "function"
+        then
+            if wasAlive and type(targetClient.RecordCombatDeath) == "function" then
+                targetClient:RecordCombatDeath(eventState, targetUnit)
+            end
+            combat:HandleUnitDeath({
+                client = targetClient,
+                eventState = eventState,
+                targetUnit = targetUnit,
+            })
+        end
+    end
+
+    local cachedChanged = false
+    if member and (targetEventId <= 0 or targetUnitIsPlayer == true) then
+        local previousResources = member.resources
+        if targetUnit and type(targetUnit.resources) == "table" then
+            member.resources = ResourceSync.CloneResources and ResourceSync.CloneResources(targetUnit.resources) or targetUnit.resources
+            cachedChanged = previousResources == nil
+                or not (ResourceSync.ResourcesEqual and ResourceSync.ResourcesEqual(previousResources, member.resources))
+        elseif type(previousResources) == "table" and ResourceSync.ApplyResourceDeltasToResources then
+            cachedChanged = select(1, ResourceSync.ApplyResourceDeltasToResources(previousResources, resourceDeltas, {
+                healthResourceRef = eventState and eventState.healthResourceRef or nil,
+            })) or false
+        end
+    end
+
+    if (cachedChanged or eventUpdated)
+        and type(targetClient) == "table"
+        and type(targetClient.BumpCombatRuntimeRevision) == "function"
+    then
+        targetClient:BumpCombatRuntimeRevision(eventState, targetEventId)
+    end
+
+    local healthAfter = getEventUnitHealthValue(targetUnit, eventState)
+    local healthMaxValue = getEventUnitHealthMaxValue(targetUnit, eventState)
+    local isDead = healthAfter ~= nil and healthAfter <= 0
+    local actualDamage = 0
+    local actualHealing = 0
+    if healthBefore ~= nil and healthAfter ~= nil then
+        actualDamage = math.max(0, healthBefore - healthAfter)
+        actualHealing = math.max(0, healthAfter - healthBefore)
+    end
+
+    return {
+        changed = cachedChanged or eventUpdated,
+        eventUpdated = eventUpdated,
+        targetUnit = targetUnit,
+        appliedDeltas = appliedDeltas or resourceDeltas,
+        resourceOwnerName = resourceOwnerName,
+        sender = sender,
+        targetEventId = tonumber(targetEventId) or 0,
+        healthBefore = healthBefore,
+        healthAfter = healthAfter,
+        healthMaxValue = healthMaxValue,
+        actualDamage = actualDamage,
+        actualHealing = actualHealing,
+        kill = wasAlive and isDead and {
+            targetEventId = tonumber(targetEventId) or 0,
+            targetUnit = targetUnit,
+            isBoss = isBossEventUnit(targetUnit),
+        } or nil,
+    }
+end
+
 local function shouldDeferTurnResourceDeltas(targetClient, state, options)
     if type(options) == "table" and options.immediate == true then
         return false
@@ -798,22 +1283,60 @@ local function shouldDeferTurnResourceDeltas(targetClient, state, options)
         and eventState.channelName == state.channelName
 end
 
-local function flushQueuedClientResourceDeltas(targetClient, expectedState, expectedScope, expectedEventId)
+local function applyQueuedLocalResourceDeltas(targetClient, state, targetEventId, resourceDeltas, options)
+    local eventState = targetClient.GetEventState and targetClient:GetEventState() or nil
+    local playerName = getPlayerNameForState(state) or ""
+    if playerName == "" or type(eventState) ~= "table" or eventState.active ~= true then
+        return false
+    end
+
+    local result = applyInboundResourceDeltasForTarget(
+        targetClient,
+        state,
+        eventState,
+        playerName,
+        playerName,
+        targetEventId,
+        resourceDeltas
+    )
+    queueRPEKillAchievement(targetClient, eventState, playerName, result, options)
+    queueRPEHealthAchievement(targetClient, eventState, playerName, result, resourceDeltas, options)
+    local suppressLocalVisualRefresh = type(options) == "table" and options.suppressLocalVisualRefresh == true
+    if result.eventUpdated and type(targetClient.QueueEventWidgetRefresh) == "function" and not suppressLocalVisualRefresh then
+        queueScopedEventPortraitRefresh(targetClient, "resource-delta-local", targetEventId)
+        bumpEventTooltipContextRevision(eventState, targetEventId)
+        refreshTargetingForEventState(targetClient, "resource-delta-local")
+    end
+    if not suppressLocalVisualRefresh
+        and shouldRefreshActionBarSlotsForTarget(targetClient, eventState, result.targetUnit, targetEventId, playerName)
+    then
+        if type(targetClient.QueueActionBarRefresh) == "function" then
+            targetClient:QueueActionBarRefresh("resource-delta-local")
+        elseif type(targetClient.RefreshActionBarWidget) == "function" then
+            targetClient:RefreshActionBarWidget("resource-delta-local")
+        end
+    end
+    if shouldRefreshCompanionBarsForTarget(targetClient, eventState, result.targetUnit, targetEventId)
+        and type(targetClient.QueueActionBarCompanionBarsRefresh) == "function"
+    then
+        targetClient:QueueActionBarCompanionBarsRefresh("resource-delta-local", { immediate = true })
+    elseif shouldRefreshCompanionBarsForTarget(targetClient, eventState, result.targetUnit, targetEventId)
+        and type(Client.RefreshActionBarCompanionBars) == "function"
+    then
+        Client:RefreshActionBarCompanionBars("resource-delta-local")
+    end
+    return result.changed == true
+end
+
+local function flushQueuedClientResourceDeltas(targetClient, expectedState, expectedScope)
     if type(targetClient) ~= "table" then
         return false
     end
 
     local scope = normalizePendingScope(expectedScope)
-    local normalizedExpectedEventId = tostring(expectedEventId or "")
+    targetClient.PendingResourceDeltaFlushQueued = false
     targetClient.PendingResourceDeltaFlushQueuedByScope = targetClient.PendingResourceDeltaFlushQueuedByScope or {}
-    targetClient.PendingResourceDeltaFlushQueuedEventIdByScope = targetClient.PendingResourceDeltaFlushQueuedEventIdByScope or {}
-    if normalizedExpectedEventId == ""
-        or tostring(targetClient.PendingResourceDeltaFlushQueuedEventIdByScope[scope] or "") == normalizedExpectedEventId
-    then
-        targetClient.PendingResourceDeltaFlushQueued = false
-        targetClient.PendingResourceDeltaFlushQueuedByScope[scope] = false
-        targetClient.PendingResourceDeltaFlushQueuedEventIdByScope[scope] = nil
-    end
+    targetClient.PendingResourceDeltaFlushQueuedByScope[scope] = false
 
     local pendingBatches = targetClient.PendingResourceDeltaBatches or {}
     if targetClient.State ~= expectedState or type(expectedState) ~= "table" or expectedState.active ~= true then
@@ -824,9 +1347,6 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
         and targetClient:GetEventState()
         or nil
     local currentEventId = type(currentEventState) == "table" and tostring(currentEventState.id or "") or nil
-    if normalizedExpectedEventId ~= "" and currentEventId ~= normalizedExpectedEventId then
-        return false
-    end
     local currentTurnNumber = type(currentEventState) == "table"
         and tonumber(currentEventState.turnNumber)
         or nil
@@ -848,11 +1368,12 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
                     and (batch.sourceTickNumber == nil or tonumber(batch.sourceTickNumber) == currentTickNumber)))
             and type(batch.resourceDeltas) == "table"
         then
-            local batchIndex = 1
+            local batchIndex = batch.allowLocalEchoApply == true and 1 or 0
             local aggregate = batchedPayloads[batchIndex]
             if not aggregate then
                 aggregate = {
                     reason = "",
+                    allowLocalEchoApply = batch.allowLocalEchoApply == true,
                     targetedResourceDeltas = {},
                     targetEventIds = {},
                     threatUpdates = {},
@@ -885,19 +1406,28 @@ local function flushQueuedClientResourceDeltas(targetClient, expectedState, expe
         if type(aggregate) == "table" and type(aggregate.targetedResourceDeltas) == "table" then
             local sent = false
             if #aggregate.targetedResourceDeltas > 0 then
-                local mutationId
-                sent, mutationId = targetClient:SendClientResourceDeltaBatch(
+                sent = targetClient:SendClientResourceDeltaBatch(
                     expectedState,
                     aggregate.reason,
                     nil,
                     aggregate.targetedResourceDeltas,
                     {
+                        allowLocalEchoApply = aggregate.allowLocalEchoApply == true,
                         threatUpdates = aggregate.threatUpdates,
-                        scope = scope,
-                        stepSensitive = scope == "turn",
                     }
                 )
             end
+            settleQueuedRPEKillAchievements(targetClient, expectedState, {
+                allowLocalEchoApply = aggregate.allowLocalEchoApply == true,
+                scope = scope,
+                targetedResourceDeltas = aggregate.targetedResourceDeltas,
+            }, sent == true)
+            settleQueuedRPEHealthAchievements(targetClient, expectedState, {
+                allowLocalEchoApply = aggregate.allowLocalEchoApply == true,
+                scope = scope,
+                targetedResourceDeltas = aggregate.targetedResourceDeltas,
+                targetEventIds = aggregate.targetEventIds,
+            }, sent == true)
             if sent then
                 for batchIndex = 1, #(aggregate.batches or {}) do
                     local batchEntry = aggregate.batches[batchIndex]
@@ -981,19 +1511,35 @@ function Client:FlushDeferredTurnResourceDeltas(stateOverride, eventStateOverrid
         and ResourceSync.CoalesceTargetedResourceDeltas(targetedResourceDeltas)
         or targetedResourceDeltas
     if type(targetedResourceDeltas) ~= "table" or #targetedResourceDeltas == 0 then
+        settleQueuedRPEHealthAchievements(self, state, {
+            allowLocalEchoApply = true,
+            scope = "turn",
+            targetedResourceDeltas = {},
+            targetEventIds = targetEventIds,
+        }, false)
         return true
     end
 
-    local sent, mutationId = self:SendClientResourceDeltaBatch(
+    local sent = self:SendClientResourceDeltaBatch(
         state,
         reason ~= "" and reason or "turn-resource",
         nil,
         targetedResourceDeltas,
         {
-            scope = "turn",
-            stepSensitive = true,
+            allowLocalEchoApply = false,
         }
     )
+    settleQueuedRPEKillAchievements(self, state, {
+        allowLocalEchoApply = true,
+        scope = "turn",
+        targetedResourceDeltas = targetedResourceDeltas,
+    }, sent == true)
+    settleQueuedRPEHealthAchievements(self, state, {
+        allowLocalEchoApply = true,
+        scope = "turn",
+        targetedResourceDeltas = targetedResourceDeltas,
+        targetEventIds = targetEventIds,
+    }, sent == true)
     if sent then
         for batchIndex = 1, #matchingBatches do
             local batchEntry = matchingBatches[batchIndex]
@@ -1080,12 +1626,14 @@ end
 
 function Client:ResetResourceState()
     self.ResourceSyncQueued = false
-    self.ResourceSyncQueuedEventId = nil
     self.LastResourceSyncSignature = nil
     self.PendingResourceDeltaFlushQueued = false
     self.PendingResourceDeltaBatches = {}
     self.PendingResourceDeltaFlushQueuedByScope = {}
-    self.PendingResourceDeltaFlushQueuedEventIdByScope = {}
+    self.PendingLocalResourceDeltaEchoSignatures = {}
+    self.PendingLocalResourceDeltaBatchEchoSignatures = {}
+    self.PendingRPEKillAchievements = {}
+    self.PendingRPEHealthAchievements = {}
     self.LastAppliedTurnRegenKey = nil
 end
 
@@ -1104,17 +1652,10 @@ function Client:ResetEventResourceDeltas(eventId)
         end
     end
 
-    local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
-    if type(currentEventState) ~= "table"
-        or tostring(currentEventState.id or "") == normalizedEventId
-    then
+    if removed then
         self.PendingResourceDeltaFlushQueuedByScope = self.PendingResourceDeltaFlushQueuedByScope or {}
         self.PendingResourceDeltaFlushQueuedByScope.turn = false
-        self.PendingResourceDeltaFlushQueuedEventIdByScope = self.PendingResourceDeltaFlushQueuedEventIdByScope or {}
-        self.PendingResourceDeltaFlushQueuedEventIdByScope.turn = nil
         self.PendingResourceDeltaFlushQueued = false
-        self.ResourceSyncQueued = false
-        self.ResourceSyncQueuedEventId = nil
     end
 
     return removed
@@ -1202,6 +1743,7 @@ function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStat
         resourceDeltas,
         activeEventId,
         {
+            allowLocalEchoApply = true,
             scope = "turn",
             suppressLocalVisualRefresh = type(options) == "table" and options.suppressLocalVisualRefresh == true,
         }
@@ -1225,73 +1767,28 @@ function Client:QueueClientResourceSync(reason, options)
         return false
     end
 
-    local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
-    local queuedEventId = type(currentEventState) == "table" and tostring(currentEventState.id or "") or ""
-    local targetEventId = tonumber(options.targetEventId)
-    if targetEventId and targetEventId > 0
-        and (type(currentEventState) ~= "table" or currentEventState.active ~= true)
-    then
-        return false
-    end
-    if self.ResourceSyncQueued and tostring(self.ResourceSyncQueuedEventId or "") == queuedEventId then
-        return true
-    end
-    if queuedEventId ~= ""
-        and tostring(self.ResourceSyncTransactionEventId or "") == queuedEventId
-        and tostring(self.ResourceSyncTransactionId or "") ~= ""
-    then
+    if self.ResourceSyncQueued then
         return true
     end
 
     self.ResourceSyncQueued = true
-    self.ResourceSyncQueuedEventId = queuedEventId
     local playerName = options.playerName or getPlayerNameForState(state) or "unknown"
+    local targetEventId = tonumber(options.targetEventId) or nil
     local capturedResources = nil
     if resources ~= nil then
         capturedResources = ResourceSync.CloneResources and ResourceSync.CloneResources(resources) or resources
     end
-    local enqueued = enqueueResourceSync(function(targetClient, expectedState, expectedEventId, syncReason, queuedPlayerName, queuedResources)
-        if tostring(targetClient.ResourceSyncQueuedEventId or "") == expectedEventId then
-            targetClient.ResourceSyncQueued = false
-            targetClient.ResourceSyncQueuedEventId = nil
-        end
+    local enqueued = enqueueResourceSync(function(targetClient, expectedState, syncReason, queuedPlayerName, queuedResources)
+        targetClient.ResourceSyncQueued = false
 
         if targetClient.State ~= expectedState or not expectedState or expectedState.active ~= true then
             return
         end
 
-        local targetEventState = targetClient.GetEventState and targetClient:GetEventState() or targetClient.EventState
-        if expectedEventId ~= ""
-            and tostring(type(targetEventState) == "table" and targetEventState.id or "") ~= expectedEventId
-        then
-            return
-        end
-
-        local sent, transactionId = targetClient:SendClientResources(
-            expectedState,
-            syncReason,
-            queuedPlayerName,
-            queuedResources,
-            targetEventId,
-            { startupResourceSync = true }
-        )
-        local pending = type(targetClient.EventTransactions) == "table"
-            and type(targetClient.EventTransactions.GetPending) == "function"
-            and targetClient.EventTransactions:GetPending(transactionId, expectedEventId)
-            or nil
-        if sent == true and transactionId and expectedEventId ~= "" and pending then
-            targetClient.ResourceSyncTransactionEventId = expectedEventId
-            targetClient.ResourceSyncTransactionId = transactionId
-        elseif tostring(targetClient.ResourceSyncTransactionEventId or "") == expectedEventId then
-            targetClient.ResourceSyncTransactionEventId = nil
-            targetClient.ResourceSyncTransactionId = nil
-        end
-    end, self, state, queuedEventId, reason, playerName, capturedResources)
+        targetClient:SendClientResources(expectedState, syncReason, queuedPlayerName, queuedResources, targetEventId)
+    end, self, state, reason, playerName, capturedResources)
     if not enqueued then
-        if tostring(self.ResourceSyncQueuedEventId or "") == queuedEventId then
-            self.ResourceSyncQueued = false
-            self.ResourceSyncQueuedEventId = nil
-        end
+        self.ResourceSyncQueued = false
         return false
     end
 
@@ -1325,13 +1822,7 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
         return false
     end
 
-    if type(ResourceSync.CoalesceResourceDeltas) ~= "function" then
-        if Debug and Debug.Error then
-            Debug.Error("RESOURCE_DELTA queue rejected: resource normalization is unavailable.")
-        end
-        return false, "resource-sync-unavailable"
-    end
-    local resourceDeltas = ResourceSync.CoalesceResourceDeltas(resourceDeltasOverride)
+    local resourceDeltas = ResourceSync.CoalesceResourceDeltas and ResourceSync.CoalesceResourceDeltas(resourceDeltasOverride) or {}
     if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
         if Debug and Debug.Error then
             Debug.Error("RESOURCE_DELTA queue skipped: resolved delta payload is empty for targetEventId=%s.", tostring(targetEventId))
@@ -1345,11 +1836,16 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
     local sourceTurnNumber = type(eventState) == "table" and math.floor(tonumber(eventState.turnNumber) or 0) or nil
     local sourceTickNumber = type(eventState) == "table" and math.floor(tonumber(eventState.tickNumber) or 0) or nil
     local playerName = getPlayerNameForState(state) or "unknown"
+    local allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true or false
     local scope = normalizePendingScope(type(options) == "table" and options.scope or nil)
     local threatUpdates = filterThreatUpdatesForEvent(
         type(options) == "table" and options.threatUpdates or nil,
         eventState
     )
+    if allowLocalEchoApply and #threatUpdates > 0 then
+        recordThreatUpdates(self, eventState, threatUpdates)
+        refreshThreatMeterWidget(self)
+    end
     self.PendingResourceDeltaBatches = self.PendingResourceDeltaBatches or {}
     local batchKey = buildResourceDeltaBatchKey(
         state.channelName,
@@ -1357,6 +1853,7 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
         sourceTurnNumber,
         sourceTickNumber,
         targetEventId,
+        allowLocalEchoApply,
         scope
     )
     local batch = self.PendingResourceDeltaBatches[batchKey]
@@ -1368,6 +1865,7 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
             sourceTurnNumber = sourceTurnNumber,
             sourceTickNumber = sourceTickNumber,
             targetEventId = targetEventId,
+            allowLocalEchoApply = allowLocalEchoApply,
             scope = scope,
             reason = tostring(reason or "resource-delta-sync"),
             resourceDeltas = resourceDeltas,
@@ -1376,13 +1874,16 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
         self.PendingResourceDeltaBatches[batchKey] = batch
     else
         batch.reason = mergeReasons(batch.reason, reason or "resource-delta-sync")
-        batch.resourceDeltas = ResourceSync.CoalesceResourceDeltas(batch.resourceDeltas, resourceDeltas)
+        batch.resourceDeltas = ResourceSync.CoalesceResourceDeltas and ResourceSync.CoalesceResourceDeltas(batch.resourceDeltas, resourceDeltas) or batch.resourceDeltas
         batch.threatUpdates = coalesceThreatUpdates(batch.threatUpdates, threatUpdates)
     end
 
     syncSuppressedLocalResourceDeltaCache(self, state, playerName, targetEventId)
 
     if shouldDeferTurnResourceDeltas(self, state, options) then
+        if allowLocalEchoApply then
+            applyQueuedLocalResourceDeltas(self, state, targetEventId, resourceDeltas, options)
+        end
         if type(self.QueueActionBarRefresh) == "function" then
             self:QueueActionBarRefresh("pending-resource")
         elseif type(self.RefreshActionBarWidget) == "function" then
@@ -1397,31 +1898,25 @@ function Client:QueueClientResourceDeltas(state, reason, resourceDeltasOverride,
     end
 
     self.PendingResourceDeltaFlushQueuedByScope = self.PendingResourceDeltaFlushQueuedByScope or {}
-    self.PendingResourceDeltaFlushQueuedEventIdByScope = self.PendingResourceDeltaFlushQueuedEventIdByScope or {}
     if self.PendingResourceDeltaFlushQueuedByScope[scope] == true then
         return true
     end
 
     self.PendingResourceDeltaFlushQueued = true
     self.PendingResourceDeltaFlushQueuedByScope[scope] = true
-    self.PendingResourceDeltaFlushQueuedEventIdByScope[scope] = tostring(eventId or "")
-    local enqueued = enqueueResourceSync(flushQueuedClientResourceDeltas, self, state, scope, eventId)
+    local enqueued = enqueueResourceSync(flushQueuedClientResourceDeltas, self, state, scope)
     if not enqueued then
         self.PendingResourceDeltaFlushQueued = false
         self.PendingResourceDeltaFlushQueuedByScope[scope] = false
-        self.PendingResourceDeltaFlushQueuedEventIdByScope[scope] = nil
         return false
     end
 
     return true
 end
 
-local getLiveResourceTarget
-local submitEventResourceTransaction
-
 -- Sends the current profile resources to the server for the given session state. 
 -- Returns true if the send was accepted, false otherwise.
-function Client:SendClientResources(state, reason, playerNameOverride, resourcesOverride, targetEventIdOverride, options)
+function Client:SendClientResources(state, reason, playerNameOverride, resourcesOverride, targetEventIdOverride)
     if not state or state.active ~= true then
         if Debug and Debug.Error then
             Debug.Error("RESOURCE sync skipped: client session is inactive.")
@@ -1437,7 +1932,6 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
     end
 
     bindStateSessionRuntime(state)
-    options = type(options) == "table" and options or {}
     local channelId = resolveChannelId(state)
     if not channelId then
         if Debug and Debug.Error then
@@ -1472,52 +1966,6 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
         return false
     end
 
-    local targetEventId = tonumber(targetEventIdOverride)
-    if not targetEventId or targetEventId <= 0 then
-        targetEventId = authoritativeTargetEventId or 0
-    end
-    if targetEventId > 0 then
-        if type(ResourceSync.NormalizeResources) ~= "function" then
-            if Debug and Debug.Error then
-                Debug.Error("RESOURCE replace rejected: resource normalization is unavailable.")
-            end
-            return false, "resource-sync-unavailable"
-        end
-        resources = ResourceSync.NormalizeResources(resources)
-        if type(resources) ~= "table" or #resources == 0 then
-            return false, "empty-resources"
-        end
-        local targetUnit = getLiveResourceTarget(self, targetEventId)
-        if not targetUnit then
-            if Debug and Debug.Error then
-                Debug.Error("RESOURCE replace rejected: live EventUnit %s is unavailable.", tostring(targetEventId))
-            end
-            return false, "missing-live-resource-target"
-        end
-        local sent, transactionId = submitEventResourceTransaction(
-            self,
-            state,
-            "event-resource-replace",
-            reason,
-            {
-                targetEventId = targetEventId,
-                resources = resources,
-                reason = tostring(reason or "resource-replace"),
-            },
-            { targetEventId },
-            {
-                stepSensitive = false,
-                startupResourceSync = options.startupResourceSync == true,
-            }
-        )
-        return sent, transactionId
-    end
-
-    -- A zero-target RESOURCE packet is profile/session bootstrap only.  It is
-    -- intentionally still allowed while an Event is active, but its handlers
-    -- must never project it into a live EventUnit.  When a live local unit is
-    -- available above, authoritativeTargetEventId selects event-resource-replace
-    -- instead.
     local payload = ResourceSync.SerializeResources and ResourceSync.SerializeResources(resources) or ""
     if payload == "" then
         if Debug and Debug.Error then
@@ -1531,6 +1979,10 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
         playerName,
         payload,
     }
+    local targetEventId = tonumber(targetEventIdOverride) or authoritativeTargetEventId or nil
+    if targetEventId and targetEventId > 0 then
+        arguments[#arguments + 1] = targetEventId
+    end
     local sent = sendToChannelForState(state, channelId, RESOURCE_OPCODE, arguments, {
         opcode = RESOURCE_OPCODE,
         scope = "client",
@@ -1556,153 +2008,15 @@ function Client:SendClientResources(state, reason, playerNameOverride, resources
         return false
     end
 
-    return true
-end
-
--- Resource packets are client-to-server commands.  Once an event has entered
--- the revisioned unit stream, peers must not apply those commands directly:
--- the server publishes the committed unit as an Event Unit delta instead.
--- This keeps an old channel packet from overwriting a newer repair snapshot.
-getLiveResourceTarget = function(client, targetEventId)
-    local eventState = client and client.GetEventState and client:GetEventState() or client and client.EventState
-    local numericTargetEventId = tonumber(targetEventId) or 0
-    if type(eventState) ~= "table" or eventState.active ~= true or numericTargetEventId <= 0 then
-        return nil, eventState
-    end
-    return findEventUnitById(eventState.units, numericTargetEventId), eventState
-end
-
-local function resolveResourceActorEventId(client, eventState, options)
-    local explicit = tonumber(type(options) == "table" and options.actorEventId or nil) or 0
-    if explicit > 0 then
-        return explicit
-    end
-    local actor = nil
-    if type(client.ResolveControlledEventUnit) == "function" then
-        actor = client:ResolveControlledEventUnit(eventState)
-    end
-    if not actor and type(client.ResolveLocalEventUnit) == "function" then
-        actor = client:ResolveLocalEventUnit(eventState)
-    end
-    return tonumber(actor and actor.eventID) or nil
-end
-
-local function presentCommittedResourceTransaction(client, envelope)
-    if type(client) ~= "table" or type(envelope) ~= "table"
-        or envelope.state ~= "committed"
-        or tostring(envelope.operation or ""):sub(1, 15) ~= "event-resource-"
+    local currentEventState = self.GetEventState and self:GetEventState() or self.EventState
+    if type(currentEventState) == "table"
+        and currentEventState.active == true
+        and currentEventState.channelName == state.channelName
     then
-        return false
+        state.lastResourceSyncEventId = currentEventState.id
     end
 
-    local eventState = client.GetEventState and client:GetEventState() or client.EventState
-    if type(eventState) ~= "table" or eventState.active ~= true then
-        return false
-    end
-    local outcome = type(envelope.outcome) == "table" and envelope.outcome or {}
-    local actionOwnerName = Common.NormalizeName(outcome.actionOwnerName or envelope.originName)
-    local localPlayerName = resolveLocalPlayerName()
-    local isLocalOrigin = actionOwnerName ~= "" and actionOwnerName == localPlayerName
-    local results = type(outcome.resourceResults) == "table" and outcome.resourceResults or {}
-    for index = 1, #results do
-        local result = results[index]
-        if type(result) == "table" then
-            local targetEventId = tonumber(result.targetEventId) or 0
-            local targetUnit = findEventUnitById(eventState.units, targetEventId)
-            result.targetUnit = targetUnit
-            if type(result.kill) == "table" then
-                result.kill.targetUnit = targetUnit
-                result.kill.isBoss = result.kill.isBoss == true or isBossEventUnit(targetUnit)
-            end
-            if isLocalOrigin then
-                grantBossKillValor(client, eventState, result)
-                notifyRPEKillAchievement(client, eventState, actionOwnerName, result)
-                notifyRPEHealthAchievement(client, eventState, actionOwnerName, result)
-            else
-                local spellcasting = client.Spellcasting
-                if spellcasting and type(spellcasting.ShowInboundResourceDeltaCombatText) == "function"
-                    and type(result.resourceDeltas) == "table"
-                then
-                    spellcasting.ShowInboundResourceDeltaCombatText(client, eventState, targetUnit, result.resourceDeltas)
-                end
-            end
-        end
-    end
-
-    if type(client.QueueEventWidgetRefresh) == "function" then
-        client:QueueEventWidgetRefresh("resource-transaction")
-    end
-    refreshTargetingForEventState(client, "resource-transaction")
     return true
-end
-
-function Client:HandleEventResourceTransactionTerminal(envelope)
-    return presentCommittedResourceTransaction(self, envelope)
-end
-
-function Client:HandleEventResourceTransactionProjection(envelope)
-    return presentCommittedResourceTransaction(self, envelope)
-end
-
-submitEventResourceTransaction = function(client, state, operation, reason, input, targetEventIds, options)
-    local transactions = EventTransactions and EventTransactions.Client
-    local eventState = client.GetEventState and client:GetEventState() or client.EventState
-    if type(transactions) ~= "table" or type(transactions.Create) ~= "function"
-        or type(transactions.Submit) ~= "function"
-    then
-        if Debug and Debug.Error then
-            Debug.Error("%s rejected: shared Event transaction service is unavailable.", tostring(operation))
-        end
-        return false, "missing-event-transaction-service"
-    end
-    if type(eventState) ~= "table" or eventState.active ~= true then
-        return false, "missing-live-event"
-    end
-
-    options = type(options) == "table" and options or {}
-    local transactionOptions = {
-        eventId = eventState.id,
-        operation = operation,
-        actorEventId = resolveResourceActorEventId(client, eventState, options),
-        targetEventIds = targetEventIds,
-        turnNumber = eventState.turnNumber,
-        tickNumber = eventState.tickNumber,
-        baseRevision = eventState.liveUnitRevision,
-        stepSensitive = options.stepSensitive == true,
-        input = input,
-    }
-    local record, createReason = transactions:Create(transactionOptions)
-    if not record then
-        return false, createReason or "transaction-create-failed"
-    end
-    record.options.onTerminal = function(envelope)
-        local terminalEventState = client.GetEventState and client:GetEventState() or client.EventState
-        local terminalTargetEventId = tonumber(envelope and envelope.targetEventIds and envelope.targetEventIds[1]) or 0
-        local startupTargetEventId = tonumber(input and input.targetEventId) or 0
-        if tostring(client.ResourceSyncTransactionId or "") == tostring(envelope and envelope.transactionId or "") then
-            client.ResourceSyncTransactionEventId = nil
-            client.ResourceSyncTransactionId = nil
-        end
-        if options.startupResourceSync == true then
-            local committed = envelope and envelope.state == "committed"
-                and envelope.operation == "event-resource-replace"
-                and startupTargetEventId > 0
-                and terminalTargetEventId == startupTargetEventId
-                and type(terminalEventState) == "table"
-                and terminalEventState.active == true
-                and tostring(envelope.eventId or "") == tostring(terminalEventState.id or "")
-                and terminalEventState.channelName == state.channelName
-            if committed then
-                state.lastResourceSyncEventId = terminalEventState.id
-            end
-        end
-        client:HandleEventResourceTransactionTerminal(envelope)
-    end
-    local submitted, submitReason = transactions:Submit(record, input)
-    if not submitted then
-        return false, submitReason or "transaction-submit-failed"
-    end
-    return true, record.id
 end
 
 function Client:SendClientResourceDeltas(state, reason, playerNameOverride, resourceDeltasOverride, targetEventIdOverride, options)
@@ -1713,44 +2027,97 @@ function Client:SendClientResourceDeltas(state, reason, playerNameOverride, reso
         return false
     end
 
-    if type(ResourceSync.CoalesceResourceDeltas) ~= "function" then
+    if not state.channelName or state.channelName == "" then
         if Debug and Debug.Error then
-            Debug.Error("RESOURCE_DELTA rejected: resource normalization is unavailable.")
+            Debug.Error("RESOURCE_DELTA sync skipped: client session has no channel name.")
         end
-        return false, "resource-sync-unavailable"
-    end
-    local resourceDeltas = ResourceSync.CoalesceResourceDeltas(resourceDeltasOverride)
-    local targetEventId = tonumber(targetEventIdOverride) or 0
-    local targetUnit = getLiveResourceTarget(self, targetEventId)
-    if not targetUnit then
-        if Debug and Debug.Error then
-            Debug.Error("RESOURCE_DELTA rejected: live EventUnit %s is unavailable.", tostring(targetEventId))
-        end
-        return false, "missing-live-resource-target"
-    end
-    if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
-        return false, "empty-resource-deltas"
+        return false
     end
 
-    local eventState = self.GetEventState and self:GetEventState() or self.EventState
-    local input = {
-        targetEventId = targetEventId,
-        resourceDeltas = resourceDeltas,
-        threatUpdates = filterThreatUpdatesForEvent(
-            type(options) == "table" and options.threatUpdates or nil,
-            eventState
-        ),
-        reason = tostring(reason or "resource-delta"),
-    }
-    return submitEventResourceTransaction(
-        self,
-        state,
-        "event-resource-delta",
-        reason,
-        input,
-        { targetEventId },
-        options
+    bindStateSessionRuntime(state)
+    local channelId = resolveChannelId(state)
+    if not channelId then
+        if Debug and Debug.Error then
+            Debug.Error(
+                "RESOURCE_DELTA sync skipped: session channel %s has no resolved channel id.",
+                tostring(state.channelName)
+            )
+        end
+        return false
+    end
+
+    local playerName = playerNameOverride or getPlayerNameForState(state) or "unknown"
+    local resourceDeltas = resourceDeltasOverride or {}
+    if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA sync skipped: resolved delta payload is empty for %s.", tostring(playerName))
+        end
+        return false
+    end
+
+    local payload = ResourceSync.SerializeResourceDeltas and ResourceSync.SerializeResourceDeltas(resourceDeltas) or ""
+    if payload == "" then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA sync skipped: serialized delta payload is empty.")
+        end
+        return false
+    end
+
+    local targetEventId = tonumber(targetEventIdOverride) or nil
+    local allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true or false
+    local threatUpdates = filterThreatUpdatesForEvent(
+        type(options) == "table" and options.threatUpdates or nil,
+        self.GetEventState and self:GetEventState() or self.EventState
     )
+    local signature = buildResourceDeltaSignature(state.channelName, playerName, payload, targetEventId)
+    if allowLocalEchoApply then
+        self.PendingLocalResourceDeltaEchoSignatures = self.PendingLocalResourceDeltaEchoSignatures or {}
+        incrementPendingSignature(self.PendingLocalResourceDeltaEchoSignatures, signature)
+    else
+        syncSuppressedLocalResourceDeltaCache(self, state, playerName, targetEventId)
+    end
+
+    local arguments = {
+        state.channelName,
+        playerName,
+        payload,
+    }
+    if targetEventId and targetEventId > 0 then
+        arguments[#arguments + 1] = targetEventId
+    end
+    if #threatUpdates > 0 then
+        arguments[#arguments + 1] = serializeThreatUpdates(threatUpdates)
+    end
+
+    local sent = sendToChannelForState(state, channelId, RESOURCE_DELTA_OPCODE, arguments, {
+        opcode = RESOURCE_DELTA_OPCODE,
+        scope = "client",
+        onFailed = function(_, result)
+            if Debug and Debug.Error then
+                Debug.Error(
+                    "RESOURCE_DELTA sync send failed on channel %s for %s: %s.",
+                    tostring(state.channelName or "unknown"),
+                    tostring(playerName),
+                    tostring(result or "unknown")
+                )
+            end
+        end,
+    })
+
+    if not sent then
+        if allowLocalEchoApply and type(self.PendingLocalResourceDeltaEchoSignatures) == "table" then
+            decrementPendingSignature(self.PendingLocalResourceDeltaEchoSignatures, signature)
+        end
+        if Debug and Debug.Error then
+            Debug.Error(
+                "RESOURCE_DELTA sync failed: send to channel %s was not accepted.",
+                tostring(state.channelName or "unknown")
+            )
+        end
+        return false
+    end
+
+    return true
 end
 
 function Client:SendClientResourceDeltaBatch(state, reason, playerNameOverride, targetedResourceDeltasOverride, options)
@@ -1761,45 +2128,106 @@ function Client:SendClientResourceDeltaBatch(state, reason, playerNameOverride, 
         return false
     end
 
-    if type(ResourceSync.CoalesceTargetedResourceDeltas) ~= "function" then
+    if not state.channelName or state.channelName == "" then
         if Debug and Debug.Error then
-            Debug.Error("RESOURCE_DELTA_BATCH rejected: resource normalization is unavailable.")
+            Debug.Error("RESOURCE_DELTA_BATCH sync skipped: client session has no channel name.")
         end
-        return false, "resource-sync-unavailable"
+        return false
     end
-    local targetedResourceDeltas = ResourceSync.CoalesceTargetedResourceDeltas(targetedResourceDeltasOverride)
+
+    bindStateSessionRuntime(state)
+    local channelId = resolveChannelId(state)
+    if not channelId then
+        if Debug and Debug.Error then
+            Debug.Error(
+                "RESOURCE_DELTA_BATCH sync skipped: session channel %s has no resolved channel id.",
+                tostring(state.channelName)
+            )
+        end
+        return false
+    end
+
+    local playerName = playerNameOverride or getPlayerNameForState(state) or "unknown"
+    local targetedResourceDeltas = ResourceSync.CoalesceTargetedResourceDeltas
+        and ResourceSync.CoalesceTargetedResourceDeltas(targetedResourceDeltasOverride)
+        or {}
     if type(targetedResourceDeltas) ~= "table" or #targetedResourceDeltas == 0 then
-        return false, "empty-targeted-resource-deltas"
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA_BATCH sync skipped: resolved delta payload is empty for %s.", tostring(playerName))
+        end
+        return false
     end
-    local targetEventIds = {}
-    local seenTargets = {}
-    for index = 1, #targetedResourceDeltas do
-        local targetEventId = tonumber(targetedResourceDeltas[index] and targetedResourceDeltas[index].targetEventId) or 0
-        if targetEventId > 0 and not seenTargets[targetEventId] then
-            seenTargets[targetEventId] = true
-            if not getLiveResourceTarget(self, targetEventId) then
-                return false, "missing-live-resource-target"
+
+    local payload = ResourceSync.SerializeTargetedResourceDeltas and ResourceSync.SerializeTargetedResourceDeltas(targetedResourceDeltas) or ""
+    if payload == "" then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA_BATCH sync skipped: serialized delta payload is empty.")
+        end
+        return false
+    end
+
+    local allowLocalEchoApply = type(options) == "table" and options.allowLocalEchoApply == true or false
+    local threatUpdates = filterThreatUpdatesForEvent(
+        type(options) == "table" and options.threatUpdates or nil,
+        self.GetEventState and self:GetEventState() or self.EventState
+    )
+    local signature = buildResourceDeltaBatchSignature(state.channelName, playerName, payload)
+    local targetOrder = nil
+    if allowLocalEchoApply then
+        self.PendingLocalResourceDeltaBatchEchoSignatures = self.PendingLocalResourceDeltaBatchEchoSignatures or {}
+        incrementPendingSignature(self.PendingLocalResourceDeltaBatchEchoSignatures, signature)
+    else
+        targetOrder = {}
+        local targetSeen = {}
+        for index = 1, #targetedResourceDeltas do
+            local targetEventId = tonumber(targetedResourceDeltas[index] and targetedResourceDeltas[index].targetEventId) or 0
+            if targetEventId > 0 and not targetSeen[targetEventId] then
+                targetSeen[targetEventId] = true
+                targetOrder[#targetOrder + 1] = targetEventId
             end
-            targetEventIds[#targetEventIds + 1] = targetEventId
+        end
+        for index = 1, #targetOrder do
+            syncSuppressedLocalResourceDeltaCache(self, state, playerName, targetOrder[index])
         end
     end
-    local eventState = self.GetEventState and self:GetEventState() or self.EventState
-    return submitEventResourceTransaction(
-        self,
-        state,
-        "event-resource-batch",
-        reason,
-        {
-            targetedResourceDeltas = targetedResourceDeltas,
-            threatUpdates = filterThreatUpdatesForEvent(
-                type(options) == "table" and options.threatUpdates or nil,
-                eventState
-            ),
-            reason = tostring(reason or "resource-delta-batch"),
-        },
-        targetEventIds,
-        options
-    )
+    if not targetOrder then
+        targetOrder = buildTargetedResourceDeltaGroups(targetedResourceDeltas)
+    end
+
+    local sent = sendToChannelForState(state, channelId, RESOURCE_DELTA_BATCH_OPCODE, {
+        state.channelName,
+        playerName,
+        payload,
+        #threatUpdates > 0 and serializeThreatUpdates(threatUpdates) or nil,
+    }, {
+        opcode = RESOURCE_DELTA_BATCH_OPCODE,
+        scope = "client",
+        onFailed = function(_, result)
+            if Debug and Debug.Error then
+                Debug.Error(
+                    "RESOURCE_DELTA_BATCH sync send failed on channel %s for %s: %s.",
+                    tostring(state.channelName or "unknown"),
+                    tostring(playerName),
+                    tostring(result or "unknown")
+                )
+            end
+        end,
+    })
+
+    if not sent then
+        if allowLocalEchoApply and type(self.PendingLocalResourceDeltaBatchEchoSignatures) == "table" then
+            decrementPendingSignature(self.PendingLocalResourceDeltaBatchEchoSignatures, signature)
+        end
+        if Debug and Debug.Error then
+            Debug.Error(
+                "RESOURCE_DELTA_BATCH sync failed: send to channel %s was not accepted.",
+                tostring(state.channelName or "unknown")
+            )
+        end
+        return false
+    end
+
+    return true
 end
 
 -- When a RESOURCE message is received from the server, this function is called to handle it.
@@ -1833,14 +2261,7 @@ function Client:HandleResource(arguments, sender)
         return false
     end
 
-    local eventState = self:GetEventState()
     local targetEventId = tonumber(arguments and arguments[4]) or 0
-    if targetEventId > 0 then
-        if Debug and Debug.Error then
-            Debug.Error("RESOURCE receive rejected: targeted live replacement requires event-resource transaction.")
-        end
-        return false
-    end
     local resourcePayload = arguments and arguments[3] or ""
     local resourceSignature = table.concat({
         tostring(channelName or ""),
@@ -1862,15 +2283,10 @@ function Client:HandleResource(arguments, sender)
     end
     state.LastResourceSyncSignature = resourceSignature
 
-    if type(ResourceSync.NormalizeResources) ~= "function" then
-        if Debug and Debug.Error then
-            Debug.Error("RESOURCE receive rejected: resource normalization is unavailable.")
-        end
-        return false
-    end
-    local resources = ResourceSync.NormalizeResources(resourcePayload)
+    local resources = ResourceSync.NormalizeResources and ResourceSync.NormalizeResources(resourcePayload) or {}
     local targetUnitIsPlayer = false
     local resourceOwnerName = playerName
+    local eventState = self:GetEventState()
     if eventState and targetEventId > 0 then
         for index = 1, #((eventState.units) or {}) do
             local unit = eventState.units[index]
@@ -1900,18 +2316,12 @@ function Client:HandleResource(arguments, sender)
             or not (ResourceSync.ResourcesEqual and ResourceSync.ResourcesEqual(member.resources, resources))
         )
 
-    -- RESOURCE is a session/profile bootstrap transport.  Once an Event is
-    -- active, only EventTransactions may mutate its EventUnits.  Inactive
-    -- drafts retain the pre-event bootstrap behavior.
     local eventUpdated = false
-    local eventIsActive = type(eventState) == "table" and eventState.active == true
-    if eventIsActive ~= true then
-        if eventState and targetEventId > 0 and ResourceSync.ApplyResourcesToEventUnitByEventID then
-            eventUpdated = ResourceSync.ApplyResourcesToEventUnitByEventID(eventState.units, targetEventId, resources) or false
-        elseif eventState and ResourceSync.ApplyResourcesToEventUnits then
-            eventUpdated = ResourceSync.ApplyResourcesToEventUnits(eventState.units, playerName, resources) or false
-            targetUnitIsPlayer = true
-        end
+    if eventState and targetEventId > 0 and ResourceSync.ApplyResourcesToEventUnitByEventID then
+        eventUpdated = ResourceSync.ApplyResourcesToEventUnitByEventID(eventState.units, targetEventId, resources) or false
+    elseif eventState and ResourceSync.ApplyResourcesToEventUnits then
+        eventUpdated = ResourceSync.ApplyResourcesToEventUnits(eventState.units, playerName, resources) or false
+        targetUnitIsPlayer = true
     end
 
     if member and cachedChanged and (targetEventId <= 0 or targetUnitIsPlayer == true) then
@@ -1966,6 +2376,280 @@ function Client:HandleResource(arguments, sender)
         and type(Client.RefreshActionBarCompanionBars) == "function"
     then
         Client:RefreshActionBarCompanionBars("resource")
+    end
+
+    local eventManage = Addon.Server and Addon.Server.UI and Addon.Server.UI.EventManage or nil
+    if eventManage and eventManage.IsDashboardPageActive and eventManage:IsDashboardPageActive() and eventManage.RefreshDashboard then
+        eventManage:RefreshDashboard()
+    end
+
+    return true
+end
+
+function Client:HandleResourceDelta(arguments, sender)
+    local state = self.State
+    if not state or state.active ~= true then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA receive ignored: client session is inactive.")
+        end
+        return false
+    end
+
+    local channelName = arguments and arguments[1] or nil
+    if channelName ~= state.channelName then
+        if Debug and Debug.Error then
+            Debug.Error(
+                "RESOURCE_DELTA receive ignored: channel mismatch received=%s expected=%s sender=%s.",
+                tostring(channelName or "nil"),
+                tostring(state.channelName or "nil"),
+                tostring(sender or "unknown")
+            )
+        end
+        return false
+    end
+    local playerName = Common.NormalizeName(arguments and arguments[2] or sender)
+    if playerName == "" then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA receive ignored: player name is empty for sender=%s.", tostring(sender or "unknown"))
+        end
+        return false
+    end
+    local transportActionOwner = getTrustedTransportActionOwner(arguments, sender)
+
+    local targetEventId = tonumber(arguments and arguments[4]) or 0
+    local deltaPayload = arguments and arguments[3] or ""
+
+    local localPlayerName = Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or nil)
+    if localPlayerName ~= "" and playerName == localPlayerName then
+        local signature = buildResourceDeltaSignature(channelName, playerName, deltaPayload, targetEventId)
+        if not consumePendingSignature(self.PendingLocalResourceDeltaEchoSignatures, signature) then
+            return true
+        end
+    end
+
+    local resourceDeltas = ResourceSync.NormalizeResourceDeltas and ResourceSync.NormalizeResourceDeltas(deltaPayload) or {}
+    if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
+        return false
+    end
+
+    local eventState = self:GetEventState()
+    local threatUpdates = filterThreatUpdatesForEvent(
+        deserializeThreatUpdates(arguments and arguments[5] or ""),
+        eventState
+    )
+    recordThreatUpdates(self, eventState, threatUpdates)
+    if #threatUpdates > 0 then refreshThreatMeterWidget(self) end
+    local result = applyInboundResourceDeltasForTarget(self, state, eventState, playerName, sender, targetEventId, resourceDeltas)
+    grantBossKillValor(self, eventState, result)
+    if transportActionOwner then
+        notifyRPEKillAchievement(self, eventState, transportActionOwner, result)
+        notifyRPEHealthAchievement(self, eventState, transportActionOwner, result)
+    end
+
+    if eventState and ResourceSync.UpdateEventReadiness then
+        ResourceSync.UpdateEventReadiness(eventState)
+    end
+    syncServerEventState(eventState)
+
+    if not result.changed then
+        return true
+    end
+
+    if isResourceTracingEnabled() and ResourceSync.LogReceivedResourceDeltas and Debug and Debug.Info then
+        ResourceSync.LogReceivedResourceDeltas(result.resourceOwnerName, result.appliedDeltas or resourceDeltas, Debug.Info)
+    end
+
+    if result.eventUpdated then
+        queueScopedEventPortraitRefresh(self, "resource-delta", targetEventId)
+        bumpEventTooltipContextRevision(eventState, targetEventId)
+        refreshTargetingForEventState(self, "resource-delta")
+    end
+    if shouldRefreshActionBarSlotsForTarget(self, eventState, result.targetUnit, targetEventId, playerName) then
+        if type(self.QueueActionBarRefresh) == "function" then
+            self:QueueActionBarRefresh("resource-delta")
+        elseif type(self.RefreshActionBarWidget) == "function" then
+            self:RefreshActionBarWidget("resource-delta")
+        end
+    end
+
+    if shouldRefreshCompanionBarsForTarget(self, eventState, result.targetUnit, targetEventId)
+        and type(self.QueueActionBarCompanionBarsRefresh) == "function"
+    then
+        self:QueueActionBarCompanionBarsRefresh("resource-delta", { immediate = true })
+    elseif shouldRefreshCompanionBarsForTarget(self, eventState, result.targetUnit, targetEventId)
+        and type(Client.RefreshActionBarCompanionBars) == "function"
+    then
+        Client:RefreshActionBarCompanionBars("resource-delta")
+    end
+
+    local spellcasting = Client.Spellcasting or nil
+    if spellcasting
+        and type(spellcasting.ShowInboundResourceDeltaCombatText) == "function"
+        and Common.NormalizeName(sender) ~= (spellcasting.GetLocalPlayerName and spellcasting.GetLocalPlayerName() or "")
+    then
+        spellcasting.ShowInboundResourceDeltaCombatText(self, eventState, result.targetUnit, result.appliedDeltas or resourceDeltas)
+    end
+
+    local eventManage = Addon.Server and Addon.Server.UI and Addon.Server.UI.EventManage or nil
+    if eventManage and eventManage.IsDashboardPageActive and eventManage:IsDashboardPageActive() and eventManage.RefreshDashboard then
+        eventManage:RefreshDashboard()
+    end
+
+    return true
+end
+
+function Client:HandleResourceDeltaBatch(arguments, sender)
+    local state = self.State
+    if not state or state.active ~= true then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA_BATCH receive ignored: client session is inactive.")
+        end
+        return false
+    end
+
+    local channelName = arguments and arguments[1] or nil
+    if channelName ~= state.channelName then
+        if Debug and Debug.Error then
+            Debug.Error(
+                "RESOURCE_DELTA_BATCH receive ignored: channel mismatch received=%s expected=%s sender=%s.",
+                tostring(channelName or "nil"),
+                tostring(state.channelName or "nil"),
+                tostring(sender or "unknown")
+            )
+        end
+        return false
+    end
+    local playerName = Common.NormalizeName(arguments and arguments[2] or sender)
+    if playerName == "" then
+        if Debug and Debug.Error then
+            Debug.Error("RESOURCE_DELTA_BATCH receive ignored: player name is empty for sender=%s.", tostring(sender or "unknown"))
+        end
+        return false
+    end
+    local transportActionOwner = getTrustedTransportActionOwner(arguments, sender)
+
+    local deltaPayload = arguments and arguments[3] or ""
+    local localPlayerName = Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or nil)
+    if localPlayerName ~= "" and playerName == localPlayerName then
+        local signature = buildResourceDeltaBatchSignature(channelName, playerName, deltaPayload)
+        if not consumePendingSignature(self.PendingLocalResourceDeltaBatchEchoSignatures, signature) then
+            return true
+        end
+    end
+
+    local targetedResourceDeltas = ResourceSync.CoalesceTargetedResourceDeltas
+        and ResourceSync.CoalesceTargetedResourceDeltas(deltaPayload)
+        or {}
+    if type(targetedResourceDeltas) ~= "table" or #targetedResourceDeltas == 0 then
+        return false
+    end
+
+    local targetOrder, deltasByTargetEventId = buildTargetedResourceDeltaGroups(targetedResourceDeltas)
+    if #targetOrder == 0 then
+        return false
+    end
+
+    local eventState = self:GetEventState()
+    local threatUpdates = filterThreatUpdatesForEvent(
+        deserializeThreatUpdates(arguments and arguments[4] or ""),
+        eventState
+    )
+    recordThreatUpdates(self, eventState, threatUpdates)
+    if #threatUpdates > 0 then refreshThreatMeterWidget(self) end
+    local changed = false
+    local anyEventUpdated = false
+    local anyCompanionBarRelevantTarget = false
+    local anyActionBarRelevantTarget = false
+    local changedEventIds = {}
+    local results = {}
+    for index = 1, #targetOrder do
+        local targetEventId = targetOrder[index]
+        local result = applyInboundResourceDeltasForTarget(
+            self,
+            state,
+            eventState,
+            playerName,
+            sender,
+            targetEventId,
+            deltasByTargetEventId[targetEventId]
+        )
+        grantBossKillValor(self, eventState, result)
+        if transportActionOwner then
+            notifyRPEKillAchievement(self, eventState, transportActionOwner, result)
+            notifyRPEHealthAchievement(self, eventState, transportActionOwner, result)
+        end
+        if result.changed then
+            changed = true
+        end
+        if result.eventUpdated then
+            anyEventUpdated = true
+            changedEventIds[#changedEventIds + 1] = targetEventId
+            bumpEventTooltipContextRevision(eventState, targetEventId)
+        end
+        if shouldRefreshCompanionBarsForTarget(self, eventState, result.targetUnit, targetEventId) then
+            anyCompanionBarRelevantTarget = true
+        end
+        if shouldRefreshActionBarSlotsForTarget(self, eventState, result.targetUnit, targetEventId, playerName) then
+            anyActionBarRelevantTarget = true
+        end
+        results[#results + 1] = result
+    end
+
+    if eventState and ResourceSync.UpdateEventReadiness then
+        ResourceSync.UpdateEventReadiness(eventState)
+    end
+    syncServerEventState(eventState)
+
+    if not changed then
+        return true
+    end
+
+    if isResourceTracingEnabled() and ResourceSync.LogReceivedResourceDeltas and Debug and Debug.Info then
+        for index = 1, #results do
+            local result = results[index]
+            if result.changed then
+                ResourceSync.LogReceivedResourceDeltas(result.resourceOwnerName, result.appliedDeltas or {}, Debug.Info)
+            end
+        end
+    end
+
+    if anyEventUpdated then
+        if type(self.QueueEventWidgetTargetedRefresh) == "function" then
+            self:QueueEventWidgetTargetedRefresh("resource-delta-batch", changedEventIds)
+        else
+            queueScopedEventPortraitRefresh(self, "resource-delta-batch", changedEventIds[1])
+        end
+        refreshTargetingForEventState(self, "resource-delta-batch")
+    end
+    if anyActionBarRelevantTarget then
+        if type(self.QueueActionBarRefresh) == "function" then
+            self:QueueActionBarRefresh("resource-delta-batch")
+        elseif type(self.RefreshActionBarWidget) == "function" then
+            self:RefreshActionBarWidget("resource-delta-batch")
+        end
+    end
+
+    if anyCompanionBarRelevantTarget
+        and type(self.QueueActionBarCompanionBarsRefresh) == "function"
+    then
+        self:QueueActionBarCompanionBarsRefresh("resource-delta-batch", { immediate = true })
+    elseif anyCompanionBarRelevantTarget
+        and type(Client.RefreshActionBarCompanionBars) == "function"
+    then
+        Client:RefreshActionBarCompanionBars("resource-delta-batch")
+    end
+
+    local spellcasting = Client.Spellcasting or nil
+    if spellcasting
+        and type(spellcasting.ShowInboundResourceDeltaCombatText) == "function"
+        and Common.NormalizeName(sender) ~= (spellcasting.GetLocalPlayerName and spellcasting.GetLocalPlayerName() or "")
+    then
+        for index = 1, #results do
+            local result = results[index]
+            if result.changed then
+                spellcasting.ShowInboundResourceDeltaCombatText(self, eventState, result.targetUnit, result.appliedDeltas or {})
+            end
+        end
     end
 
     local eventManage = Addon.Server and Addon.Server.UI and Addon.Server.UI.EventManage or nil

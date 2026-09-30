@@ -171,7 +171,7 @@ function Server:ApplyEventManagerHealthAction(eventId, action, amount)
         queued = Client:SendClientResources(ctx.clientState, "event-manager-resurrect", resourceOwner, resources, targetId) == true
     else
         if type(Client.QueueClientResourceDeltas) ~= "function" then return false, "resource-sync-unavailable" end
-        queued = Client:QueueClientResourceDeltas(ctx.clientState, "event-manager-" .. key, {{ resourceRef = hs.resourceRef, delta = delta, maxValue = hs.maxValue, currentValue = math.max(0, math.min(hs.maxValue, hs.currentValue + delta)) }}, targetId, { immediate = true, scope = "reaction" }) == true
+        queued = Client:QueueClientResourceDeltas(ctx.clientState, "event-manager-" .. key, {{ resourceRef = hs.resourceRef, delta = delta, maxValue = hs.maxValue, currentValue = math.max(0, math.min(hs.maxValue, hs.currentValue + delta)) }}, targetId, { allowLocalEchoApply = true, immediate = true, scope = "reaction" }) == true
     end
     if not queued then return false, key == "resurrect" and "resource-sync-rejected" or "resource-delta-rejected" end
     return true, { action = key, eventId = targetId, resourceRef = hs.resourceRef, delta = delta, previousValue = hs.currentValue, nextValue = math.max(0, math.min(hs.maxValue, hs.currentValue + delta)), maxValue = hs.maxValue }
@@ -262,7 +262,7 @@ local function hookRefresh(name)
     Client[name]=function(self,...) local result=original(self,...); if result==true then refreshActions() end; return result end
 end
 if Client._eventManagerActionRefreshHooksInstalled~=true then
-    for _,name in ipairs({"HandleResource","HandleAuraApply","HandleAuraApplyBatch","HandleAuraDispel","HandleAuraDispelBatch","HandleAuraRuntimeUpdate","HandleAuraRuntimeUpdateBatch"}) do hookRefresh(name) end
+    for _,name in ipairs({"HandleResource","HandleResourceDelta","HandleResourceDeltaBatch","HandleAuraApply","HandleAuraApplyBatch","HandleAuraDispel","HandleAuraDispelBatch","HandleAuraRuntimeUpdate","HandleAuraRuntimeUpdateBatch"}) do hookRefresh(name) end
     Client._eventManagerActionRefreshHooksInstalled=true
 end
 

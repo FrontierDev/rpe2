@@ -197,16 +197,23 @@ local function hasPositiveThreat(threatTable)
     return false
 end
 
-local function buildThreatTargets(eventState)
+local function buildThreatTargets(eventState, scope)
     local targets = {}
+    local eventMeters = Client.EventMeters
     for index = 1, #((eventState and eventState.units) or {}) do
         local unit = eventState.units[index]
         if type(unit) == "table" and unit.isPlayer ~= true and isUnitActive(unit) then
+            local ledgerRows = type(eventMeters) == "table" and type(eventMeters.GetRows) == "function"
+                and eventMeters:GetRows(eventState.id, "threat", scope, {
+                    targetEventId = unit.eventID,
+                    turnNumber = eventState.turnNumber,
+                })
+                or {}
             targets[#targets + 1] = {
                 eventId = tonumber(unit.eventID) or 0,
                 name = tostring(unit.name or "Unknown"),
                 boss = isUnitBoss(unit),
-                hasThreat = hasPositiveThreat(unit.threatTable),
+                hasThreat = hasPositiveThreat(unit.threatTable) or #ledgerRows > 0,
                 order = index,
             }
         end
@@ -372,16 +379,12 @@ local function buildMeterRows(eventState, eventId, meterType, scope, threatEvent
     local rows = {}
     local largest = 0
     local eventMeters = Client.EventMeters
-    local sourceRows = {}
-    if meterType == "threat" then
-        sourceRows = type(eventMeters) == "table" and type(eventMeters.GetThreatRows) == "function"
-            and eventMeters:GetThreatRows(eventState, threatEventId)
-            or {}
-    else
-        sourceRows = type(eventMeters) == "table" and type(eventMeters.GetRows) == "function"
-            and eventMeters:GetRows(eventId, meterType, scope, { turnNumber = eventState and eventState.turnNumber })
-            or {}
-    end
+    local sourceRows = type(eventMeters) == "table" and type(eventMeters.GetRows) == "function"
+        and eventMeters:GetRows(eventId, meterType, scope, {
+            targetEventId = threatEventId,
+            turnNumber = eventState and eventState.turnNumber,
+        })
+        or {}
     local total = 0
     for index = 1, #sourceRows do
         total = total + math.max(0, tonumber(sourceRows[index].amount) or 0)
@@ -437,7 +440,7 @@ function EventWidget:RefreshMetersThreatTargets(eventState)
         return
     end
 
-    local targets = buildThreatTargets(eventState)
+    local targets = buildThreatTargets(eventState, self.metersScope)
     local items = {}
     for index = 1, #targets do
         local target = targets[index]
@@ -491,8 +494,7 @@ function EventWidget:RefreshMetersPanel()
     self.metersScope = tostring(self.metersScope or "total") == "turn" and "turn" or "total"
 
     local meterType = self.metersViewType
-    local scopeLabel = meterType == "threat" and "Current" or METER_SCOPE_LABELS[self.metersScope]
-    self.metersTitle:SetText((METER_LABELS[meterType] or "Damage") .. " Meter - " .. scopeLabel)
+    self.metersTitle:SetText((METER_LABELS[meterType] or "Damage") .. " Meter - " .. METER_SCOPE_LABELS[self.metersScope])
     for index = 1, #METER_SCOPES do
         local scope = METER_SCOPES[index]
         local button = self.metersScopeButtons and self.metersScopeButtons[scope]
@@ -502,7 +504,6 @@ function EventWidget:RefreshMetersPanel()
     end
     setShown(self.metersThreatLabel, meterType == "threat")
     setShown(self.metersThreatDropdown, meterType == "threat")
-    setShown(self.metersScopeTabs, meterType ~= "threat")
     if meterType == "threat" then
         self:RefreshMetersThreatTargets(state)
     end

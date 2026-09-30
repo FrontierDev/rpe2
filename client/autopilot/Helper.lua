@@ -907,27 +907,6 @@ function Helper.UpdateDamageOutcome(entry, damageResult)
     return outcome
 end
 
-function Helper.RecordCombatTransactionOutcome(entry, envelope)
-    if type(entry) ~= "table" or type(envelope) ~= "table" then
-        return false
-    end
-    local outcome = type(envelope.outcome) == "table" and envelope.outcome or {}
-    local resultToken = tostring(outcome.resultToken or ""):lower()
-    if envelope.state == "committed" and (resultToken == "pass" or resultToken == "fail") then
-        Helper.RecordHitCheckOutcome(entry, resultToken == "pass")
-        if resultToken == "pass" then
-            Helper.UpdateDamageOutcome(entry, outcome.damageResult)
-        end
-    elseif envelope.state == "rejected"
-        or envelope.state == "cancelled"
-        or envelope.state == "timed-out"
-    then
-        -- A terminal failure releases the action without claiming damage.
-        Helper.RecordHitCheckOutcome(entry, false)
-    end
-    return true
-end
-
 function Helper.GetTurnOutcomes(eventState)
     local bucket = getOutcomeBucket(eventState, false)
     if type(bucket) ~= "table" then
@@ -1162,6 +1141,20 @@ local function installOutcomeHooks()
         return true
     end
 
+    local baseCompleteHitCheck = Combat.CompleteHitCheck
+    if type(baseCompleteHitCheck) == "function" then
+        function Combat:CompleteHitCheck(entry, resultToken, reason, ...)
+            local results = pack(baseCompleteHitCheck(self, entry, resultToken, reason, ...))
+            if results[1] == true then
+                local result = results[2]
+                local landed = type(result) == "table" and result.landed == true
+                    or tostring(resultToken or "") == "pass"
+                Helper.RecordHitCheckOutcome(entry, landed)
+            end
+            return unpack(results, 1, results.n)
+        end
+    end
+
     local baseFinalizeLocalDamageResult = Combat.FinalizeLocalDamageResult
     if type(baseFinalizeLocalDamageResult) == "function" then
         function Combat:FinalizeLocalDamageResult(entry, damageResult, ...)
@@ -1171,11 +1164,19 @@ local function installOutcomeHooks()
         end
     end
 
-    local baseHandleCombatTransactionTerminal = Client.HandleCombatTransactionTerminal
-    if type(baseHandleCombatTransactionTerminal) == "function" then
-        function Client:HandleCombatTransactionTerminal(entry, envelope, ...)
-            local results = pack(baseHandleCombatTransactionTerminal(self, entry, envelope, ...))
-            Helper.RecordCombatTransactionOutcome(entry, envelope)
+    local baseHandleDamageHitCheckResponse = Combat.HandleDamageHitCheckResponse
+    if type(baseHandleDamageHitCheckResponse) == "function" then
+        function Combat:HandleDamageHitCheckResponse(client, arguments, sender, ...)
+            local checkId = tostring(arguments and arguments[1] or "")
+            local entry = checkId ~= ""
+                and type(client) == "table"
+                and type(client.GetPendingCombatHitCheck) == "function"
+                and client:GetPendingCombatHitCheck(checkId)
+                or nil
+            local results = pack(baseHandleDamageHitCheckResponse(self, client, arguments, sender, ...))
+            if results[1] == true and type(entry) == "table" and type(entry.lastDamageResult) == "table" then
+                Helper.UpdateDamageOutcome(entry, entry.lastDamageResult)
+            end
             return unpack(results, 1, results.n)
         end
     end

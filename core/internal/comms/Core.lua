@@ -22,7 +22,6 @@ Comms.MaxIncomingChunkEntries = Comms.MaxIncomingChunkEntries or 128
 Comms.RecentLocalEchoes = Comms.RecentLocalEchoes or {}
 Comms.RecentLocalEchoTimeout = Comms.RecentLocalEchoTimeout or 5
 Comms.MaxRecentLocalEchoes = Comms.MaxRecentLocalEchoes or 256
-Comms.OutboundMessageSequence = tonumber(Comms.OutboundMessageSequence) or 0
 
 local getGroupType = Common.GetGroupType
 local getNow = Common.GetNow
@@ -70,20 +69,11 @@ local function logTimingParts(label, context, parts, totalElapsedMs, thresholdMs
     return false
 end
 
-local function buildInboundChunkKey(sender, opcode, messageId)
+local function buildInboundChunkKey(sender, opcode)
     return table.concat({
         tostring(sender or ""),
         tostring(opcode or ""),
-        tostring(messageId or "legacy"),
     }, ":")
-end
-
-local function buildLogicalMessageId(self)
-    self.OutboundMessageSequence = (math.floor(tonumber(self.OutboundMessageSequence) or 0) + 1) % 0x1000000
-    local now = Common.GetNow
-    local seconds = type(now) == "function" and now() or (type(getNow) == "function" and getNow() or 0)
-    local milliseconds = math.floor((tonumber(seconds) or 0) * 1000) % 0x100000000
-    return ("%08x%06x"):format(milliseconds, self.OutboundMessageSequence)
 end
 
 local function buildRecentLocalEchoKey(prefix, message, distribution, sender, target)
@@ -143,30 +133,11 @@ local function cleanupIncomingChunks(self, now)
     local entryCount = 0
     local oldestKey = nil
     local oldestAt = nil
-    local function recordChunkExpiry(entry, reason)
-        if type(Diagnostics) ~= "table" or type(Diagnostics.GetTransportDiagnosticsStore) ~= "function" then
-            return
-        end
-        local store = Diagnostics:GetTransportDiagnosticsStore()
-        if type(store) ~= "table" then
-            return
-        end
-        store.multipartTimeoutCount = (tonumber(store.multipartTimeoutCount) or 0) + 1
-        store.lastMultipartTimeout = {
-            opcode = entry and entry.opcode or nil,
-            logicalMessageId = entry and entry.messageId or nil,
-            sender = entry and entry.sender or nil,
-            receivedPartCount = entry and entry.receivedCount or 0,
-            expectedPartCount = entry and entry.partCount or 0,
-            reason = reason,
-        }
-    end
 
     for key, entry in pairs(self.IncomingChunks or {}) do
         local receivedAt = tonumber(entry and entry.receivedAt) or 0
         if timeoutSeconds > 0 and (now - receivedAt) > timeoutSeconds then
             self.IncomingChunks[key] = nil
-            recordChunkExpiry(entry, "timeout")
         else
             entryCount = entryCount + 1
             if maxEntries > 0 and (oldestAt == nil or receivedAt < oldestAt) then
@@ -177,7 +148,6 @@ local function cleanupIncomingChunks(self, now)
     end
 
     while maxEntries > 0 and entryCount >= maxEntries and oldestKey do
-        recordChunkExpiry(self.IncomingChunks[oldestKey], "capacity")
         self.IncomingChunks[oldestKey] = nil
         entryCount = entryCount - 1
 
@@ -371,16 +341,13 @@ local function buildSendMetadata(opcode, metadata)
     return details
 end
 
-function Comms:GetPacketPayloadLimit(opcode, partCount, messageId)
-    local chunkToken = Serialization:BuildChunkToken(partCount, partCount, messageId or "ffffffffffffff")
-    if not chunkToken then
-        return 0
-    end
+function Comms:GetPacketPayloadLimit(opcode, partCount)
+    local chunkToken = Serialization:BuildChunkToken(partCount, partCount)
     local headerPacket = Serialization:SerializePacket(self.Prefix, chunkToken, opcode, "")
     return (tonumber(self.MaxAddonMessageLength) or 255) - #headerPacket
 end
 
-function Comms:ResolveChunkPlan(argumentsText, opcode, messageId)
+function Comms:ResolveChunkPlan(argumentsText, opcode)
     local payloadLength = #(argumentsText or "")
     local optionalCap = tonumber(self.SafeChunkLength)
     if optionalCap ~= nil then
@@ -398,7 +365,7 @@ function Comms:ResolveChunkPlan(argumentsText, opcode, messageId)
         end
         seenPartCounts[partCount] = true
 
-        local packetPayloadLimit = math.floor(tonumber(self:GetPacketPayloadLimit(opcode, partCount, messageId)) or 0)
+        local packetPayloadLimit = math.floor(tonumber(self:GetPacketPayloadLimit(opcode, partCount)) or 0)
         if packetPayloadLimit < 1 then
             return nil
         end
@@ -509,8 +476,7 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
 
     local timedOpcodeKey = getTimedEventOpcodeKey(opcode)
     local chunkPlanStartTime = timedOpcodeKey and getTimingNowMilliseconds() or nil
-    local messageId = buildLogicalMessageId(self)
-    local chunkLength, partCount = self:ResolveChunkPlan(argumentsText, opcode, messageId)
+    local chunkLength, partCount = self:ResolveChunkPlan(argumentsText, opcode)
     local chunkPlanElapsedMs = chunkPlanStartTime and (getTimingNowMilliseconds() - chunkPlanStartTime) or 0
     if not chunkLength or not partCount then
         if Diagnostics.RecordSendFailure then
@@ -527,13 +493,13 @@ function Comms:SendMessage(distribution, opcodeOrPayload, argumentsOrTarget, tar
             #argumentsText,
             chunkLength,
             partCount,
-            self:GetPacketPayloadLimit(opcode, partCount, messageId)
+            self:GetPacketPayloadLimit(opcode, partCount)
         )
     end
 
     local packets = {}
     for partIndex = 1, partCount do
-        local chunkToken = Serialization:BuildChunkToken(partIndex, partCount, messageId)
+        local chunkToken = Serialization:BuildChunkToken(partIndex, partCount)
         local rangeStart = ((partIndex - 1) * chunkLength) + 1
         local rangeEnd = partIndex * chunkLength
         local packet = Serialization:SerializePacket(
@@ -709,7 +675,6 @@ function Comms:FinalizeInbound(packet, distribution, sender, target)
         sender = sender,
         target = target,
         chunkCount = packet.partCount,
-        logicalMessageId = packet.messageId,
         receivedAt = getNow(),
     }
     local deserializeElapsedMs = totalStartTime and (getTimingNowMilliseconds() - deserializeStartTime) or 0
@@ -778,12 +743,11 @@ function Comms:ReceiveMessage(prefix, message, distribution, sender, target, opt
         return self:FinalizeInbound(packet, distribution, sender, target)
     end
 
-    local chunkKey = buildInboundChunkKey(sender, packet.opcode, packet.messageId)
+    local chunkKey = buildInboundChunkKey(sender, packet.opcode)
     local entry = self.IncomingChunks[chunkKey]
     if not entry then
         entry = {
             opcode = packet.opcode,
-            messageId = packet.messageId,
             partCount = packet.partCount,
             distribution = distribution,
             sender = sender,
@@ -836,7 +800,6 @@ function Comms:ReceiveMessage(prefix, message, distribution, sender, target, opt
     return self:FinalizeInbound({
         prefix = packet.prefix,
         opcode = packet.opcode,
-        messageId = packet.messageId,
         partCount = entry.partCount,
         argumentsText = table.concat(entry.parts, ""),
     }, distribution, sender, target)

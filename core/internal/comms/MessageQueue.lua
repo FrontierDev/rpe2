@@ -1104,18 +1104,5 @@ function Queue:GetStats()
     stats.scheduledWakeAt = math.max(0, tonumber(self.ScheduledWakeAt) or 0)
     stats.isWaiting = stats.scheduledWakeAt > now or self.ImmediateYieldPending == true
     stats.isSending = self.IsSending and true or false
-    stats.pendingLogicalMessages = {}
-    local operations = Addon.Internal and Addon.Internal.Comms and Addon.Internal.Comms.Operations or nil
-    for index = 1, #self.Items do
-        local item = self.Items[index]
-        local opcode = getItemOpcode(item)
-        local operation = type(operations) == "table" and type(operations.Get) == "function"
-            and operations:Get(opcode) or nil
-        stats.pendingLogicalMessages[#stats.pendingLogicalMessages + 1] = {
-            operation = type(operation) == "table" and tostring(operation.key or "") or tostring(opcode or "unknown"),
-            distribution = tostring(item and item.distribution or ""),
-            remainingChunks = getRemainingChunkCount(item),
-        }
-    end
     return stats
 end

@@ -9,7 +9,6 @@ local Server = Addon.Server
 local Client = Addon.Client
 local Common = Addon.Utils.Common
 local Comms = Addon.Internal.Comms
-local EventTransactions = Comms.EventTransactions
 local Operations = Comms.Operations
 local ResourceSync = Comms.ResourceSync or {}
 local Ruleset = Addon.Internal.Ruleset or {}
@@ -946,23 +945,18 @@ local EVENT_END_OPCODE = Operations:GetOpcode("EVENT_END")
 local EVENT_UNITS_OPCODE = Operations:GetOpcode("EVENT_UNITS")
 local EVENT_STATE_OPCODE = Operations:GetOpcode("EVENT_STATE")
 local EVENT_UNIT_DELTA_BATCH_OPCODE = Operations:GetOpcode("EVENT_UNIT_DELTA_BATCH")
-local LIVE_UNIT_REVISION_MARKER = "rpe-live-unit-revision"
 
 local function buildEventUnitsArguments(eventState)
     return {
         eventState and eventState.channelName or "",
         eventState and eventState.id or nil,
         eventState and eventState.SerializeUnitsForNetwork and eventState:SerializeUnitsForNetwork() or "",
-        math.max(0, math.floor(tonumber(eventState and eventState.liveUnitRevision) or 0)),
     }
 end
 
 local function buildEventStateArguments(eventState)
     if eventState and eventState.ToStateArguments then
-        local arguments = eventState:ToStateArguments()
-        arguments[#arguments + 1] = LIVE_UNIT_REVISION_MARKER
-        arguments[#arguments + 1] = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
-        return arguments
+        return eventState:ToStateArguments()
     end
 
     return {
@@ -971,8 +965,6 @@ local function buildEventStateArguments(eventState)
         eventState and eventState.turnNumber or 0,
         eventState and eventState.tickNumber or 0,
         eventState and eventState.totalTicks or 0,
-        LIVE_UNIT_REVISION_MARKER,
-        math.max(0, math.floor(tonumber(eventState and eventState.liveUnitRevision) or 0)),
     }
 end
 
@@ -1194,7 +1186,6 @@ local function buildEventUnitDeltaBatchArguments(eventState, entries)
         eventState and eventState.channelName or "",
         eventState and eventState.id or nil,
         Event and Event.SerializeUnitDeltaBatchForNetwork and Event.SerializeUnitDeltaBatchForNetwork(entries, options) or "",
-        math.max(0, math.floor(tonumber(eventState and eventState.liveUnitRevision) or 0)),
     }
 end
 
@@ -1248,7 +1239,6 @@ local function broadcastEventDeltaBatch(server, eventState, entries, includeStat
         return false
     end
 
-    eventState.liveUnitRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) + 1
     local arguments = buildEventUnitDeltaBatchArguments(eventState, entries)
     if type(arguments[3]) ~= "string" or arguments[3] == "" then
         return false
@@ -1268,14 +1258,6 @@ local function broadcastEventDeltaBatch(server, eventState, entries, includeStat
     ) and true or false
 
     if includeState then
-        -- A complete authoritative snapshot at the step boundary repairs any
-        -- missed delta without relying on clients retaining every packet.
-        Comms:SendToChannel(
-            channelId,
-            EVENT_UNITS_OPCODE,
-            buildEventUnitsArguments(eventState),
-            buildSendMetadata(EVENT_UNITS_OPCODE)
-        )
         Comms:SendToChannel(
             channelId,
             EVENT_STATE_OPCODE,
@@ -1289,19 +1271,6 @@ end
 
 function Server:BroadcastEventDeltaBatch(entries, includeState)
     return broadcastEventDeltaBatch(self, self.EventState, entries, includeState)
-end
-
-function Server:AdvanceLiveUnitRevision(reason)
-    local eventState = self.EventState
-    if type(eventState) ~= "table" or eventState.active ~= true then
-        return nil
-    end
-    eventState.liveUnitRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) + 1
-    if type(Debug) == "table" and type(Debug.Internal) == "function" then
-        Debug.Internal("Live EventUnit revision advanced: eventId=%s revision=%d reason=%s.",
-            tostring(eventState.id or ""), eventState.liveUnitRevision, tostring(reason or "mutation"))
-    end
-    return eventState.liveUnitRevision
 end
 
 function Server:CopyLiveEventToDraftState()
@@ -1358,20 +1327,6 @@ local function sendEventSnapshotToClient(eventState, clientName, snapshot)
 
     local resolvedSnapshot = snapshot or buildEventSnapshot(eventState)
     return sendBuiltEventSnapshot("WHISPER", normalizedClientName, resolvedSnapshot)
-end
-
-function Server:HandleEventSnapshotRequest(arguments, sender)
-    local eventState = self.EventState
-    local channelName = arguments and arguments[1] or nil
-    local eventId = arguments and arguments[2] or nil
-    local requester = Common.NormalizeName(sender)
-    if type(eventState) ~= "table" or eventState.active ~= true
-        or requester == "" or tostring(eventState.channelName or "") ~= tostring(channelName or "")
-        or tostring(eventState.id or "") ~= tostring(eventId or "")
-    then
-        return false
-    end
-    return sendEventSnapshotToClient(eventState, requester)
 end
 
 local function sendInitialEventSnapshot(server, sessionState, eventState)
@@ -2344,11 +2299,6 @@ function Server:StartEvent(data)
     stopTiming(buildStateTimer)
 
     self.EventState = eventState
-    if EventTransactions and type(EventTransactions.Server) == "table"
-        and type(EventTransactions.Server.StartEvent) == "function"
-    then
-        EventTransactions.Server:StartEvent(eventState.id)
-    end
     if type(Client.EventMeters) == "table" and type(Client.EventMeters.ResetEvent) == "function" then
         Client.EventMeters:ResetEvent(eventState.id)
     end
@@ -2399,28 +2349,14 @@ function Server:EndEvent(reason)
     if not eventState then
         return false
     end
-    if EventTransactions and type(EventTransactions.Server) == "table"
-        and type(EventTransactions.Server.EndEvent) == "function"
-    then
-        EventTransactions.Server:EndEvent(eventState.id, reason or "ended")
-    end
 
     if type(self.PendingEventAdvanceCommit) == "table"
         and tostring(self.PendingEventAdvanceCommit.eventId or "") == tostring(eventState.id or "")
     then
+        if Client and type(Client.CancelPendingTurnCommit) == "function" then
+            Client:CancelPendingTurnCommit("event-ending", eventState.id)
+        end
         self.PendingEventAdvanceCommit = nil
-    end
-
-    if Client and type(Client.CancelPendingTurnCommit) == "function" then
-        Client:CancelPendingTurnCommit("event-ending", eventState.id)
-    end
-    if Client and type(Client.ClearAutopilotBatch) == "function" then
-        Client:ClearAutopilotBatch(eventState.id, reason or "event-ended")
-    end
-    if type(self.LastEventAdvanceCommit) == "table"
-        and tostring(self.LastEventAdvanceCommit.eventId or "") == tostring(eventState.id or "")
-    then
-        self.LastEventAdvanceCommit = nil
     end
 
     if Client and type(Client.ResetEventResourceDeltas) == "function" then
@@ -2555,14 +2491,6 @@ function Server:_AdvanceEventStepAfterCommit(commit, completed)
     end
 
     if channelId then
-        -- The step boundary is the normal convergence point for resource-only
-        -- commits, which do not otherwise have an EventUnit delta packet.
-        Comms:SendToChannel(
-            channelId,
-            EVENT_UNITS_OPCODE,
-            buildEventUnitsArguments(eventState),
-            buildSendMetadata(EVENT_UNITS_OPCODE)
-        )
         Comms:SendToChannel(
             channelId,
             EVENT_STATE_OPCODE,

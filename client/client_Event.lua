@@ -10,175 +10,10 @@ local Debug = Addon.Debug
 local Common = Addon.Utils.Common
 local Commands = Addon.Commands
 local Comms = Addon.Internal.Comms
-local EventTransactions = Comms.EventTransactions
 local Event = Addon.Internal.Database.Classes.Event
 local ResourceSync = Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local EventUnit = Addon.Internal.Database.Classes.EventUnit
 local Runtime = Addon.Internal.Runtime or {}
-local Operations = Comms.Operations or {}
-local LIVE_UNIT_REVISION_MARKER = "rpe-live-unit-revision"
-local SNAPSHOT_REPAIR_RETRY_MS = 1500
-local MAX_SNAPSHOT_REPAIR_ATTEMPTS = 3
-local scheduleSnapshotRepair
-
-local function getSnapshotRepairNowMilliseconds()
-    if type(GetTimePreciseSec) == "function" then
-        return GetTimePreciseSec() * 1000
-    end
-    return (GetTime and GetTime() or 0) * 1000
-end
-
-local function getLiveUnitRevisionFromStateArguments(arguments)
-    local argumentCount = type(arguments) == "table" and #arguments or 0
-    if argumentCount >= 2 and arguments[argumentCount - 1] == LIVE_UNIT_REVISION_MARKER then
-        return math.max(0, math.floor(tonumber(arguments[argumentCount]) or 0)), argumentCount - 2
-    end
-    return 0, nil
-end
-
-local function requestAuthoritativeEventSnapshot(client, eventState, expectedRevision, reason, nowOverride)
-    if type(client) ~= "table" or type(eventState) ~= "table" then
-        return false
-    end
-    local revision = math.max(0, math.floor(tonumber(expectedRevision) or 0))
-    local now = tonumber(nowOverride) or getSnapshotRepairNowMilliseconds()
-    local repair = type(client.EventSnapshotRepair) == "table" and client.EventSnapshotRepair or nil
-    if repair and (tostring(repair.eventId or "") ~= tostring(eventState.id or "") or tonumber(repair.revision) ~= revision) then
-        repair = nil
-        client.EventSnapshotRepair = nil
-        client.EventSnapshotRepairRequestedRevision = nil
-    end
-    if repair and now < (tonumber(repair.nextRetryAtMs) or 0) then
-        return false
-    end
-    local opcode = Operations.GetOpcode and Operations:GetOpcode("EVENT_SNAPSHOT_REQUEST") or nil
-    local hostName = Common and Common.NormalizeName and Common.NormalizeName(eventState.hostName) or tostring(eventState.hostName or "")
-    if not opcode or hostName == "" then
-        return false
-    end
-    repair = repair or {
-        eventId = eventState.id,
-        revision = revision,
-        attempts = 0,
-        createdAtMs = now,
-    }
-    if (tonumber(repair.attempts) or 0) >= MAX_SNAPSHOT_REPAIR_ATTEMPTS then
-        client.EventSnapshotRepair = nil
-        client.EventSnapshotRepairRequestedRevision = nil
-        if type(Debug) == "table" and type(Debug.Internal) == "function" then
-            Debug.Internal("Authoritative event snapshot repair expired: eventId=%s revision=%s.", tostring(eventState.id or ""), tostring(revision))
-        end
-        return false
-    end
-    repair.attempts = (tonumber(repair.attempts) or 0) + 1
-    repair.lastAttemptAtMs = now
-    repair.nextRetryAtMs = now + SNAPSHOT_REPAIR_RETRY_MS
-    repair.reason = tostring(reason or repair.reason or "revision-mismatch")
-    client.EventSnapshotRepair = repair
-    client.EventSnapshotRepairRequestedRevision = revision
-    client.EventSnapshotRepairReason = repair.reason
-    local sent = Comms:SendMessage("WHISPER", opcode, {
-        eventState.channelName,
-        eventState.id,
-        revision,
-    }, hostName, { opcode = opcode, scope = "client" }) == true
-    repair.lastSendSucceeded = sent
-    local diagnostics = Comms.Diagnostics
-    local store = type(diagnostics) == "table" and type(diagnostics.GetTransportDiagnosticsStore) == "function"
-        and diagnostics:GetTransportDiagnosticsStore() or nil
-    if type(store) == "table" then
-        store.lastSnapshotRepair = {
-            eventId = eventState.id,
-            revision = revision,
-            attempts = repair.attempts,
-            reason = repair.reason,
-            sent = sent,
-            nextRetryAtMs = repair.nextRetryAtMs,
-        }
-    end
-    scheduleSnapshotRepair(client)
-    if type(Debug) == "table" and type(Debug.Internal) == "function" then
-        Debug.Internal(
-            "Authoritative event snapshot repair %s: eventId=%s localRevision=%s expectedRevision=%s.",
-            sent and "requested" or "failed", tostring(eventState.id or ""),
-            tostring(eventState.liveUnitRevision or 0), tostring(revision)
-        )
-    end
-    return sent
-end
-
-local function clearEventSnapshotRepair(client, eventId)
-    if type(client) ~= "table" then
-        return false
-    end
-    local normalizedEventId = eventId ~= nil and tostring(eventId or "") or nil
-    local repair = client.EventSnapshotRepair
-    if normalizedEventId ~= nil
-        and type(repair) == "table"
-        and tostring(repair.eventId or "") ~= normalizedEventId
-    then
-        return false
-    end
-    client.EventSnapshotRepair = nil
-    client.EventSnapshotRepairRequestedRevision = nil
-    client.EventSnapshotRepairReason = nil
-    if normalizedEventId == nil
-        or tostring(client.EventSnapshotRepairTimerEventId or "") == normalizedEventId
-    then
-        client.EventSnapshotRepairTimerActive = nil
-        client.EventSnapshotRepairTimerEventId = nil
-    end
-    return true
-end
-
-function Client:RequestAuthoritativeEventSnapshot(eventState, expectedRevision, reason, nowMs)
-    return requestAuthoritativeEventSnapshot(self, eventState, expectedRevision, reason, nowMs)
-end
-
-function Client:ProcessEventSnapshotRepair(nowMs)
-    local repair = self.EventSnapshotRepair
-    local eventState = self.GetEventState and self:GetEventState() or nil
-    if type(repair) ~= "table" or type(eventState) ~= "table" or eventState.active ~= true
-        or tostring(eventState.id or "") ~= tostring(repair.eventId or "")
-    then
-        return false
-    end
-    return requestAuthoritativeEventSnapshot(self, eventState, repair.revision, repair.reason, nowMs)
-end
-
-scheduleSnapshotRepair = function(client)
-    if type(client) ~= "table" or not (C_Timer and C_Timer.After) then
-        return false
-    end
-    local repair = client.EventSnapshotRepair
-    local eventId = type(repair) == "table" and tostring(repair.eventId or "") or ""
-    if eventId == "" then
-        return false
-    end
-    if client.EventSnapshotRepairTimerActive == true
-        and tostring(client.EventSnapshotRepairTimerEventId or "") == eventId
-    then
-        return false
-    end
-    client.EventSnapshotRepairTimerActive = true
-    client.EventSnapshotRepairTimerEventId = eventId
-    C_Timer.After(SNAPSHOT_REPAIR_RETRY_MS / 1000, function()
-        if tostring(client.EventSnapshotRepairTimerEventId or "") == eventId then
-            client.EventSnapshotRepairTimerActive = nil
-            client.EventSnapshotRepairTimerEventId = nil
-        end
-        local repair = client.EventSnapshotRepair
-        local eventState = client.GetEventState and client:GetEventState() or nil
-        if type(repair) == "table" and type(eventState) == "table"
-            and eventState.active == true
-            and tostring(eventState.id or "") == eventId
-            and tostring(repair.eventId or "") == eventId
-        then
-            client:ProcessEventSnapshotRepair()
-        end
-    end)
-    return true
-end
 
 local function getTimings()
     return Addon.Debug and Addon.Debug.Timings or nil
@@ -507,14 +342,9 @@ function Client:SetEventTransitionPhase(phase, eventState)
     if eventState ~= nil and transition.eventState ~= eventState then
         return false
     end
-    local nextPhase = tostring(phase or transition.phase or "starting")
-    local changed = transition.phase ~= nextPhase
-    transition.phase = nextPhase
+    transition.phase = tostring(phase or transition.phase or "starting")
     if type(eventState) == "table" then
         eventState.transitionPhase = transition.phase
-    end
-    if changed and type(self.QueueEventWidgetRefresh) == "function" then
-        self:QueueEventWidgetRefresh("event-transition-" .. nextPhase)
     end
     return true
 end
@@ -1818,7 +1648,7 @@ tryQueueInitialLocalResourceSync = function(client, sessionState, eventState, re
     return client:QueueClientResourceSync(reason or "event-start") or false
 end
 
-local function applyLocalProfileResourcesToEventUnits(sessionState, units, options)
+local function applyLocalProfileResourcesToEventUnits(sessionState, units)
     if type(units) ~= "table" then
         return false
     end
@@ -1826,26 +1656,6 @@ local function applyLocalProfileResourcesToEventUnits(sessionState, units, optio
     local localPlayerName = Common.NormalizeName and Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or nil) or ""
     if localPlayerName == "" then
         return false
-    end
-
-    if type(options) == "table" and options.preserveInboundResources == true then
-        for index = 1, #units do
-            local unit = units[index]
-            local ownerName = unit and unit.isPlayer == true
-                and (Common.NormalizeName and Common.NormalizeName(unit.ownerID or unit.controllerID or unit.name) or "") or ""
-            if ownerName == localPlayerName and type(unit.resources) == "table" and #unit.resources > 0 then
-                local sessionMember = type(sessionState) == "table"
-                    and type(sessionState.membersByName) == "table"
-                    and sessionState.membersByName[localPlayerName] or nil
-                if sessionMember then
-                    sessionMember.resources = ResourceSync.CloneResources and ResourceSync.CloneResources(unit.resources) or unit.resources
-                end
-                return true
-            end
-        end
-        if options.skipProfileFallback == true then
-            return false
-        end
     end
 
     local resources = ResourceSync.BuildProfileResourceSnapshot and ResourceSync.BuildProfileResourceSnapshot() or nil
@@ -2697,14 +2507,6 @@ local function clearEventStateNow(client, state, reason, options)
     local transition = client.EventTransition
     local eventState = type(state) == "table" and state or (transition and transition.eventState)
     local eventId = eventState and eventState.id or nil
-    if eventId == nil and EventTransactions and type(EventTransactions.Client) == "table" then
-        eventId = EventTransactions.Client.currentEventId
-    end
-    if EventTransactions and type(EventTransactions.Client) == "table"
-        and eventId ~= nil and type(EventTransactions.Client.EndEvent) == "function"
-    then
-        EventTransactions.Client:EndEvent(eventId, reason or "event-reset")
-    end
     local eventMeters = client.EventMeters
     if type(eventMeters) == "table" and type(eventMeters.ResetEvent) == "function" and eventId ~= nil then
         eventMeters:ResetEvent(eventId)
@@ -2713,33 +2515,14 @@ local function clearEventStateNow(client, state, reason, options)
     if type(combat) == "table" and type(combat.ClearDefensiveReactionUseLedger) == "function" then
         combat:ClearDefensiveReactionUseLedger(eventId)
     end
-    if type(client.ClearCombatReactionRuntime) == "function" then
-        client:ClearCombatReactionRuntime(eventId, reason or "event-reset")
+    if type(combat) == "table" and type(combat.ClearPendingDamageOutcomes) == "function" then
+        combat:ClearPendingDamageOutcomes(eventId)
     end
     if type(client.CancelPendingTurnCommit) == "function" then
         client:CancelPendingTurnCommit(options.cancelReason or "event-reset", eventId)
     end
     if type(client.ResetEventResourceDeltas) == "function" then
         client:ResetEventResourceDeltas(eventId)
-    end
-    clearEventSnapshotRepair(client, eventId)
-    if type(client.PendingEventRejoinStateByEventId) == "table" and eventId ~= nil then
-        client.PendingEventRejoinStateByEventId[tostring(eventId or "")] = nil
-    end
-    if type(client.ClearAutopilotBatch) == "function" then
-        client:ClearAutopilotBatch(eventId, reason or "event-reset")
-    end
-    if eventId ~= nil then
-        local normalizedEventId = tostring(eventId or "")
-        if type(client.EventUnitTauntApplications) == "table" then
-            client.EventUnitTauntApplications[normalizedEventId] = nil
-        end
-        if type(client.AutopilotTurnOutcomesByEventId) == "table" then
-            client.AutopilotTurnOutcomesByEventId[normalizedEventId] = nil
-        end
-        if type(client.AutopilotRuntimeByEventId) == "table" then
-            client.AutopilotRuntimeByEventId[normalizedEventId] = nil
-        end
     end
     if options.skipCancel ~= true then
         cancelEventSliceableWork(client, eventId, options.cancelReason or "event-reset")
@@ -2980,6 +2763,9 @@ local function runEventEndStep(targetClient, work, deadlineMs)
         targetClient:SetEventTransitionPhase("visual-teardown", eventState)
         local timer = startTiming("Event end phase: visual-queue", 8, work.eventId)
         local combat = targetClient.Combat or (Addon.Client and Addon.Client.Combat) or nil
+        if type(combat) == "table" and type(combat.ClearPendingDamageOutcomes) == "function" then
+            combat:ClearPendingDamageOutcomes(work.eventId)
+        end
         eventState.active = false
         eventState.ending = false
         eventState.startupReady = false
@@ -3191,11 +2977,6 @@ function Client:HandleEventStart(arguments, sender)
     appendTimingPart(timingParts, "hydrate-resources", hydrateStartTime, 10)
 
     self.EventState = nextState
-    if EventTransactions and type(EventTransactions.Client) == "table"
-        and type(EventTransactions.Client.StartEvent) == "function"
-    then
-        EventTransactions.Client:StartEvent(nextState.id)
-    end
     local transition = self:BeginEventTransition("starting", nextState.id)
     transition.eventState = nextState
     local startupRuntime = getEventStartupRuntime(self, nextState.id, true)
@@ -3375,7 +3156,7 @@ function Client:HandleEventUnits(arguments)
     end
 
     local eventId = arguments and arguments[2] or nil
-    if tostring(eventId or "") == "" or tostring(eventState.id or "") ~= tostring(eventId or "") then
+    if eventState.id and eventState.id ~= "" and eventId and eventId ~= "" and eventState.id ~= eventId then
         return false
     end
 
@@ -3385,13 +3166,6 @@ function Client:HandleEventUnits(arguments)
     local startupRuntime = getEventStartupRuntime(self, eventState.id, true)
     local deserializeStartTime = timingParts and getTimingNowMilliseconds() or nil
     local serializedUnits = arguments and arguments[3] or ""
-    local receivedRevision = math.max(0, math.floor(tonumber(arguments and arguments[4]) or 0))
-    local localRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
-    if (receivedRevision == 0 and localRevision > 0)
-        or (receivedRevision > 0 and receivedRevision < localRevision)
-    then
-        return true
-    end
     local units = Event.DeserializeUnitsFromNetwork(serializedUnits, {
         level = eventState.level,
         difficulty = eventState.difficulty,
@@ -3400,45 +3174,18 @@ function Client:HandleEventUnits(arguments)
     appendTimingPart(timingParts, "deserialize-units", deserializeStartTime, 15)
 
     local resourcesStartTime = timingParts and getTimingNowMilliseconds() or nil
-    if receivedRevision <= 0 and ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
+    if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
         ResourceSync.ApplyTrackedPlayerResourcesToEventUnits(sessionState.membersByName, units)
     end
-    applyLocalProfileResourcesToEventUnits(sessionState, units, {
-        preserveInboundResources = receivedRevision > 0,
-        skipProfileFallback = receivedRevision > 0,
-    })
+    applyLocalProfileResourcesToEventUnits(sessionState, units)
     appendTimingPart(timingParts, "apply-resources", resourcesStartTime, 10)
 
     local readinessStartTime = timingParts and getTimingNowMilliseconds() or nil
     eventState.units = units
-    if receivedRevision > 0 then
-        eventState.liveUnitRevision = receivedRevision
-    end
-    local repair = self.EventSnapshotRepair
-    local requestedRevision = type(repair) == "table"
-        and tostring(repair.eventId or "") == tostring(eventState.id or "")
-        and tonumber(repair.revision)
-        or nil
-    if requestedRevision and receivedRevision >= requestedRevision then
-        clearEventSnapshotRepair(self, eventState.id)
-    end
     eventState.rosterReady = true
     eventState.unitsChunkReceived = eventState.unitsChunkExpected or eventState.unitsChunkReceived or 0
     if ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(eventState)
-    end
-    if type(self.ClearCombatReactionRuntime) == "function" then
-        self:ClearCombatReactionRuntime(eventState.id, "authoritative-snapshot")
-    end
-    if type(self.PruneCombatReactionTransactions) == "function" then
-        self:PruneCombatReactionTransactions("authoritative-snapshot")
-    end
-    if type(self.ClearAutopilotBatch) == "function" then
-        local isHost = type(self.IsLocalEventHost) == "function" and self:IsLocalEventHost(eventState) == true
-        self:ClearAutopilotBatch(eventState.id, "authoritative-snapshot")
-        if isHost and type(self.StartAutopilotStep) == "function" and type(Addon.Server) == "table" then
-            self:StartAutopilotStep(Addon.Server.EventState or eventState)
-        end
     end
     refreshEventStartupPhase(eventState, startupRuntime)
     appendTimingPart(timingParts, "readiness", readinessStartTime, 10)
@@ -3502,20 +3249,7 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     end
 
     local eventId = arguments and arguments[2] or nil
-    if tostring(eventId or "") == "" or tostring(eventState.id or "") ~= tostring(eventId or "") then
-        return false
-    end
-
-    local receivedRevision = math.max(0, math.floor(tonumber(arguments and arguments[4]) or 0))
-    local localRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
-    if receivedRevision == 0 and localRevision > 0 then
-        return true
-    end
-    if receivedRevision > 0 and receivedRevision <= localRevision then
-        return true
-    end
-    if receivedRevision > 0 and localRevision > 0 and receivedRevision ~= localRevision + 1 then
-        requestAuthoritativeEventSnapshot(self, eventState, receivedRevision, "delta-revision-mismatch")
+    if eventState.id and eventState.id ~= "" and eventId and eventId ~= "" and eventState.id ~= eventId then
         return false
     end
 
@@ -3544,23 +3278,13 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     end
 
     if not changed then
-        if receivedRevision > 0 then
-            eventState.liveUnitRevision = receivedRevision
-        end
         return false
     end
-    if receivedRevision > 0 then
-        eventState.liveUnitRevision = receivedRevision
-    end
-    -- Revisioned unit deltas are the authoritative resource transport.  Do not
-    -- merge a local profile/cache over them after accepting the delta.
-    if receivedRevision <= 0 and ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
+
+    if ResourceSync.ApplyTrackedPlayerResourcesToEventUnits then
         ResourceSync.ApplyTrackedPlayerResourcesToEventUnits(sessionState.membersByName, eventState.units)
     end
-    applyLocalProfileResourcesToEventUnits(sessionState, eventState.units, {
-        preserveInboundResources = receivedRevision > 0,
-        skipProfileFallback = receivedRevision > 0,
-    })
+    applyLocalProfileResourcesToEventUnits(sessionState, eventState.units)
     if ResourceSync.UpdateEventReadiness then
         ResourceSync.UpdateEventReadiness(eventState)
     end
@@ -3581,16 +3305,6 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     local auraManager = self.Spellcasting and self.Spellcasting.AuraManager or nil
     if type(auraManager) == "table" and type(auraManager.RecheckAuraOwnerOccurrences) == "function" then
         auraManager:RecheckAuraOwnerOccurrences(self)
-    end
-    if type(self.PruneCombatReactionTransactions) == "function" then
-        self:PruneCombatReactionTransactions("event-unit-delta")
-    end
-    if type(self.ClearAutopilotBatch) == "function" then
-        local isHost = type(self.IsLocalEventHost) == "function" and self:IsLocalEventHost(eventState) == true
-        self:ClearAutopilotBatch(eventState.id, "authoritative-unit-delta")
-        if isHost and type(self.StartAutopilotStep) == "function" and type(Addon.Server) == "table" then
-            self:StartAutopilotStep(Addon.Server.EventState or eventState)
-        end
     end
     return true
 end
@@ -3660,17 +3374,8 @@ function Client:HandleEventState(arguments)
     end
 
     local eventId = arguments and arguments[2] or nil
-    if tostring(eventId or "") == "" or tostring(eventState.id or "") ~= tostring(eventId or "") then
+    if eventState.id and eventState.id ~= "" and eventId and eventId ~= "" and eventState.id ~= eventId then
         return false
-    end
-
-    local expectedRevision, stateArgumentCount = getLiveUnitRevisionFromStateArguments(arguments)
-    local localRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
-    if (expectedRevision == 0 and localRevision > 0) or (expectedRevision > 0 and expectedRevision < localRevision) then
-        return true
-    end
-    if expectedRevision > math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0)) then
-        requestAuthoritativeEventSnapshot(self, eventState, expectedRevision, "state-revision-mismatch")
     end
 
     local timer = startTiming("Event-state immediate handler", 8, eventState.id or "event-state")
@@ -3683,14 +3388,7 @@ function Client:HandleEventState(arguments)
 
     local stateApplyStartTime = timingParts and getTimingNowMilliseconds() or nil
     if Event and Event.ApplyStateArguments then
-        local stateArguments = arguments
-        if stateArgumentCount then
-            stateArguments = {}
-            for index = 1, stateArgumentCount do
-                stateArguments[index] = arguments[index]
-            end
-        end
-        Event.ApplyStateArguments(eventState, stateArguments)
+        Event.ApplyStateArguments(eventState, arguments)
     else
         eventState.turnNumber = tonumber(arguments and arguments[3]) or eventState.turnNumber or 0
         eventState.tickNumber = tonumber(arguments and arguments[4]) or eventState.tickNumber or 0
@@ -3700,9 +3398,6 @@ function Client:HandleEventState(arguments)
     if startupRuntime then
         startupRuntime.startupStateReceived = true
         refreshEventStartupPhase(eventState, startupRuntime)
-    end
-    if type(self.PruneCombatReactionTransactions) == "function" then
-        self:PruneCombatReactionTransactions("event-state")
     end
 
     if previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)

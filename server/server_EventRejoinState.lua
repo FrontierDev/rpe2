@@ -125,10 +125,6 @@ function Server:SendEventRejoinState(clientName, options)
     end
 
     local mode = type(options) == "table" and options.replaceExisting == true and "replace" or "merge"
-    local liveUnitRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
-    local serializedUnits = type(eventState.SerializeUnitsForNetwork) == "function"
-        and eventState:SerializeUnitsForNetwork()
-        or ""
     local sent = Comms:SendMessage(
         "WHISPER",
         EVENT_REJOIN_STATE_OPCODE,
@@ -137,8 +133,6 @@ function Server:SendEventRejoinState(clientName, options)
             eventId,
             payload,
             mode,
-            liveUnitRevision,
-            serializedUnits,
         },
         normalizedClientName,
         {
@@ -149,12 +143,10 @@ function Server:SendEventRejoinState(clientName, options)
 
     if type(Debug.Internal) == "function" then
         Debug.Internal(
-            "Event rejoin state queued: client=%s event=%s revision=%d mode=%s units=%d auras=%d casts=%d damageRows=%d healingRows=%d queued=%s.",
+            "Event rejoin state queued: client=%s event=%s mode=%s auras=%d casts=%d damageRows=%d healingRows=%d queued=%s.",
             normalizedClientName,
             eventId,
-            liveUnitRevision,
             mode,
-            #(eventState.units or {}),
             #auraRecords,
             #castRecords,
             #((meters.total and meters.total.damage) or meters.damage or {}),

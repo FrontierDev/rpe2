@@ -9,7 +9,6 @@ local Client = Addon.Client
 local Common = Addon.Utils.Common
 local Comms = Addon.Internal.Comms
 local Operations = Comms.Operations
-local EventTransactions = Comms.EventTransactions
 local Registry = Addon.Internal.Registry or {}
 local ResourceSync = Comms.ResourceSync or {}
 local Debug = Addon.Debug or {}
@@ -21,9 +20,12 @@ end
 local SERVER_START_OPCODE = Operations:GetOpcode("SERVER_START")
 local SERVER_STOP_OPCODE = Operations:GetOpcode("SERVER_STOP")
 local SERVER_QUERY_OPCODE = Operations:GetOpcode("SERVER_QUERY")
+local RESOURCE_DELTA_OPCODE = Operations:GetOpcode("RESOURCE_DELTA")
 local SKILL_ROLL_RESULT_OPCODE = Operations:GetOpcode("SKILL_ROLL_RESULT")
 local MAX_START_ATTEMPTS = 5
 local START_RETRY_DELAY = 1.5
+local THREAT_UPDATE_RECORD_SEPARATOR = string.char(30)
+local THREAT_UPDATE_FIELD_SEPARATOR = string.char(31)
 
 local function buildChannelName()
     local now = tonumber(Common.GetNow()) or 0
@@ -89,6 +91,32 @@ local function findEventUnitById(units, eventId)
     return nil
 end
 
+local function normalizeThreatUpdates(text)
+    local normalized = {}
+    if type(text) ~= "string" or text == "" then
+        return normalized
+    end
+
+    local records = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(text, THREAT_UPDATE_RECORD_SEPARATOR) or {}
+    for index = 1, #records do
+        local values = Common.SplitPreservingEmpty and Common.SplitPreservingEmpty(records[index], THREAT_UPDATE_FIELD_SEPARATOR) or {}
+        local targetEventId = math.floor(tonumber(values[1]) or 0)
+        local sourceEventId = math.floor(tonumber(values[2]) or 0)
+        local amount = math.max(0, tonumber(values[3]) or 0)
+        local turnNumber = math.floor(tonumber(values[4]) or 0)
+        if targetEventId > 0 and sourceEventId > 0 and amount > 0 then
+            normalized[#normalized + 1] = {
+                targetEventId = targetEventId,
+                sourceEventId = sourceEventId,
+                amount = amount,
+                turnNumber = turnNumber > 0 and turnNumber or nil,
+            }
+        end
+    end
+
+    return normalized
+end
+
 local function applyThreatUpdatesToUnits(units, threatUpdates, changedByEventId, validSourceUnits)
     local changed = false
     local sourceUnits = validSourceUnits or {}
@@ -109,13 +137,13 @@ local function applyThreatUpdatesToUnits(units, threatUpdates, changedByEventId,
     return changed
 end
 
-local function applyThreatUpdatesToServerState(server, threatUpdates, changedByEventId)
+local function applyThreatUpdatesToServerState(server, threatUpdates)
     local normalizedThreatUpdates = type(threatUpdates) == "table" and threatUpdates or {}
     if #normalizedThreatUpdates == 0 then
-        return false, changedByEventId or {}
+        return false
     end
 
-    changedByEventId = changedByEventId or {}
+    local changedByEventId = {}
     local activeUnits = server.EventState and server.EventState.units or nil
     local eventChanged = applyThreatUpdatesToUnits(activeUnits, normalizedThreatUpdates, changedByEventId, activeUnits)
     local draftChanged = applyThreatUpdatesToUnits(
@@ -125,10 +153,24 @@ local function applyThreatUpdatesToServerState(server, threatUpdates, changedByE
         activeUnits
     )
     if not eventChanged and not draftChanged then
-        return false, changedByEventId
+        return false
+    end
+
+    if eventChanged and type(server.BroadcastEventDeltaBatch) == "function" then
+        local entries = {}
+        for _, unit in pairs(changedByEventId) do
+            entries[#entries + 1] = {
+                operation = "upsert",
+                eventID = tonumber(unit and unit.eventID) or 0,
+                unit = unit,
+            }
+        end
+        if #entries > 0 then
+            server:BroadcastEventDeltaBatch(entries, false)
+        end
     end
     refreshEventManagePage()
-    return true, changedByEventId
+    return true
 end
 
 local function addClient(state, clientName, connectedAt)
@@ -191,19 +233,13 @@ local function applyClientResourceDeltasToServerState(server, state, clientName,
         return false
     end
 
-    if type(ResourceSync.CoalesceResourceDeltas) ~= "function"
-        or type(ResourceSync.ApplyResourceDeltasToEventUnitByEventID) ~= "function"
-    then
-        return false
-    end
-    local normalizedResourceDeltas = ResourceSync.CoalesceResourceDeltas(resourceDeltas)
+    local normalizedResourceDeltas = ResourceSync.CoalesceResourceDeltas and ResourceSync.CoalesceResourceDeltas(resourceDeltas) or {}
     if type(normalizedResourceDeltas) ~= "table" or #normalizedResourceDeltas == 0 then
         return false
     end
 
     local draftUpdated = false
     local eventUpdated = false
-    local appliedDeltas = normalizedResourceDeltas
     local targetUnit = nil
     local targetUnitIsPlayer = false
     local targetOwnerName = ""
@@ -213,7 +249,7 @@ local function applyClientResourceDeltasToServerState(server, state, clientName,
             numericTargetEventId,
             normalizedResourceDeltas
         )) or false
-        eventUpdated, targetUnit, appliedDeltas = ResourceSync.ApplyResourceDeltasToEventUnitByEventID(
+        eventUpdated, targetUnit = ResourceSync.ApplyResourceDeltasToEventUnitByEventID(
             server.EventState and server.EventState.units or nil,
             numericTargetEventId,
             normalizedResourceDeltas
@@ -241,209 +277,7 @@ local function applyClientResourceDeltasToServerState(server, state, clientName,
         end
     end
 
-    -- Accept a valid client command even when it only affects the draft/cache;
-    -- only a live EventUnit change is eligible for the authoritative broadcast.
-    return true, eventUpdated, targetUnit, appliedDeltas
-end
-
-local function getUnitHealthValue(unit, eventState)
-    if type(unit) ~= "table" then
-        return nil
-    end
-    local healthRef = eventState and eventState.healthResourceRef or "health"
-    for index = 1, #(unit.resources or {}) do
-        local resource = unit.resources[index]
-        if resource and resource.resourceRef == healthRef then
-            return tonumber(resource.currentValue) or 0
-        end
-    end
-    return nil
-end
-
-local function isBossEventUnit(unit)
-    if type(unit) ~= "table" then
-        return false
-    end
-    local eventUnitClass = Addon.Internal
-        and Addon.Internal.Database
-        and Addon.Internal.Database.Classes
-        and Addon.Internal.Database.Classes.EventUnit
-        or nil
-    if eventUnitClass and type(eventUnitClass.IsBoss) == "function" then
-        return eventUnitClass.IsBoss(unit) == true
-    end
-    return unit.boss == true
-end
-
-local function getUnitOwnerName(unit)
-    return Common.NormalizeName(unit and (unit.ownerID or unit.controllerID or unit.name) or nil)
-end
-
-local function getEventHostName(eventState)
-    return Common.NormalizeName(eventState and eventState.hostName)
-end
-
-local function validateResourceTarget(eventState, envelope, targetEventId)
-    local numericTargetEventId = tonumber(targetEventId) or 0
-    if type(eventState) ~= "table" or eventState.active ~= true or numericTargetEventId <= 0 then
-        return nil, "invalid-target"
-    end
-
-    local targetUnit = findEventUnitById(eventState.units, numericTargetEventId)
-    if type(targetUnit) ~= "table" then
-        return nil, "unknown-target"
-    end
-
-    local originName = Common.NormalizeName(envelope and envelope.originName)
-    local hostName = getEventHostName(eventState)
-    local actorEventId = tonumber(envelope and envelope.actorEventId) or 0
-    local actorUnit = actorEventId > 0 and findEventUnitById(eventState.units, actorEventId) or nil
-    if actorEventId > 0 and not actorUnit then
-        return nil, "unknown-actor"
-    end
-
-    if originName ~= hostName then
-        local ownedUnit = actorUnit or (targetUnit.isPlayer == true and targetUnit or nil)
-        if type(ownedUnit) ~= "table" or getUnitOwnerName(ownedUnit) ~= originName then
-            return nil, "origin-does-not-own-actor"
-        end
-    end
-
-    return targetUnit
-end
-
-local function normalizeResourceDeltas(resourceDeltas)
-    if type(ResourceSync.CoalesceResourceDeltas) ~= "function" then
-        return nil
-    end
-    return ResourceSync.CoalesceResourceDeltas(resourceDeltas)
-end
-
-local function normalizeTargetedResourceDeltas(targetedResourceDeltas)
-    if type(ResourceSync.CoalesceTargetedResourceDeltas) ~= "function" then
-        return nil
-    end
-    return ResourceSync.CoalesceTargetedResourceDeltas(targetedResourceDeltas)
-end
-
-local function updateTrackedClientResources(state, clientName, targetUnit)
-    if type(state) ~= "table" or type(targetUnit) ~= "table" then
-        return
-    end
-    local targetOwnerName = getUnitOwnerName(targetUnit)
-    local cacheName = targetUnit.isPlayer == true and targetOwnerName or Common.NormalizeName(clientName)
-    if cacheName == "" then
-        return
-    end
-    local tracked = state.clientsByName and state.clientsByName[cacheName]
-    if not tracked then
-        addClient(state, cacheName)
-        tracked = state.clientsByName and state.clientsByName[cacheName]
-    end
-    if tracked and type(targetUnit.resources) == "table" then
-        tracked.resources = ResourceSync.CloneResources
-            and ResourceSync.CloneResources(targetUnit.resources)
-            or targetUnit.resources
-    end
-end
-
-local function applyResourceReplaceToServerState(server, state, clientName, targetEventId, resources)
-    local targetUnit = findEventUnitById(server.EventState and server.EventState.units, targetEventId)
-    local draftUnit = findEventUnitById(server.EventDraftState and server.EventDraftState.units, targetEventId)
-    local eventUpdated = false
-    local draftUpdated = false
-    if type(ResourceSync.ApplyResourcesToEventUnitByEventID) == "function" then
-        draftUpdated = ResourceSync.ApplyResourcesToEventUnitByEventID(
-            server.EventDraftState and server.EventDraftState.units,
-            targetEventId,
-            resources
-        ) or false
-        eventUpdated = ResourceSync.ApplyResourcesToEventUnitByEventID(
-            server.EventState and server.EventState.units,
-            targetEventId,
-            resources
-        ) or false
-    end
-    targetUnit = findEventUnitById(server.EventState and server.EventState.units, targetEventId) or targetUnit or draftUnit
-    if targetUnit then
-        updateTrackedClientResources(state, clientName, targetUnit)
-    end
-    return draftUpdated or eventUpdated, eventUpdated, targetUnit
-end
-
-local function applyResourceDeltasForTransaction(server, state, clientName, targetEventId, resourceDeltas)
-    local eventState = server.EventState
-    local targetUnit = findEventUnitById(eventState and eventState.units, targetEventId)
-    local healthBefore = getUnitHealthValue(targetUnit, eventState)
-    local changedByEventId = {}
-    local applied, eventUpdated, updatedUnit, appliedDeltas = applyClientResourceDeltasToServerState(
-        server,
-        state,
-        clientName,
-        targetEventId,
-        resourceDeltas
-    )
-    if not applied then
-        return false, nil, changedByEventId
-    end
-    updatedUnit = updatedUnit or findEventUnitById(eventState and eventState.units, targetEventId)
-    if eventUpdated and updatedUnit then
-        changedByEventId[tonumber(updatedUnit.eventID) or 0] = updatedUnit
-    end
-
-    local healthAfter = getUnitHealthValue(updatedUnit, eventState)
-    local result = {
-        targetEventId = tonumber(targetEventId) or 0,
-        resourceDeltas = appliedDeltas or resourceDeltas,
-        actualDamage = healthBefore ~= nil and healthAfter ~= nil and math.max(0, healthBefore - healthAfter) or 0,
-        actualHealing = healthBefore ~= nil and healthAfter ~= nil and math.max(0, healthAfter - healthBefore) or 0,
-    }
-    if healthBefore ~= nil and healthAfter ~= nil and healthBefore > 0 and healthAfter <= 0 then
-        result.kill = {
-            targetEventId = result.targetEventId,
-            isBoss = isBossEventUnit(updatedUnit),
-        }
-    end
-    return true, result, changedByEventId
-end
-
-local function buildAuthoritativeEntries(changedByEventId)
-    local entries = {}
-    for eventId, unit in pairs(changedByEventId or {}) do
-        if type(unit) == "table" and tonumber(eventId) and tonumber(eventId) > 0 then
-            entries[#entries + 1] = {
-                operation = "upsert",
-                eventID = tonumber(eventId),
-                unit = unit,
-            }
-        end
-    end
-    table.sort(entries, function(left, right)
-        return (tonumber(left.eventID) or 0) < (tonumber(right.eventID) or 0)
-    end)
-    return entries
-end
-
-local function commitResourceTransaction(server, changedByEventId)
-    local entries = buildAuthoritativeEntries(changedByEventId)
-    if #entries == 0 then
-        if type(ResourceSync.UpdateEventReadiness) ~= "function" then
-            return false, "resource-readiness-unavailable"
-        end
-        ResourceSync.UpdateEventReadiness(server.EventState)
-        return true, nil
-    end
-    if type(server.BroadcastEventDeltaBatch) ~= "function" then
-        return false, "missing-authoritative-broadcaster"
-    end
-    if server:BroadcastEventDeltaBatch(entries, false) ~= true then
-        return false, "authoritative-broadcast-failed"
-    end
-    if type(ResourceSync.UpdateEventReadiness) ~= "function" then
-        return false, "resource-readiness-unavailable"
-    end
-    ResourceSync.UpdateEventReadiness(server.EventState)
-    return true, entries
+    return true
 end
 
 Server.State = Server.State or nil
@@ -728,53 +562,50 @@ function Server:HandleResource(arguments, sender)
         return false
     end
 
-    local clientName = Common.NormalizeName(sender)
-    if clientName == "" or clientName ~= Common.NormalizeName(arguments and arguments[2]) then
+    local clientName = Common.NormalizeName(arguments and arguments[2] or sender)
+    if clientName == "" then
         return false
     end
 
     addClient(state, clientName)
     local targetEventId = tonumber(arguments and arguments[4]) or 0
 
-    -- Live EventUnits are transaction-owned. RESOURCE remains only for the
-    -- session/profile bootstrap path; a targeted live replace is submitted as
-    -- event-resource-replace by the client adapter.
-    if targetEventId > 0 then
-        return false
-    end
     local clientState = state.clientsByName and state.clientsByName[clientName] or nil
     if not clientState then
         return false
     end
 
-    if type(ResourceSync.NormalizeResources) ~= "function" then
-        if Debug and type(Debug.Error) == "function" then
-            Debug.Error("RESOURCE bootstrap rejected: resource normalization is unavailable.")
-        end
-        return false
-    end
-    local resources = ResourceSync.NormalizeResources(arguments and arguments[3] or "")
+    local resources = ResourceSync.NormalizeResources and ResourceSync.NormalizeResources(arguments and arguments[3] or "") or {}
     local hadCachedResources = type(clientState.resources) == "table" and #clientState.resources > 0
     local cachedChanged = not hadCachedResources
         or not (ResourceSync.ResourcesEqual and ResourceSync.ResourcesEqual(clientState.resources, resources))
 
-    -- RESOURCE is retained for session/profile bootstrap.  It must not mutate
-    -- a live EventUnit, including before the first revisioned delta.  Live
-    -- resource ownership belongs to event-resource-replace/delta transactions.
-    local eventState = self.GetEventState and self:GetEventState() or self.EventState
-    local eventIsActive = type(eventState) == "table" and eventState.active == true
     local draftUpdated = false
     local eventUpdated = false
-    if eventIsActive ~= true then
+    local targetUnitIsPlayer = false
+    if targetEventId > 0 and ResourceSync.ApplyResourcesToEventUnitByEventID then
+        draftUpdated = ResourceSync.ApplyResourcesToEventUnitByEventID(self.EventDraftState and self.EventDraftState.units or nil, targetEventId, resources) or false
+        eventUpdated = ResourceSync.ApplyResourcesToEventUnitByEventID(self.EventState and self.EventState.units or nil, targetEventId, resources) or false
+
+        local searchState = eventUpdated and self.EventState or (draftUpdated and self.EventDraftState or nil)
+        for index = 1, #(((searchState and searchState.units) or {})) do
+            local unit = searchState.units[index]
+            if unit and tonumber(unit.eventID) == targetEventId then
+                targetUnitIsPlayer = unit.isPlayer == true
+                break
+            end
+        end
+    else
         draftUpdated = ResourceSync.ApplyResourcesToEventUnits
             and ResourceSync.ApplyResourcesToEventUnits(self.EventDraftState and self.EventDraftState.units or nil, clientName, resources)
             or false
         eventUpdated = ResourceSync.ApplyResourcesToEventUnits
             and ResourceSync.ApplyResourcesToEventUnits(self.EventState and self.EventState.units or nil, clientName, resources)
             or false
+        targetUnitIsPlayer = true
     end
 
-    if cachedChanged then
+    if cachedChanged and (targetEventId <= 0 or targetUnitIsPlayer == true) then
         if targetEventId > 0 and ResourceSync.MergeResourcesByRef then
             clientState.resources = ResourceSync.MergeResourcesByRef(clientState.resources, resources)
         else
@@ -787,6 +618,106 @@ function Server:HandleResource(arguments, sender)
     end
 
     return true
+end
+
+function Server:HandleResourceDelta(arguments, sender)
+    local state = self.State
+    if not state or state.active ~= true then
+        return false
+    end
+
+    local channelName = arguments and arguments[1] or nil
+    if channelName ~= state.channelName then
+        return false
+    end
+
+    local clientName = Common.NormalizeName(arguments and arguments[2] or sender)
+    if clientName == "" then
+        return false
+    end
+
+    addClient(state, clientName)
+    local targetEventId = tonumber(arguments and arguments[4]) or 0
+
+    local resourceDeltas = ResourceSync.NormalizeResourceDeltas and ResourceSync.NormalizeResourceDeltas(arguments and arguments[3] or "") or {}
+    if type(resourceDeltas) ~= "table" or #resourceDeltas == 0 then
+        return false
+    end
+
+    local handled = applyClientResourceDeltasToServerState(self, state, clientName, targetEventId, resourceDeltas)
+    local threatUpdates = normalizeThreatUpdates(arguments and arguments[5] or "")
+    if #threatUpdates > 0 then
+        applyThreatUpdatesToServerState(self, threatUpdates)
+    end
+    return handled
+end
+
+function Server:HandleResourceDeltaBatch(arguments, sender)
+    local state = self.State
+    if not state or state.active ~= true then
+        return false
+    end
+
+    local channelName = arguments and arguments[1] or nil
+    if channelName ~= state.channelName then
+        return false
+    end
+
+    local clientName = Common.NormalizeName(arguments and arguments[2] or sender)
+    if clientName == "" then
+        return false
+    end
+
+    addClient(state, clientName)
+
+    local targetedResourceDeltas = ResourceSync.CoalesceTargetedResourceDeltas
+        and ResourceSync.CoalesceTargetedResourceDeltas(arguments and arguments[3] or "")
+        or {}
+    if type(targetedResourceDeltas) ~= "table" or #targetedResourceDeltas == 0 then
+        return false
+    end
+    local deltaOrder = {}
+    local deltasByTargetEventId = {}
+    for index = 1, #targetedResourceDeltas do
+        local entry = targetedResourceDeltas[index]
+        local targetEventId = tonumber(entry and entry.targetEventId) or 0
+        if targetEventId > 0 then
+            if not deltasByTargetEventId[targetEventId] then
+                deltasByTargetEventId[targetEventId] = {}
+                deltaOrder[#deltaOrder + 1] = targetEventId
+            end
+
+            local deltas = deltasByTargetEventId[targetEventId]
+            deltas[#deltas + 1] = {
+                resourceRef = entry.resourceRef,
+                delta = entry.delta,
+                maxValue = entry.maxValue,
+                currentValue = entry.currentValue,
+            }
+        end
+    end
+
+    if #deltaOrder == 0 then
+        return false
+    end
+
+    local handled = false
+    for index = 1, #deltaOrder do
+        handled = applyClientResourceDeltasToServerState(
+            self,
+            state,
+            clientName,
+            deltaOrder[index],
+            deltasByTargetEventId[deltaOrder[index]]
+        ) or handled
+    end
+
+    local threatUpdates = normalizeThreatUpdates(arguments and arguments[4] or "")
+    if #threatUpdates > 0 then
+        applyThreatUpdatesToServerState(self, threatUpdates)
+    end
+
+    return handled
 end
 
 function Server:IsHostClientReady(state)
@@ -898,34 +829,11 @@ end
 function Server:StopServer(reason)
     local state = self.State
     if not state then
-        local serverTransactions = self.EventTransactions
-        local remainingEventId = type(serverTransactions) == "table"
-            and tostring(serverTransactions.currentEventId or "")
-            or ""
-        if remainingEventId ~= "" and type(serverTransactions.EndEvent) == "function" then
-            if Debug and type(Debug.Error) == "function" then
-                Debug.Error("Clearing server transaction scope without session state: eventId=%s.", remainingEventId)
-            end
-            serverTransactions:EndEvent(remainingEventId, reason or "server-stopped-safety")
-        end
         return false
     end
 
     if self:IsEventActive() then
         self:EndEvent(reason or "server-stopped")
-    end
-
-    local serverTransactions = self.EventTransactions
-    local remainingEventId = type(serverTransactions) == "table"
-        and tostring(serverTransactions.currentEventId or "")
-        or ""
-    if remainingEventId ~= "" then
-        if Debug and type(Debug.Error) == "function" then
-            Debug.Error("Clearing server transaction scope after StopServer: eventId=%s.", remainingEventId)
-        end
-        if type(serverTransactions.EndEvent) == "function" then
-            serverTransactions:EndEvent(remainingEventId, reason or "server-stopped-safety")
-        end
     end
 
     local distribution, target = buildServerRoute(Common.GetGroupType() or state.distribution)
@@ -939,172 +847,3 @@ function Server:StopServer(reason)
     refreshEventManagePage()
     return true
 end
-
-local function handleEventResourceTransaction(envelope, context, operation)
-    local state = Server.State
-    local eventState = Server.GetEventState and Server:GetEventState() or Server.EventState
-    local input = type(envelope and envelope.input) == "table" and envelope.input or {}
-    local originName = Common.NormalizeName(envelope and envelope.originName)
-    if type(state) ~= "table" or state.active ~= true
-        or type(eventState) ~= "table" or eventState.active ~= true
-        or tostring(envelope and envelope.eventId or "") ~= tostring(eventState.id or "")
-        or originName == ""
-    then
-        return { state = "rejected", outcome = { reason = "inactive-event" } }
-    end
-    if type(ResourceSync.NormalizeResources) ~= "function"
-        or type(ResourceSync.CoalesceResourceDeltas) ~= "function"
-        or type(ResourceSync.CoalesceTargetedResourceDeltas) ~= "function"
-        or type(ResourceSync.ApplyResourcesToEventUnitByEventID) ~= "function"
-        or type(ResourceSync.ApplyResourceDeltasToEventUnitByEventID) ~= "function"
-        or type(ResourceSync.UpdateEventReadiness) ~= "function"
-        or type(Server.BroadcastEventDeltaBatch) ~= "function"
-    then
-        return { state = "rejected", outcome = { reason = "resource-sync-unavailable" } }
-    end
-
-    local changedByEventId = {}
-    local resourceResults = {}
-    local targetEventIds = {}
-    local targetSeen = {}
-    local targetDeltas = {}
-    local targetOrder = {}
-
-    if operation == "event-resource-replace" then
-        local targetEventId = tonumber(input.targetEventId or envelope.targetEventIds and envelope.targetEventIds[1]) or 0
-        local targetUnit, targetReason = validateResourceTarget(eventState, envelope, targetEventId)
-        local resources = ResourceSync.NormalizeResources(input.resources)
-        if not targetUnit then
-            return { state = "rejected", outcome = { reason = targetReason or "invalid-target" } }
-        end
-        if type(resources) ~= "table" or #resources == 0 then
-            return { state = "rejected", outcome = { reason = "empty-resources" } }
-        end
-        if type(Server.BroadcastEventDeltaBatch) ~= "function" then
-            return { state = "rejected", outcome = { reason = "missing-authoritative-broadcaster" } }
-        end
-
-        local healthBefore = getUnitHealthValue(targetUnit, eventState)
-        local accepted, eventUpdated, updatedUnit = applyResourceReplaceToServerState(
-            Server,
-            state,
-            originName,
-            targetEventId,
-            resources
-        )
-        if not accepted then
-            return { state = "rejected", outcome = { reason = "resource-replace-failed" } }
-        end
-        updatedUnit = updatedUnit or targetUnit
-        if eventUpdated and updatedUnit then
-            changedByEventId[targetEventId] = updatedUnit
-        end
-        local healthAfter = getUnitHealthValue(updatedUnit, eventState)
-        local result = {
-            targetEventId = targetEventId,
-            replacement = true,
-            actualDamage = healthBefore ~= nil and healthAfter ~= nil and math.max(0, healthBefore - healthAfter) or 0,
-            actualHealing = healthBefore ~= nil and healthAfter ~= nil and math.max(0, healthAfter - healthBefore) or 0,
-        }
-        if healthBefore ~= nil and healthAfter ~= nil and healthBefore <= 0 and healthAfter > 0 then
-            result.resurrect = true
-        end
-        resourceResults[1] = result
-        targetEventIds[1] = targetEventId
-    else
-        if operation == "event-resource-delta" then
-            local targetEventId = tonumber(input.targetEventId) or 0
-            targetDeltas[targetEventId] = normalizeResourceDeltas(input.resourceDeltas)
-            targetOrder[1] = targetEventId
-            targetEventIds[1] = targetEventId
-        else
-            local normalized = normalizeTargetedResourceDeltas(input.targetedResourceDeltas)
-            for index = 1, #normalized do
-                local entry = normalized[index]
-                local targetEventId = tonumber(entry and entry.targetEventId) or 0
-                if targetEventId > 0 then
-                    targetDeltas[targetEventId] = targetDeltas[targetEventId] or {}
-                    targetDeltas[targetEventId][#targetDeltas[targetEventId] + 1] = {
-                        resourceRef = entry.resourceRef,
-                        delta = entry.delta,
-                        maxValue = entry.maxValue,
-                        currentValue = entry.currentValue,
-                    }
-                    if not targetSeen[targetEventId] then
-                        targetSeen[targetEventId] = true
-                        targetEventIds[#targetEventIds + 1] = targetEventId
-                        targetOrder[#targetOrder + 1] = targetEventId
-                    end
-                end
-            end
-        end
-
-        if #targetOrder == 0 then
-            return { state = "rejected", outcome = { reason = "empty-resource-deltas" } }
-        end
-        for index = 1, #targetOrder do
-            local targetEventId = targetOrder[index]
-            local targetUnit, targetReason = validateResourceTarget(eventState, envelope, targetEventId)
-            if not targetUnit then
-                return { state = "rejected", outcome = { reason = targetReason or "invalid-target" } }
-            end
-            local deltas = normalizeResourceDeltas(targetDeltas[targetEventId])
-            if #deltas == 0 then
-                return { state = "rejected", outcome = { reason = "empty-resource-deltas" } }
-            end
-            local applied, result, changed = applyResourceDeltasForTransaction(
-                Server,
-                state,
-                originName,
-                targetEventId,
-                deltas
-            )
-            if not applied then
-                return { state = "rejected", outcome = { reason = "resource-delta-failed" } }
-            end
-            for eventId, unit in pairs(changed) do
-                changedByEventId[eventId] = unit
-            end
-            resourceResults[#resourceResults + 1] = result
-        end
-    end
-
-    local threatUpdates = type(input.threatUpdates) == "table" and input.threatUpdates or {}
-    local threatChanged
-    threatChanged, changedByEventId = applyThreatUpdatesToServerState(Server, threatUpdates, changedByEventId)
-    local committed, entriesOrReason = commitResourceTransaction(Server, changedByEventId)
-    if not committed then
-        return { state = "rejected", outcome = { reason = entriesOrReason or "resource-commit-failed" } }
-    end
-
-    local currentRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
-    return {
-        state = "committed",
-        outcome = {
-            operation = operation,
-            actionOwnerName = originName,
-            reason = tostring(input.reason or operation),
-            targetEventIds = targetEventIds,
-            resourceResults = resourceResults,
-            threatChanged = threatChanged == true,
-        },
-        authoritativeDelta = entriesOrReason,
-        newRevision = currentRevision,
-    }
-end
-
-if type(EventTransactions) ~= "table"
-    or type(EventTransactions.Server) ~= "table"
-    or type(EventTransactions.Server.Register) ~= "function"
-then
-    error("Authoritative EventTransactions server service is unavailable for resource mutations.")
-end
-EventTransactions.Server:Register("event-resource-delta", function(envelope, context)
-    return handleEventResourceTransaction(envelope, context, "event-resource-delta")
-end)
-EventTransactions.Server:Register("event-resource-batch", function(envelope, context)
-    return handleEventResourceTransaction(envelope, context, "event-resource-batch")
-end)
-EventTransactions.Server:Register("event-resource-replace", function(envelope, context)
-    return handleEventResourceTransaction(envelope, context, "event-resource-replace")
-end)

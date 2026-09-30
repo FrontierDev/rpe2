@@ -51,14 +51,12 @@ core/internal/comms/Diagnostics.lua
 core/internal/tasks/TaskQueue.lua
 core/internal/comms/MessageQueue.lua
 core/internal/comms/Operations.lua
-core/internal/comms/EventStateRepair.lua
+core/internal/comms/CombatDamageResolved.lua
 core/internal/comms/EventUnitHidden.lua
 core/internal/comms/EventUnitTaunt.lua
 core/internal/comms/EventUnitTauntApplied.lua
 core/internal/comms/EventTurnComplete.lua
 core/internal/comms/Serialization.lua
-core/internal/comms/EventTransactions.lua
-core/internal/comms/ThreatUpdates.lua
 core/internal/comms/EventRejoinState.lua
 core/internal/comms/Core.lua
 core/internal/comms/TransportDiagnostics.lua
@@ -179,7 +177,6 @@ client/client_CombatLogTurnIdentity.lua
 client/client_Skills.lua
 client/client_SkillProgression.lua
 server/server_Event.lua
-server/server_CombatTransactions.lua
 server/server_EventNpcMode.lua
 server/server_EventUnitHidden.lua
 server/server_EventUnitTaunt.lua
@@ -227,6 +224,7 @@ client/combat/Events.lua
 client/combat/Normalization.lua
 client/combat/Helpers.lua
 client/combat/Reaction.lua
+client/combat/Handles.lua
 client/combat/effects/Damage.lua
 client/combat/effects/NpcDifficulty.lua
 client/combat/effects/Heal.lua

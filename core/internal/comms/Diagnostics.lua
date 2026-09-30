@@ -48,22 +48,6 @@ function Diagnostics:GetQueueDiagnosticsStore()
     return getStore(self, "queue")
 end
 
-function Diagnostics:GetTransactionDiagnosticsStore()
-    return getStore(self, "transaction")
-end
-
-function Diagnostics:RecordTransaction(entry)
-    local diagnostics = self:GetTransactionDiagnosticsStore()
-    diagnostics.count = (diagnostics.count or 0) + 1
-    diagnostics.last = copyTable(entry or {})
-    diagnostics.recent = diagnostics.recent or {}
-    diagnostics.recent[#diagnostics.recent + 1] = diagnostics.last
-    while #diagnostics.recent > 256 do
-        table.remove(diagnostics.recent, 1)
-    end
-    return diagnostics.last
-end
-
 function Diagnostics:ResetTransportDiagnostics()
     self.State = self.State or {}
     self.State.transport = {}

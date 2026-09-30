@@ -199,11 +199,6 @@ function Client:IsAutopilotPlanStateStale(state)
     then
         return true
     end
-    if math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
-        ~= math.max(0, math.floor(tonumber(state.liveUnitRevision) or 0))
-    then
-        return true
-    end
 
     local runtime = type(Client.AutopilotRuntimeByEventId) == "table"
         and Client.AutopilotRuntimeByEventId[tostring(state.eventId or "")]
@@ -363,7 +358,6 @@ function Client:StartAutopilotStep(eventStateOverride)
     state.runtimeRef = runtime
     state.planRecord = plan
     state.stepCapacity = stepCapacity
-    state.liveUnitRevision = math.max(0, math.floor(tonumber(eventState.liveUnitRevision) or 0))
     runtime.planByStepKey[planId] = plan
     runtime.activePlanId = planId
     runtime.plannerStatus = "planning"
@@ -398,21 +392,6 @@ function Client:StartAutopilotStep(eventStateOverride)
             updateRuntimeAfterCancellation(jobRuntime, jobPlan, cancelReason)
             if type(Planner.ReleaseScratch) == "function" then
                 Planner.ReleaseScratch(jobState)
-            end
-
-            -- A frozen-state change (for example an NPC becoming inactive)
-            -- invalidates only this disposable plan.  Rebuild the current step
-            -- immediately from the authoritative event state so the planner
-            -- cannot remain stuck in cancelled-stale until a manual replan.
-            local normalizedReason = tostring(cancelReason or "")
-            if string.find(normalizedReason, "stale", 1, true)
-                and type(Server.EventState) == "table"
-                and isHostAutopilotEvent(Server.EventState)
-                and getEventId(Server.EventState) == tostring(jobState and jobState.eventId or "")
-                and tonumber(Server.EventState.turnNumber) == tonumber(jobState and jobState.turnNumber)
-                and tonumber(Server.EventState.tickNumber) == tonumber(jobState and jobState.tickNumber)
-            then
-                Client:StartAutopilotStep(Server.EventState)
             end
         end,
         onComplete = function(jobState)

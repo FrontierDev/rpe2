@@ -8,6 +8,8 @@ Addon.Utils = Addon.Utils or {}
 
 local Client = Addon.Client
 local Combat = Addon.Client.Combat
+local Comms = Addon.Internal.Comms or {}
+local Operations = Comms.Operations or {}
 local Registry = Addon.Internal.Registry or {}
 local Database = Addon.Internal.Database or {}
 local EventUnit = (Database.Classes or {}).EventUnit
@@ -42,6 +44,7 @@ local DEFAULT_ATTACK_ROLL_DICE = "1d20"
 local DEFAULT_DEFENCE_ROLL_DICE = "1d20"
 local RESULT_PASS = "pass"
 local RESULT_FAIL = "fail"
+local HIT_CHECK_REQUEST_OPCODE = Operations.GetOpcode and Operations:GetOpcode("COMBAT_HIT_CHECK_REQUEST") or nil
 local SPELLCAST_SLOW_HELPER_MS = 25
 local SPELLCAST_SLOW_TOTAL_MS = 100
 local trimText = Normalization.TrimText
@@ -371,11 +374,10 @@ local function applyThreatToUnit(targetUnit, sourceEventId, threatAmount)
         return false, numericThreatAmount, 0
     end
 
-    -- Threat is host-authoritative. Do not mutate the local EventUnit here: the
-    -- server applies this update and returns the synchronized table in an Event
-    -- Unit delta consumed by both the meter and Autopilot.
-    local previousThreat = tonumber(type(targetUnit.threatTable) == "table" and targetUnit.threatTable[numericSourceEventId]) or 0
-    return true, numericThreatAmount, previousThreat + numericThreatAmount
+    targetUnit.threatTable = type(targetUnit.threatTable) == "table" and targetUnit.threatTable or {}
+    local previousThreat = tonumber(targetUnit.threatTable[numericSourceEventId]) or 0
+    targetUnit.threatTable[numericSourceEventId] = previousThreat + numericThreatAmount
+    return true, numericThreatAmount, targetUnit.threatTable[numericSourceEventId]
 end
 
 local function getThreatForUnit(targetUnit, sourceEventId)
@@ -1133,7 +1135,6 @@ local function buildSharedHitPreviewEntry(self, context, effect, component, timi
         attackerEventId = tonumber(attackerUnit.eventID) or 0,
         defenderEventId = tonumber(defenderUnit.eventID) or 0,
         turnNumber = math.max(1, math.floor(tonumber(eventState.turnNumber) or 1)),
-        tickNumber = math.max(0, math.floor(tonumber(eventState.tickNumber) or 0)),
         attackerTotal = attackerTotal,
         rawDamage = nil,
         resultType = resultType,
@@ -1605,7 +1606,7 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
         end
 
         -- Damage results are always previewed locally and become authoritative only once
-        -- the corresponding Event transaction is handled by the shared client service.
+        -- the corresponding RESOURCE_DELTA message is handled back through the client.
         local applied, resourceEntry, appliedDelta = self:PreviewResourceDelta(resourceUnit, healthResourceRef, -finalDamage)
         result.applied = applied
         result.resourceEntry = resourceEntry
@@ -1627,7 +1628,7 @@ function Combat:ApplyResolvedDamage(entry, previewOnly)
         end
     else
         -- A fully absorbed hit is still a landed hit, but it must not invent a
-        -- zero-valued health resource transaction.
+        -- zero-valued health RESOURCE_DELTA.
         result.applied = true
         result.appliedDelta = 0
     end
@@ -1773,76 +1774,6 @@ function Combat:BuildHitPreviewEntry(context, effect, component, timingParts)
     return buildSharedHitPreviewEntry(self, context, effect, component, timingParts)
 end
 
-local function buildCombatTransactionRequest(entry)
-    return {
-        spellRef = entry.spellRef,
-        componentKey = entry.componentKey,
-        attackType = entry.attackType,
-        defenceSystem = entry.defenceSystem,
-        attackerTotal = entry.attackerTotal,
-        rawDamage = entry.rawDamage,
-        resultType = entry.resultType,
-        weaponSkillContext = Combat:CloneValue(entry.weaponSkillContext),
-        attackerRollContext = Combat:CloneValue(entry.attackerRollContext),
-        attackModifierContext = Combat:CloneValue(entry.attackModifierContext),
-        combatLookupSnapshot = Combat:CloneValue(entry.combatLookupSnapshot),
-        targetEvents = Combat:CloneValue(entry.targetEvents),
-        healthResourceRef = entry.eventState and entry.eventState.healthResourceRef or nil,
-    }
-end
-
-local function submitImmediateCombatTransaction(entry, request, reaction)
-    local transactions = Client.EventTransactions
-    if type(transactions) ~= "table"
-        or type(transactions.Create) ~= "function"
-        or type(transactions.Submit) ~= "function"
-    then
-        if type(Debug) == "table" and type(Debug.Error) == "function" then
-            Debug.Error("Authoritative combat transaction service unavailable for event=%s.", tostring(entry.eventId or ""))
-        end
-        return nil, "transaction-service-unavailable"
-    end
-    if type(Client.HandleCombatTransactionTerminal) ~= "function" then
-        if type(Debug) == "table" and type(Debug.Error) == "function" then
-            Debug.Error("Authoritative combat terminal presenter unavailable for event=%s.", tostring(entry.eventId or ""))
-        end
-        return nil, "combat-terminal-presenter-unavailable"
-    end
-
-    local record, reason = transactions:Create({
-        operation = "combat-hit",
-        originName = Common.GetPlayerName and Common.GetPlayerName() or nil,
-        eventId = entry.eventId,
-        actorEventId = entry.attackerEventId,
-        targetEventIds = { entry.defenderEventId },
-        turnNumber = entry.turnNumber,
-        tickNumber = entry.tickNumber,
-        baseRevision = entry.eventState and entry.eventState.liveUnitRevision or nil,
-        stepSensitive = true,
-        input = { request = request, reaction = reaction },
-    })
-    if not record then
-        return nil, reason or "transaction-create-failed"
-    end
-
-    local submitted, submitReason = transactions:Submit(record, {
-        request = Combat:CloneValue(request),
-        reaction = Combat:CloneValue(reaction),
-    })
-    if not submitted then
-        return nil, submitReason or "transaction-submit-failed"
-    end
-    entry.transactionId = record.id
-    entry.checkId = record.id
-    entry.sharedTransaction = record
-    record.combatEntry = entry
-    record.options = record.options or {}
-    record.options.onTerminal = function(envelope)
-        Client:HandleCombatTransactionTerminal(entry, envelope)
-    end
-    return record
-end
-
 function Combat:BeginHitCheck(context, effect, component)
     local timingEnabled = isSpellcastTimingEnabled()
     local totalStartTime = timingEnabled and getNowMilliseconds() or nil
@@ -1884,11 +1815,17 @@ function Combat:BeginHitCheck(context, effect, component)
         and auraManager:ShouldForceAutoHitAgainstTarget(entry.eventState, entry.defenderEventId) == true
     then
         local forcedHitStartTime = timingEnabled and getNowMilliseconds() or nil
-        local record, reason = submitImmediateCombatTransaction(
-            entry,
-            buildCombatTransactionRequest(entry),
-            { resultToken = RESULT_PASS, successfullyDefended = false }
-        )
+        local completed, result = Combat:CompleteHitCheck(entry, RESULT_PASS, "forced-hit")
+        if completed and type(Combat.RecordResolvedCombatAttackHistory) == "function" then
+            Combat:RecordResolvedCombatAttackHistory(Client, entry, RESULT_PASS, RESULT_PASS, nil)
+        end
+        if completed and type(Combat.ApplyResolvedDamage) == "function" then
+            local _, damageResult = self:ApplyResolvedDamage(entry)
+            entry.lastDamageResult = damageResult
+            if type(self.FinalizeLocalDamageResult) == "function" then
+                self:FinalizeLocalDamageResult(entry, damageResult)
+            end
+        end
         if timingEnabled then
             appendTimingPart(timingParts, "forced-hit", getNowMilliseconds() - forcedHitStartTime)
             if profilerStartTime ~= nil then
@@ -1901,18 +1838,14 @@ function Combat:BeginHitCheck(context, effect, component)
                 SPELLCAST_SLOW_TOTAL_MS
             )
         end
-        if not record then
-            return false, buildCombatResult(entry, nil, reason or "transaction-failed")
-        end
-        return true, buildCombatResult(entry, nil, "pending")
+        return completed, result
     end
 
-    local localEventUnit = Client.ResolveLocalEventUnit and Client:ResolveLocalEventUnit(entry.eventState) or nil
-    local localReaction = tonumber(localEventUnit and localEventUnit.eventID) == entry.defenderEventId
-    -- Player defenders, including the host's local player, use the same
-    -- server-created EventTransactions record.  There is no local-only hit
-    -- check or peer damage hand-off.
-    local migratedRemoteReaction = entry.defenderUnit.isPlayer == true
+    local pendingStartTime = timingEnabled and getNowMilliseconds() or nil
+    Client:SetPendingCombatHitCheck(entry)
+    if timingEnabled then
+        appendTimingPart(timingParts, "set-pending", getNowMilliseconds() - pendingStartTime)
+    end
 
     if entry.defenderUnit.isPlayer ~= true then
         local autoResolveStartTime = timingEnabled and getNowMilliseconds() or nil
@@ -1930,20 +1863,44 @@ function Combat:BeginHitCheck(context, effect, component)
 
         local resultToken, resolution = self:ResolveHitCheckOutcome(entry, action)
         entry.lastResolution = resolution
+        if type(Combat.LogDefenceAttempt) == "function" then
+            Combat:LogDefenceAttempt(entry, resultToken, resolution)
+        end
         if timingEnabled then
             appendTimingPart(timingParts, "resolve-outcome", getNowMilliseconds() - resolveOutcomeStartTime)
         end
-        local successfullyDefended = resultToken == RESULT_FAIL and action ~= RESULT_PASS
-        local record, reason = submitImmediateCombatTransaction(
-            entry,
-            buildCombatTransactionRequest(entry),
-            {
-                resultToken = resultToken,
-                successfullyDefended = successfullyDefended,
-                defenceStatRef = successfullyDefended and resolution and resolution.defenceStatRef or nil,
-                resolution = Combat:CloneValue(resolution),
-            }
-        )
+        local completed, result = false, nil
+        if type(Combat.CompleteHitCheck) == "function" then
+            completed, result = Combat:CompleteHitCheck(entry, resultToken, "npc-local")
+        end
+        if completed and type(Combat.RecordResolvedCombatAttackHistory) == "function" then
+            Combat:RecordResolvedCombatAttackHistory(Client, entry, resultToken, action, resolution)
+        end
+        if completed and resultToken == RESULT_PASS then
+            local applyDamageStartTime = timingEnabled and getNowMilliseconds() or nil
+            local _, damageResult = self:ApplyResolvedDamage(entry)
+            entry.lastDamageResult = damageResult
+            if timingEnabled then
+                appendTimingPart(timingParts, "apply-damage", getNowMilliseconds() - applyDamageStartTime)
+            end
+            if type(self.FinalizeLocalDamageResult) == "function" then
+                local finalizeDamageStartTime = timingEnabled and getNowMilliseconds() or nil
+                self:FinalizeLocalDamageResult(entry, damageResult)
+                if timingEnabled then
+                    appendTimingPart(timingParts, "finalize-damage", getNowMilliseconds() - finalizeDamageStartTime)
+                end
+            end
+        elseif completed and resultToken == RESULT_FAIL then
+            if type(Combat.EmitSuccessfulDefenceEvent) == "function" then
+                Combat:EmitSuccessfulDefenceEvent(Client, entry, action, resultToken, resolution)
+            end
+            if type(Combat.CompleteActionDamageResolution) == "function" then
+                Combat:CompleteActionDamageResolution(Client, entry, false)
+            end
+            if type(self.ShowMissCombatText) == "function" then
+                self:ShowMissCombatText(entry)
+            end
+        end
         if timingEnabled then
             appendTimingPart(timingParts, "npc-local", getNowMilliseconds() - autoResolveStartTime)
             if profilerStartTime ~= nil then
@@ -1956,40 +1913,49 @@ function Combat:BeginHitCheck(context, effect, component)
                 SPELLCAST_SLOW_TOTAL_MS
             )
         end
-        if not record then
-            return false, buildCombatResult(entry, nil, reason or "transaction-failed")
+        return completed, result
+    end
+
+    local localEventUnit = Client.ResolveLocalEventUnit and Client:ResolveLocalEventUnit(entry.eventState) or nil
+    if tonumber(localEventUnit and localEventUnit.eventID) == entry.defenderEventId then
+        entry.localOnly = true
+        local scheduleReactionStartTime = timingEnabled and getNowMilliseconds() or nil
+        enqueueDamagePresentationWork(showCombatReactionDeferred, Client, entry)
+        if timingEnabled then
+            appendTimingPart(timingParts, "schedule-reaction", getNowMilliseconds() - scheduleReactionStartTime)
         end
-        return true, buildCombatResult(entry, nil, "pending")
+        local pendingResult = buildCombatResult(entry, nil, "pending")
+        pendingResult.resultType = entry.resultType or pendingResult.resultType
+        if timingEnabled then
+            appendTimingPart(timingParts, "return-pending", getNowMilliseconds() - totalStartTime, SPELLCAST_SLOW_HELPER_MS)
+            if profilerStartTime ~= nil then
+                appendTimingPart(timingParts, "profiler-total", getProfilerMilliseconds() - profilerStartTime, SPELLCAST_SLOW_TOTAL_MS)
+            end
+            logDamageTimingLine(
+                ("%s/%s local-reaction"):format(tostring(entry.spellRef or "spell"), tostring(entry.componentKey or "component")),
+                timingParts,
+                getNowMilliseconds() - totalStartTime,
+                SPELLCAST_SLOW_TOTAL_MS
+            )
+        end
+        return true, pendingResult
     end
 
     local defenderName = Combat.ResolveSenderForUnit and Combat:ResolveSenderForUnit(entry.eventState, entry.defenderUnit) or ""
     local sendStartTime = timingEnabled and getNowMilliseconds() or nil
-    local transactionService = Addon.Server and Addon.Server.EventTransactions
-    local request = buildCombatTransactionRequest(entry)
-    local record, beginReason
-    if migratedRemoteReaction and defenderName ~= "" and transactionService
-        and type(transactionService.BeginAwaitingInput) == "function"
-    then
-        record, beginReason = transactionService:BeginAwaitingInput({
-            operation = "combat-hit",
-            originName = Common.GetPlayerName and Common.GetPlayerName() or nil,
-            inputRecipient = defenderName,
-            eventId = entry.eventId,
-            actorEventId = entry.attackerEventId,
-            targetEventIds = { entry.defenderEventId },
-            turnNumber = entry.turnNumber,
-            tickNumber = entry.tickNumber,
-            baseRevision = entry.eventState and entry.eventState.liveUnitRevision or nil,
-            stepSensitive = true,
-            input = { request = request },
-        })
-    end
-    if not record then
-        if type(Debug) == "table" and type(Debug.Error) == "function" then
-            Debug.Error(
-                "Authoritative combat transaction unavailable: event=%s check=%s reason=%s.",
-                tostring(entry.eventId or ""), tostring(entry.checkId or ""), tostring(beginReason or "missing-service")
-            )
+    if defenderName == "" or not Combat.SendCombatWhisper or not Combat:SendCombatWhisper(defenderName, HIT_CHECK_REQUEST_OPCODE, {
+        entry.checkId,
+        entry.eventId,
+        entry.attackerEventId,
+        entry.defenderEventId,
+        entry.spellRef,
+        entry.componentKey,
+        entry.attackerTotal,
+        entry.rawDamage,
+        entry.resultType,
+    }) then
+        if Client.ClearPendingCombatHitCheck then
+            Client:ClearPendingCombatHitCheck(entry.checkId)
         end
         if timingEnabled then
             appendTimingPart(timingParts, "send-request", getNowMilliseconds() - sendStartTime)
@@ -1997,20 +1963,13 @@ function Combat:BeginHitCheck(context, effect, component)
                 appendTimingPart(timingParts, "profiler-total", getProfilerMilliseconds() - profilerStartTime, SPELLCAST_SLOW_TOTAL_MS)
             end
             logDamageTimingLine(
-                ("%s/%s transaction-failed"):format(tostring(entry.spellRef or "spell"), tostring(entry.componentKey or "component")),
+                ("%s/%s send-failed"):format(tostring(entry.spellRef or "spell"), tostring(entry.componentKey or "component")),
                 timingParts,
                 getNowMilliseconds() - totalStartTime,
                 SPELLCAST_SLOW_TOTAL_MS
             )
         end
-        return false, buildCombatResult(entry, nil, beginReason or "transaction-failed")
-    end
-    entry.transactionId = record.id
-    entry.checkId = record.id
-    entry.sharedTransaction = record
-    record.combatEntry = entry
-    if localReaction then
-        enqueueDamagePresentationWork(showCombatReactionDeferred, Client, entry)
+        return false, buildCombatResult(entry, nil, "send_failed")
     end
     if timingEnabled then
         appendTimingPart(timingParts, "send-request", getNowMilliseconds() - sendStartTime)

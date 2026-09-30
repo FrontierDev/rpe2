@@ -153,27 +153,16 @@ local function buildTooltipSpec(stats, presentation)
     local pendingChunks = math.max(0, math.floor(tonumber(stats.pendingChunkCount) or 0))
     local waitReason = tostring(stats.waitReason or "none")
 
-    local lines = {
-        { left = "Logical messages queued", right = tostring(logicalMessages) },
-        { left = "Pending physical chunks", right = tostring(pendingChunks) },
-        { left = "Estimated allowance", right = formatAllowance(stats.estimatedAllowance) },
-        { left = "Wait reason", right = waitReason },
-    }
-    for index, message in ipairs(type(stats.pendingLogicalMessages) == "table" and stats.pendingLogicalMessages or {}) do
-        lines[#lines + 1] = {
-            left = index == 1 and "Queued payloads" or "",
-            right = ("%s (%s)"):format(
-                tostring(message.operation or "unknown"),
-                tostring(math.max(0, math.floor(tonumber(message.remainingChunks) or 0)))
-            ),
-        }
-    end
-
     return {
         type = "custom",
         title = "Communications: " .. tostring(presentation.label or "Normal"),
         width = 250,
-        lines = lines,
+        lines = {
+            { left = "Logical messages queued", right = tostring(logicalMessages) },
+            { left = "Pending physical chunks", right = tostring(pendingChunks) },
+            { left = "Estimated allowance", right = formatAllowance(stats.estimatedAllowance) },
+            { left = "Wait reason", right = waitReason },
+        },
     }
 end
 

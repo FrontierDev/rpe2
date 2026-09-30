@@ -366,6 +366,49 @@ Operations.Opcodes = Operations.Opcodes or {
             return handled
         end,
     },
+    [14] = {
+        key = "COMBAT_HIT_CHECK_REQUEST",
+        name = "combat-hit-check-request",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleCombatHitCheckRequest) ~= "function" then
+                return false
+            end
+
+            return client:HandleCombatHitCheckRequest(arguments, sender, distribution, target, message)
+        end,
+    },
+    [15] = {
+        key = "COMBAT_HIT_CHECK_RESPONSE",
+        name = "combat-hit-check-response",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local client = Addon.Client
+            if not client or type(client.HandleCombatHitCheckResponse) ~= "function" then
+                return false
+            end
+
+            return client:HandleCombatHitCheckResponse(arguments, sender, distribution, target, message)
+        end,
+    },
+    [16] = {
+        key = "RESOURCE_DELTA",
+        name = "resource-delta",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local server = Addon.Server
+            local client = Addon.Client
+            local handled = false
+
+            if server and type(server.HandleResourceDelta) == "function" then
+                handled = server:HandleResourceDelta(arguments, sender, distribution, target, message) or handled
+            end
+
+            if client and type(client.HandleResourceDelta) == "function" then
+                handled = client:HandleResourceDelta(arguments, sender, distribution, target, message) or handled
+            end
+
+            return handled
+        end,
+    },
     [17] = {
         key = "AURA_APPLY",
         name = "aura-apply",
@@ -388,6 +431,25 @@ Operations.Opcodes = Operations.Opcodes or {
             end
 
             return client:HandleAuraDispel(arguments, sender, distribution, target, message)
+        end,
+    },
+    [19] = {
+        key = "RESOURCE_DELTA_BATCH",
+        name = "resource-delta-batch",
+        ["function"] = function(arguments, sender, distribution, target, message)
+            local server = Addon.Server
+            local client = Addon.Client
+            local handled = false
+
+            if server and type(server.HandleResourceDeltaBatch) == "function" then
+                handled = server:HandleResourceDeltaBatch(arguments, sender, distribution, target, message) or handled
+            end
+
+            if client and type(client.HandleResourceDeltaBatch) == "function" then
+                handled = client:HandleResourceDeltaBatch(arguments, sender, distribution, target, message) or handled
+            end
+
+            return handled
         end,
     },
     [20] = {

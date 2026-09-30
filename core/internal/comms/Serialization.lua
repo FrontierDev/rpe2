@@ -42,7 +42,7 @@ function Serialization:DeserializeArguments(argumentsText, separator)
     return splitPreservingEmpty(argumentsText or "", argumentSeparator)
 end
 
-function Serialization:BuildChunkToken(partIndex, partCount, messageId)
+function Serialization:BuildChunkToken(partIndex, partCount)
     local chunkIndex = tonumber(partIndex)
     local chunkTotal = tonumber(partCount)
 
@@ -54,21 +54,11 @@ function Serialization:BuildChunkToken(partIndex, partCount, messageId)
         return nil
     end
 
-    local sequence = chunkTotal == 1 and "1" or ("%d/%d"):format(chunkIndex, chunkTotal)
-    local normalizedMessageId = tostring(messageId or "")
-    if normalizedMessageId == "" then
-        return sequence
+    if chunkTotal == 1 then
+        return "1"
     end
 
-    -- The identifier is part of the packet header, rather than payload, so
-    -- concurrent multipart messages from one sender/opcode cannot assemble
-    -- into each other. It must not contain the packet separator.
-    if string.find(normalizedMessageId, self.PacketSeparator or ":", 1, true)
-        or string.find(normalizedMessageId, "~", 1, true)
-    then
-        return nil
-    end
-    return normalizedMessageId .. "~" .. sequence
+    return ("%d/%d"):format(chunkIndex, chunkTotal)
 end
 
 function Serialization:ParseChunkToken(chunkToken)
@@ -77,22 +67,11 @@ function Serialization:ParseChunkToken(chunkToken)
         return nil
     end
 
-    local messageId = nil
-    local sequence = token
-    local separatorIndex = string.find(token, "~", 1, true)
-    if separatorIndex then
-        messageId = string.sub(token, 1, separatorIndex - 1)
-        sequence = string.sub(token, separatorIndex + 1)
-        if messageId == "" or sequence == "" then
-            return nil
-        end
-    end
-
-    local chunkParts = splitPreservingEmpty(sequence, "/", 2)
+    local chunkParts = splitPreservingEmpty(token, "/", 2)
     if #chunkParts == 1 then
         local singleChunk = tonumber(chunkParts[1])
         if singleChunk == 1 then
-            return 1, 1, messageId
+            return 1, 1
         end
 
         return nil
@@ -108,7 +87,7 @@ function Serialization:ParseChunkToken(chunkToken)
         return nil
     end
 
-    return partIndex, partCount, messageId
+    return partIndex, partCount
 end
 
 function Serialization:SerializePacket(prefix, chunkToken, opcode, argumentsText)
@@ -128,7 +107,7 @@ function Serialization:DeserializePacket(message)
     local chunkToken = parts[2] or ""
     local opcode = tonumber(parts[3])
     local argumentsText = parts[4]
-    local partIndex, partCount, messageId = self:ParseChunkToken(chunkToken)
+    local partIndex, partCount = self:ParseChunkToken(chunkToken)
 
     if prefix == "" or not partIndex or not partCount or not opcode or argumentsText == nil then
         return nil
@@ -139,7 +118,6 @@ function Serialization:DeserializePacket(message)
         chunkToken = chunkToken,
         partIndex = partIndex,
         partCount = partCount,
-        messageId = messageId,
         opcode = opcode,
         argumentsText = argumentsText,
     }
