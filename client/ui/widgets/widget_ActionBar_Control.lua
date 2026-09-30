@@ -227,7 +227,8 @@ local function isLocalPlayerPet(eventUnit, localEventUnit)
     if type(eventUnit) ~= "table" or type(localEventUnit) ~= "table" or eventUnit.isPlayer == true then
         return false
     end
-    if tostring(eventUnit.petRef or "") == "" then
+    local isPetUnit = eventUnit.isPet == true or tostring(eventUnit.petRef or "") ~= ""
+    if not isPetUnit then
         return false
     end
 
@@ -237,7 +238,7 @@ local function isLocalPlayerPet(eventUnit, localEventUnit)
     end
 
     local controllerId = tonumber(eventUnit.controllerID) or 0
-    if controllerId > 0 and controllerId == localEventId and tostring(eventUnit.petRef or "") ~= "" then
+    if controllerId > 0 and controllerId == localEventId then
         return true
     end
 
