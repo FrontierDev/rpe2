@@ -529,6 +529,7 @@ local function buildDefaultEffect(effectType)
         return {
             type = "summon_unit",
             unitRef = nil,
+            summonAsPet = false,
             targetEvents = {},
         }
     end
@@ -684,6 +685,7 @@ local function normalizeEffect(value)
 
     if effect.type == "summon_unit" then
         effect.unitRef = normalizeQualifiedUnitRef(data.unitRef)
+        effect.summonAsPet = normalizeBool(data.summonAsPet, false)
         effect.targetEvents = normalizeEventList(data.targetEvents)
         return effect
     end
