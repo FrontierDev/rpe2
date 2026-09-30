@@ -2938,21 +2938,27 @@ function Spellcasting.ResolveComponentTargets(eventState, casterUnit, component,
     end
     if targetType == "pet" then
         local selectedPetRef = type(casterUnit) == "table" and tostring(casterUnit.petRef or "") or ""
-        if selectedPetRef == "" then
-            return {}
-        end
+        local controllerEventId = casterUnit.isPlayer == true
+            and tonumber(casterUnit.eventID)
+            or tonumber(casterUnit.controllerID)
+        local fallbackPet = nil
 
         for index = 1, #(eventState.units or {}) do
             local unit = eventState.units[index]
-            if unit
+            local isPetUnit = unit
                 and unit.isPlayer ~= true
-                and tostring(unit.petRef or "") == selectedPetRef
-                and tonumber(unit.controllerID) == tonumber(casterUnit.eventID)
-            then
-                return { unit }
+                and (unit.isPet == true or tostring(unit.petRef or "") ~= "")
+            if isPetUnit and tonumber(unit.controllerID) == controllerEventId then
+                if selectedPetRef ~= "" and tostring(unit.petRef or "") == selectedPetRef then
+                    return { unit }
+                end
+                if fallbackPet == nil then
+                    fallbackPet = unit
+                end
             end
         end
-        return {}
+
+        return fallbackPet and { fallbackPet } or {}
     end
 
     if type(castEntry) == "table" and type(castEntry.targetPolicy) == "table" then
