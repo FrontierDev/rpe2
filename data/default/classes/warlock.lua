@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 11,
+    version = 12,
     dataset = {
         achievements = {},
         auras = {
@@ -392,6 +392,8 @@ Addon.Data.DefaultDatasets:Register({
         datasetType = "class",
         dependencies = {
             "f82db71a",
+            "7bbb4cb9",
+            "d7c874c4",
         },
         description = "",
         groupName = "Core",
@@ -404,6 +406,27 @@ Addon.Data.DefaultDatasets:Register({
         mounts = {},
         name = "Warlock",
         pets = {
+            {
+                equipmentSlotRefs = {},
+                id = "smnfelgd",
+                name = "Summoned Felguard",
+                spells = {
+                    "f82db71a:6uix049h",
+                    "7bbb4cb9:e0mooybr",
+                },
+                unitRef = "f82db71a:felgrd01",
+            },
+            {
+                equipmentSlotRefs = {},
+                id = "smnimp01",
+                name = "Summoned Imp",
+                spells = {
+                    "f82db71a:6uix049h",
+                    "d7c874c4:68dy7na1",
+                    "d7c874c4:fireward",
+                },
+                unitRef = "f82db71a:imp00001",
+            },
             {
                 equipmentSlotRefs = {},
                 id = "smnvoid1",
@@ -2338,6 +2361,58 @@ Addon.Data.DefaultDatasets:Register({
                 rankInterval = 8,
                 mountedCombatOnly = false,
                 name = "Summon Imp",
+                range = 0,
+                resourceCosts = {},
+                seedNPCSpell = false,
+                spellbookCategory = "Demonology",
+                tags = {},
+                tooltipTemplate = true,
+                totalTicks = 0,
+                useCooldownCharges = false,
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                canTargetHiddenUnits = false,
+                castTime = 1,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            targetEvents = {},
+                            type = "summon_pet",
+                            unitRef = "f82db71a:voidw001",
+                        },
+                        key = "wlsmvoic",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 0,
+                            minTargets = 0,
+                            requiresTarget = false,
+                            targetDisposition = "ally",
+                            type = "caster",
+                        },
+                    },
+                },
+                conditions = {},
+                cooldown = 0,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                doesNotRevealCaster = false,
+                icon = "interface/icons/spell_shadow_summonvoidwalker.blp",
+                id = "wlsmvoid",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Summon Voidwalker",
                 range = 0,
                 resourceCosts = {},
                 seedNPCSpell = false,
