@@ -19,7 +19,7 @@ local RESOURCE_DELTA_BATCH_OPCODE = Operations:GetOpcode("RESOURCE_DELTA_BATCH")
 local NativeJoinChannel = Comms and Comms.JoinChannel or nil
 local NativeResolveChannelId = Comms and Comms.ResolveChannelId or nil
 local THREAT_UPDATE_RECORD_SEPARATOR = string.char(30)
-local THREAT_UPDATE_FIELD_SEPARATOR = string.char(31)
+local THREAT_UPDATE_FIELD_SEPARATOR = string.char(29)
 
 Client.ResourceSyncQueued = Client.ResourceSyncQueued or false
 Client.LastResourceSyncSignature = Client.LastResourceSyncSignature or nil

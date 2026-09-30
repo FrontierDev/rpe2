@@ -66,11 +66,13 @@ local Addon = {
 }
 
 loadAddonFile("core/internal/comms/ResourceSync.lua", Addon)
+loadAddonFile("core/internal/comms/Serialization.lua", Addon)
 loadAddonFile("client/client_Resources.lua", Addon)
 
 local Client = Addon.Client
 local state = { active = true, channelName = "channel", channelId = 9 }
 local sourceUnit = { eventID = 101, isPlayer = true, name = "Alice" }
+local secondSourceUnit = { eventID = 102, isPlayer = true, name = "Bob" }
 local targetUnit = {
     eventID = 202,
     isPlayer = false,
@@ -83,7 +85,7 @@ local eventState = {
     channelName = "channel",
     turnNumber = 4,
     tickNumber = 2,
-    units = { sourceUnit, targetUnit },
+    units = { sourceUnit, secondSourceUnit, targetUnit },
 }
 
 function Client:GetState() return state end
@@ -104,6 +106,7 @@ Client.PendingResourceDeltaBatches = {
         },
         threatUpdates = {
             { targetEventId = 202, sourceEventId = 101, amount = 5, turnNumber = 4 },
+            { targetEventId = 202, sourceEventId = 102, amount = 3, turnNumber = 4 },
         },
     },
     second = {
@@ -120,6 +123,7 @@ Client.PendingResourceDeltaBatches = {
         },
         threatUpdates = {
             { targetEventId = 202, sourceEventId = 101, amount = 7, turnNumber = 4 },
+            { targetEventId = 202, sourceEventId = 102, amount = 4, turnNumber = 4 },
         },
     },
 }
@@ -130,12 +134,38 @@ assertTrue(
 )
 assertEqual(#sent, 1, "deferred flush sends one coalesced batch")
 assertTrue(sent[1].arguments[3] ~= "", "deferred flush transmits resource deltas")
+local expectedThreatPayload = table.concat({
+    table.concat({ "202", "101", "12", "4" }, string.char(29)),
+    table.concat({ "202", "102", "7", "4" }, string.char(29)),
+}, string.char(30))
 assertEqual(
     sent[1].arguments[4],
-    table.concat({ "202", "101", "12", "4" }, string.char(31)),
+    expectedThreatPayload,
     "deferred flush coalesces and transmits threat updates"
 )
 assertEqual(next(Client.PendingResourceDeltaBatches), nil, "sent deferred batches are removed")
+
+local Serialization = Addon.Internal.Comms.Serialization
+local serializedArguments = Serialization:SerializeArguments(sent[1].arguments)
+local transportedArguments = Serialization:DeserializeArguments(serializedArguments)
+assertEqual(#transportedArguments, 4, "serialized resource batch preserves argument count")
+assertEqual(
+    transportedArguments[4],
+    expectedThreatPayload,
+    "serialized resource batch preserves the complete threat payload"
+)
+local transportedThreatRecords = splitPreservingEmpty(transportedArguments[4], string.char(30))
+assertEqual(#transportedThreatRecords, 2, "serialized resource batch preserves multiple threat records")
+assertEqual(
+    table.concat(splitPreservingEmpty(transportedThreatRecords[1], string.char(29)), ":"),
+    "202:101:12:4",
+    "first transported threat record preserves all fields"
+)
+assertEqual(
+    table.concat(splitPreservingEmpty(transportedThreatRecords[2], string.char(29)), ":"),
+    "202:102:7:4",
+    "second transported threat record preserves all fields"
+)
 
 local Server = Addon.Server
 Server.State = {
@@ -148,6 +178,7 @@ Server.EventState = eventState
 Server.EventDraftState = {
     units = {
         { eventID = 101, isPlayer = true, name = "Alice" },
+        { eventID = 102, isPlayer = true, name = "Bob" },
         { eventID = 202, isPlayer = false, name = "Goblin" },
     },
 }
@@ -156,10 +187,11 @@ function Server:BroadcastEventDeltaBatch() broadcasts = broadcasts + 1 end
 loadAddonFile("server/server_Session.lua", Addon)
 
 assertTrue(
-    Server:HandleResourceDeltaBatch(sent[1].arguments, "Alice"),
+    Server:HandleResourceDeltaBatch(transportedArguments, "Alice"),
     "server accepts the transmitted deferred resource batch"
 )
 assertEqual(targetUnit.threatTable[101], 12, "server applies deferred threat to the target NPC")
+assertEqual(targetUnit.threatTable[102], 7, "server applies every transported threat record")
 assertTrue(broadcasts > 0, "authoritative threat update is broadcast to other clients")
 
 local reactionBatch = {
