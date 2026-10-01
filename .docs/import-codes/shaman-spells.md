@@ -20,6 +20,8 @@ Import each listed **Aura** before its associated **Spell**. All entries use the
 - **Lightning Shield** applies 3 stacks. Each melee hit taken deals Nature damage to the attacker and removes one stack.
 - Group stat/resistance totems last 5 turns, matching their 5-turn spell cooldown. Strength/Agility/Armor/Spell Power buffs use +10%; resistance totems use +30 resistance, matching the current fixed Frost Resistance magnitude used by Ice Armor.
 - **Healing Stream Totem** applies a 5-turn all-allies HoT. Its per-target tick uses the standard 5-target periodic-healing reduction from the current Renew archetype.
+- **Riptide** is an instant Bonus Action 5-turn HoT with a meaningful secondary effect. Its HoT uses the Renew healing archetype reduced by the 0.85 secondary-effect modifier: **17.68 + 0.5304 Healing Power per turn**. It also grants **+5 percentage points Healing Received for 1 turn** and costs **15% base Mana**.
+- **Earth Shield** uses the current Prayer of Mending reactive-heal pattern: **2% Max Health** when the owner takes a basic attack, followed by removal of one stack. It applies **8 stacks**, lasts **10 turns**, is a Buff Action with a **1-turn cooldown**, and costs **5% base Mana**.
 - The Mana Spring request says allies gain “Healing Stream”; this sheet treats that as a naming slip and applies a **Mana Spring** aura instead. It restores **2% Base Mana per turn for 5 turns** (10% total per ally).
 - **Tranquil Air Totem** targets between 1 and 10 selected allies and applies -30% Threat Generated for 5 turns.
 
@@ -4446,6 +4448,412 @@ RPE_DATASET_ENTRY_V1
                     tokenType = "spell_heal_range",
                 },
             },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Riptide
+
+#### Healing-over-time Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "c4a91e7d",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseHealing = 17.68,
+                scaleWithRank = true,
+                statScaling = {
+                    {
+                        coefficient = 0.5304,
+                        statRef = "f82db71a:hj6d4kvy",
+                    },
+                },
+                type = "heal",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_nature_riptide.blp",
+        id = "shrptdha",
+        maxStacks = 1,
+        name = "Riptide",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "Heals for {AURA_HEAL_1} health each turn.",
+            bodyTokens = {
+                {
+                    applyMode = "heal_amount",
+                    baseField = "baseHealing",
+                    effectIndex = 1,
+                    key = "AURA_HEAL_1",
+                    tokenType = "aura_amount",
+                },
+            },
+            stackingText = "",
+            stackingTokens = {  },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Healing Received Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "c4a91e7d",
+    entry = {
+        description = "",
+        duration = 1,
+        effects = {
+            {
+                baseAmount = 5,
+                operation = "flat",
+                scaleWithRank = false,
+                statRef = "f82db71a:ok80ohz3",
+                statScaling = {  },
+                type = "stat",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_nature_riptide.blp",
+        id = "shrptdba",
+        maxStacks = 1,
+        name = "Riptide - Healing Received",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "Increases Healing Received by 5%.",
+            bodyTokens = {  },
+            stackingText = "",
+            stackingTokens = {  },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "c4a91e7d",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "c4a91e7d:shrptdha",
+                    basePower = 0,
+                    duration = 5,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                    threatCoefficient = 0.375,
+                },
+                key = "shrptdh1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "c4a91e7d:shrptdba",
+                    basePower = 0,
+                    duration = 1,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "shrptdb1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_nature_riptide.blp",
+        id = "shriptid",
+        cooldownChannel = 2,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Riptide",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 15,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Restoration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {
+                {
+                    auraRef = "c4a91e7d:shrptdha",
+                    datasetId = "c4a91e7d",
+                    descriptionText = "Heals for {AURA_HEAL_1} health each turn.",
+                    duration = 5,
+                    icon = "interface/icons/spell_nature_riptide.blp",
+                    nameText = "Riptide",
+                    powerLevel = 0,
+                    spellDatasetId = "c4a91e7d",
+                    stacks = 1,
+                    targetContext = {
+                        object = "an ally",
+                        possessive = "the ally's",
+                        reflexive = "themselves",
+                        subject = "an ally",
+                    },
+                    tokens = {
+                        {
+                            applyMode = "heal_amount",
+                            baseField = "baseHealing",
+                            effectIndex = 1,
+                            key = "AURA_HEAL_1",
+                            tokenType = "aura_amount",
+                        },
+                    },
+                },
+                {
+                    auraRef = "c4a91e7d:shrptdba",
+                    datasetId = "c4a91e7d",
+                    descriptionText = "Increases Healing Received by 5%.",
+                    duration = 1,
+                    icon = "interface/icons/spell_nature_riptide.blp",
+                    nameText = "Riptide - Healing Received",
+                    powerLevel = 0,
+                    spellDatasetId = "c4a91e7d",
+                    stacks = 1,
+                    targetContext = {
+                        object = "an ally",
+                        possessive = "the ally's",
+                        reflexive = "themselves",
+                        subject = "an ally",
+                    },
+                    tokens = {  },
+                },
+            },
+            mainText = "Apply Riptide to an ally for 5 turns and increase their Healing Received by 5% for 1 turn.",
+            tokens = {  },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+### Earth Shield
+
+#### Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "c4a91e7d",
+    entry = {
+        description = "",
+        duration = 10,
+        effects = {  },
+        events = {
+            {
+                chance = 100,
+                combatEventId = "on_auto_attack_taken",
+                effects = {
+                    {
+                        amountMode = "max_percent",
+                        baseHealing = 2,
+                        statScaling = {  },
+                        type = "heal",
+                    },
+                    {
+                        auraRef = "c4a91e7d:sheashla",
+                        stacks = 1,
+                        type = "remove_aura",
+                    },
+                },
+                triggerTarget = "aura_target",
+            },
+        },
+        icon = "interface/icons/spell_nature_skinofearth.blp",
+        id = "sheashla",
+        maxStacks = 8,
+        name = "Earth Shield",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            bodyText = "When the affected unit is victim of a basic attack, heal the affected unit for 2% of Max health and remove 1 stack.",
+            bodyTokens = {  },
+            stackingText = "Applies {AURA_APPLIED_STACKS_1} stacks. Stacks up to {AURA_MAX_STACKS_1} times.",
+            stackingTokens = {
+                {
+                    applyMode = "applied_stacks",
+                    key = "AURA_APPLIED_STACKS_1",
+                    tokenType = "aura_stacks",
+                },
+                {
+                    applyMode = "max_stacks",
+                    key = "AURA_MAX_STACKS_1",
+                    tokenType = "aura_stacks",
+                },
+            },
+            version = 1,
+        },
+    },
+}
+```
+
+#### Spell
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "c4a91e7d",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "c4a91e7d:sheashla",
+                    basePower = 0,
+                    duration = 10,
+                    stacks = 8,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                    threatCoefficient = 0.5,
+                },
+                key = "sheashl1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 1,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_nature_skinofearth.blp",
+        id = "sheashld",
+        cooldownChannel = 3,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Earth Shield",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Restoration",
+        tags = {  },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {
+                {
+                    auraRef = "c4a91e7d:sheashla",
+                    datasetId = "c4a91e7d",
+                    descriptionText = "When the affected unit is victim of a basic attack, heal the affected unit for 2% of Max health and remove 1 stack.",
+                    duration = 10,
+                    icon = "interface/icons/spell_nature_skinofearth.blp",
+                    nameText = "Earth Shield",
+                    powerLevel = 0,
+                    spellDatasetId = "c4a91e7d",
+                    stacks = 8,
+                    targetContext = {
+                        object = "an ally",
+                        possessive = "the ally's",
+                        reflexive = "themselves",
+                        subject = "an ally",
+                    },
+                    tokens = {  },
+                },
+            },
+            mainText = "Apply 8 stacks of Earth Shield to an ally for 10 turns.",
+            tokens = {  },
             version = 1,
         },
         totalTicks = 0,
