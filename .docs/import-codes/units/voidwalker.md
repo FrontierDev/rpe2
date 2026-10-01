@@ -60,11 +60,12 @@ Spells:
 
 ### Tormenter
 
-A melee pressure variant.
+A defensive melee/tank-pressure variant built around the Voidwalker's dedicated taunt.
 
 Spells:
 
-- Multiattack — `f82db71a:npcmulti`
+- Pet Attack — `f82db71a:6uix049h`
+- Torment — `e8f3b2c6:wltorm01`
 
 ## Authoring notes
 
@@ -76,6 +77,8 @@ Spells:
 - Fire, Frost, Nature, Arcane and Shadow Resistance use level-scaled stat rows rather than fixed values.
 - Damage Done and Damage Reduction are not seeded on the base unit.
 - Preset spell lists are explicit replacements under the current Unit preset spell-resolution implementation.
+- Corruptor references the Warlock **Spell** IDs for Corruption and Curse of Shadows, not their Aura IDs.
+- Tormenter uses the Core Pet Attack plus the Warlock import-code Torment ability; it does not use the generic NPC Multiattack.
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -115,7 +118,8 @@ RPE_DATASET_ENTRY_V1
                 resourceModifiers = {  },
                 statModifiers = {  },
                 spells = {
-                    "f82db71a:npcmulti",
+                    "f82db71a:6uix049h",
+                    "e8f3b2c6:wltorm01",
                 },
                 equipment = {  },
             },
