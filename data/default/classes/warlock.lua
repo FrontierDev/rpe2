@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 13,
+    version = 14,
     dataset = {
         achievements = {},
         auras = {
@@ -2315,7 +2315,7 @@ Addon.Data.DefaultDatasets:Register({
                 seedNPCSpell = false,
                 spellbookCategory = "Demonology",
                 tags = {},
-                tooltipTemplate = true,
+                tooltipTemplate = false,
                 totalTicks = 0,
                 useCooldownCharges = false,
             },
@@ -2367,7 +2367,7 @@ Addon.Data.DefaultDatasets:Register({
                 seedNPCSpell = false,
                 spellbookCategory = "Demonology",
                 tags = {},
-                tooltipTemplate = true,
+                tooltipTemplate = false,
                 totalTicks = 0,
                 useCooldownCharges = false,
             },
@@ -2419,7 +2419,7 @@ Addon.Data.DefaultDatasets:Register({
                 seedNPCSpell = false,
                 spellbookCategory = "Demonology",
                 tags = {},
-                tooltipTemplate = true,
+                tooltipTemplate = false,
                 totalTicks = 0,
                 useCooldownCharges = false,
             },
