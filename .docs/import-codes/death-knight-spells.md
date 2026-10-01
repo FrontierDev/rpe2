@@ -12,14 +12,14 @@ Import required **Aura** entries before spells that reference them.
 - Rune-type simulation uses existing cooldown groups: `dk_blood`, `dk_frost`, and `dk_unholy`.
 - A 1-Rune spell uses a 1-turn cooldown; a 2-Rune spell uses a 2-turn cooldown; Death and Decay uses a 3-turn cooldown. Runic Power-only spells have no DK rune group.
 - Death Strike is Blood-only, Obliterate Frost-only, and Death and Decay Unholy-only for cooldown-group purposes.
-- WotLK Rune/Runic Power costs are retained where represented. Rotational 1-Rune attacks generate 10 Runic Power; 2-/3-Rune attacks generate 15.
+- WotLK Rune/Runic Power costs are retained where represented, with RPE tuning overrides documented in the entries. Obliterate generates 20 Runic Power and Death and Decay generates 30.
 - Blood uses the Tank role output profile; Frost and Unholy use DPS. DK magical attacks scale from Melee Attack Power.
 - Descriptions are left empty so the runtime description builder derives them from components/effects.
-- Disease-count scaling is not fabricated. Death Strike uses a fixed 10% maximum-health heal as the normal two-disease state.
+- Disease-count scaling is not fabricated. Death Strike and Rune Tap use RPE direct-healing budgets that scale from Melee Attack Power rather than Healing Power.
 - Frost Fever's attack-speed reduction is deferred because Core has no suitable attack-speed stat.
-- Anti-Magic Shell does not model harmful-magic immunity or proportional Runic Power gain from absorbed damage.
+- Anti-Magic Shell is represented as +100 Magic Resistance for 1 turn; harmful-magic immunity and proportional Runic Power gain are not separately modelled.
 - Anti-Magic Zone is represented as a one-turn all-allies +75 Magic Resistance effect; the stationary shared absorb pool is not currently representable.
-- Bone Shield loses one stack on each damaging melee/ranged/spell event; its sub-turn internal cooldown is not represented.
+- Bone Shield begins with 10 stacks and loses one stack on each damaging melee/ranged/spell event; its sub-turn internal cooldown is not represented.
 
 ## Deferred non-pet spells
 
@@ -60,6 +60,18 @@ RPE_DATASET_ENTRY_V1
             },
             {
                 chance = 100,
+                combatEventId = "on_melee_hit",
+                triggerTarget = "aura_target",
+                effects = {
+                    {
+                        auraRef = "dknight1:dkmob001",
+                        stacks = 1,
+                        type = "remove_aura",
+                    },
+                },
+            },
+            {
+                chance = 100,
                 combatEventId = "on_ranged_hit",
                 triggerTarget = "event_other",
                 effects = {
@@ -69,6 +81,18 @@ RPE_DATASET_ENTRY_V1
                         scaleWithRank = false,
                         statScaling = { },
                         type = "heal",
+                    },
+                },
+            },
+            {
+                chance = 100,
+                combatEventId = "on_ranged_hit",
+                triggerTarget = "aura_target",
+                effects = {
+                    {
+                        auraRef = "dknight1:dkmob001",
+                        stacks = 1,
+                        type = "remove_aura",
                     },
                 },
             },
@@ -86,10 +110,22 @@ RPE_DATASET_ENTRY_V1
                     },
                 },
             },
+            {
+                chance = 100,
+                combatEventId = "on_spell_hit",
+                triggerTarget = "aura_target",
+                effects = {
+                    {
+                        auraRef = "dknight1:dkmob001",
+                        stacks = 1,
+                        type = "remove_aura",
+                    },
+                },
+            },
         },
         icon = "interface/icons/ability_hunter_rapidkilling.blp",
         id = "dkmob001",
-        maxStacks = 1,
+        maxStacks = 20,
         name = "Mark of Blood",
         stackBehavior = "refresh_duration",
         tags = { },
@@ -162,7 +198,7 @@ RPE_DATASET_ENTRY_V1
                 type = "stat",
             },
             {
-                amount = -1,
+                amount = -10,
                 amountMode = "max_percent",
                 resourceRef = "f82db71a:q2ktkztt",
                 scaleWithRank = false,
@@ -583,11 +619,16 @@ RPE_DATASET_ENTRY_V1
                 effect = {
                     applyAura = false,
                     auraStacks = 1,
-                    amountMode = "max_percent",
-                    baseHealing = 10,
+                    amountMode = "flat",
+                    baseHealing = 53.7625,
                     projectilePath = "",
                     projectileSpeed = 0,
-                    statScaling = { },
+                    statScaling = {
+                        {
+                            coefficient = 0.322575,
+                            statRef = "f82db71a:u7b49vs9",
+                        },
+                    },
                     targetEvents = {
                         "on_heal_taken",
                         "on_critical_heal_taken",
@@ -804,7 +845,7 @@ RPE_DATASET_ENTRY_V1
                 castPhase = "on_cast_end",
                 castingGroup = "default",
                 effect = {
-                    duration = 3,
+                    duration = 1,
                     targetEvents = {
                         "on_taunted",
                     },
@@ -814,11 +855,11 @@ RPE_DATASET_ENTRY_V1
                 target = {
                     allowDeadTargets = false,
                     disableSelfCast = false,
-                    maxTargets = 1,
+                    maxTargets = 3,
                     minTargets = 1,
                     requiresTarget = true,
                     targetDisposition = "enemy",
-                    type = "single",
+                    type = "multi",
                 },
             },
         },
@@ -870,11 +911,16 @@ RPE_DATASET_ENTRY_V1
                 effect = {
                     applyAura = false,
                     auraStacks = 1,
-                    amountMode = "max_percent",
-                    baseHealing = 10,
+                    amountMode = "flat",
+                    baseHealing = 57.75,
                     projectilePath = "",
                     projectileSpeed = 0,
-                    statScaling = { },
+                    statScaling = {
+                        {
+                            coefficient = 0.3465,
+                            statRef = "f82db71a:u7b49vs9",
+                        },
+                    },
                     targetEvents = {
                         "on_heal_taken",
                         "on_critical_heal_taken",
@@ -951,7 +997,7 @@ RPE_DATASET_ENTRY_V1
                     auraRef = "dknight1:dkmob001",
                     basePower = 0,
                     duration = 3,
-                    stacks = 1,
+                    stacks = 20,
                     targetEvents = { },
                     type = "apply_aura",
                 },
@@ -1352,7 +1398,7 @@ RPE_DATASET_ENTRY_V1
         duration = 10,
         effects = {
             {
-                baseAmount = 10,
+                baseAmount = 6,
                 operation = "percent",
                 scaleWithRank = false,
                 statRef = "f82db71a:zfqm8dxp",
@@ -1360,7 +1406,7 @@ RPE_DATASET_ENTRY_V1
                 type = "stat",
             },
             {
-                baseAmount = 10,
+                baseAmount = 6,
                 operation = "percent",
                 scaleWithRank = false,
                 statRef = "f82db71a:xqz0daz2",
@@ -1414,7 +1460,7 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
-## Hungering Cold — Aura
+## Remorseless Winter — Aura
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -1436,10 +1482,10 @@ RPE_DATASET_ENTRY_V1
             },
         },
         events = { },
-        icon = "interface/icons/spell_frost_chainsofice.blp",
+        icon = "interface/icons/ability_deathknight_remorselesswinters2.blp",
         id = "dkhca001",
         maxStacks = 1,
-        name = "Hungering Cold",
+        name = "Remorseless Winter",
         stackBehavior = "refresh_duration",
         tags = { },
         tooltipTemplate = false,
@@ -1478,7 +1524,7 @@ RPE_DATASET_ENTRY_V1
             },
         },
         events = { },
-        icon = "interface/icons/spell_deathknight_unbreakablearmor.blp",
+        icon = "interface/icons/spell_frost_frostarmor02.blp",
         id = "dkuaa001",
         maxStacks = 1,
         name = "Unbreakable Armor",
@@ -1863,6 +1909,7 @@ RPE_DATASET_ENTRY_V1
                     auraStacks = 1,
                     baseDamage = 73.3125,
                     damageSchoolRefs = {
+                        "f82db71a:hx7pnwv4",
                         "f82db71a:v1azo4j6",
                     },
                     damageType = "melee",
@@ -1900,7 +1947,7 @@ RPE_DATASET_ENTRY_V1
                 castPhase = "on_cast_end",
                 castingGroup = "default",
                 effect = {
-                    amount = 15,
+                    amount = 20,
                     amountMode = "flat",
                     resourceRef = "f82db71a:jolh6o6e",
                     scaleWithRank = false,
@@ -2095,7 +2142,7 @@ RPE_DATASET_ENTRY_V1
                     amountMode = "flat",
                     applyAura = false,
                     auraStacks = 1,
-                    baseDamage = 43.9875,
+                    baseDamage = 48.875,
                     damageSchoolRefs = {
                         "f82db71a:hx7pnwv4",
                     },
@@ -2105,7 +2152,7 @@ RPE_DATASET_ENTRY_V1
                     projectileSpeed = 0,
                     statScaling = {
                         {
-                            coefficient = 0.15395625,
+                            coefficient = 0.1710625,
                             statRef = "f82db71a:u7b49vs9",
                         },
                     },
@@ -2123,11 +2170,11 @@ RPE_DATASET_ENTRY_V1
                 target = {
                     allowDeadTargets = false,
                     disableSelfCast = false,
-                    maxTargets = 5,
+                    maxTargets = 4,
                     minTargets = 1,
                     requiresTarget = true,
                     targetDisposition = "enemy",
-                    type = "multi",
+                    type = "raid_marker",
                 },
             },
             {
@@ -2239,7 +2286,7 @@ RPE_DATASET_ENTRY_V1
         range = 20,
         resourceCosts = {
             {
-                amount = 20,
+                amount = 10,
                 amountMode = "flat",
                 castPhase = "on_cast_end",
                 refundOnInterrupt = 0,
@@ -2312,7 +2359,7 @@ RPE_DATASET_ENTRY_V1
         range = 0,
         resourceCosts = {
             {
-                amount = 20,
+                amount = 10,
                 amountMode = "flat",
                 castPhase = "on_cast_end",
                 refundOnInterrupt = 0,
@@ -2329,7 +2376,7 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
-## Hungering Cold
+## Remorseless Winter
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -2395,7 +2442,7 @@ RPE_DATASET_ENTRY_V1
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
-        icon = "interface/icons/spell_frost_chainsofice.blp",
+        icon = "interface/icons/ability_deathknight_remorselesswinters2.blp",
         id = "dkhc0001",
         cooldownChannel = 2,
         learnMode = "always_learned",
@@ -2403,7 +2450,7 @@ RPE_DATASET_ENTRY_V1
         usesRanks = false,
         rankInterval = 8,
         mountedCombatOnly = false,
-        name = "Hungering Cold",
+        name = "Remorseless Winter",
         range = 0,
         resourceCosts = {
             {
@@ -2490,7 +2537,7 @@ RPE_DATASET_ENTRY_V1
         cooldownGroup = "dk_frost",
         cooldownScalesWithHaste = false,
         description = "",
-        icon = "interface/icons/spell_deathknight_unbreakablearmor.blp",
+        icon = "interface/icons/spell_frost_frostarmor02.blp",
         id = "dkua0001",
         cooldownChannel = 3,
         learnMode = "always_learned",
@@ -2810,19 +2857,12 @@ RPE_DATASET_ENTRY_V1
         duration = 1,
         effects = {
             {
-                amountMode = "max_percent",
-                baseAbsorption = 50,
-                damageSchoolRefs = {
-                    "f82db71a:dtxhglqg",
-                    "f82db71a:esjguw6d",
-                    "f82db71a:hx7pnwv4",
-                    "f82db71a:wwctys5s",
-                    "f82db71a:qtr10qyj",
-                    "f82db71a:1ggt4t3v",
-                },
+                baseAmount = 100,
+                operation = "flat",
                 scaleWithRank = false,
+                statRef = "f82db71a:zs1nbz13",
                 statScaling = { },
-                type = "absorb",
+                type = "stat",
             },
         },
         events = { },
@@ -2907,7 +2947,7 @@ RPE_DATASET_ENTRY_V1
         },
         icon = "interface/icons/ability_deathknight_boneshield.blp",
         id = "dkbsha01",
-        maxStacks = 3,
+        maxStacks = 10,
         name = "Bone Shield",
         stackBehavior = "refresh_duration",
         tags = { },
@@ -3071,7 +3111,7 @@ RPE_DATASET_ENTRY_V1
         cooldownGroup = "dk_unholy",
         cooldownScalesWithHaste = false,
         description = "",
-        icon = "interface/icons/spell_deathknight_empowerruneblade2.blp",
+        icon = "interface/icons/spell_deathknight_empowerruneblade.blp",
         id = "dkps0001",
         cooldownChannel = 1,
         learnMode = "always_learned",
@@ -3239,7 +3279,7 @@ RPE_DATASET_ENTRY_V1
                 castPhase = "on_cast_end",
                 castingGroup = "default",
                 effect = {
-                    amount = 15,
+                    amount = 30,
                     amountMode = "flat",
                     resourceRef = "f82db71a:jolh6o6e",
                     scaleWithRank = false,
@@ -3265,7 +3305,7 @@ RPE_DATASET_ENTRY_V1
         description = "",
         icon = "interface/icons/spell_shadow_deathanddecay.blp",
         id = "dkdnd001",
-        cooldownChannel = 1,
+        cooldownChannel = 2,
         learnMode = "always_learned",
         learnLevel = 1,
         usesRanks = true,
@@ -3454,7 +3494,6 @@ RPE_DATASET_ENTRY_V1
         casterEvents = {
             "on_melee_hit",
             "on_critical_hit",
-            "on_spell_hit",
         },
         charges = 0,
         components = {
@@ -3469,6 +3508,7 @@ RPE_DATASET_ENTRY_V1
                     baseDamage = 73.3125,
                     damageSchoolRefs = {
                         "f82db71a:v1azo4j6",
+                        "f82db71a:1ggt4t3v",
                     },
                     damageType = "melee",
                     hitType = "ability",
@@ -3491,49 +3531,6 @@ RPE_DATASET_ENTRY_V1
                     weaponDamageMode = "main_hand",
                 },
                 key = "dkssph01",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 97.75,
-                    damageSchoolRefs = {
-                        "f82db71a:1ggt4t3v",
-                    },
-                    damageType = "spell",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.342125,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_spell_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 1,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 0,
-                    weaponDamageMode = "none",
-                },
-                key = "dksssh01",
                 target = {
                     allowDeadTargets = false,
                     disableSelfCast = false,
@@ -3633,7 +3630,7 @@ RPE_DATASET_ENTRY_V1
                     auraRef = "dknight1:dkbsha01",
                     basePower = 0,
                     duration = 5,
-                    stacks = 1,
+                    stacks = 10,
                     targetEvents = { },
                     type = "apply_aura",
                 },
