@@ -87,7 +87,7 @@ assertClass("c4a91e7d", 1, "shaman01", "Shaman", {
     ["f82db71a:4c8mfm99"] = { 53, 24.86 },
 })
 
-assertClass("e8f3b2c6", 6, "warlock1", "Warlock", {
+assertClass("e8f3b2c6", 13, "warlock1", "Warlock", {
     ["f82db71a:zfqm8dxp"] = { 0, 0.42 },
     ["f82db71a:xqz0daz2"] = { 0, 0.51 },
     ["f82db71a:ygjno50i"] = { 1, 0.75 },
