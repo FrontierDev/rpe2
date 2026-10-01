@@ -349,6 +349,7 @@ Addon.Client.Spellcasting.AuraManager.ResolveAuraDefinition = function(_, auraRe
 end
 loadAddonFile("client/autopilot/AuraEvaluator.lua")
 loadAddonFile("client/autopilot/AuraEvaluatorPerformance.lua")
+loadAddonFile("client/combat/Normalization.lua")
 loadAddonFile("client/combat/Helpers.lua")
 loadAddonFile("client/autopilot/SpellEvaluator.lua")
 loadAddonFile("client/autopilot/ActionEconomy.lua")

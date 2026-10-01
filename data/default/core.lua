@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 51,
+    version = 52,
     dataset = {
         achievements = {},
         auras = {},
@@ -5920,8 +5920,6 @@ units = {
                 spells = {
                     "e8f3b2c6:wlcorru1",
                     "e8f3b2c6:wlcshads",
-                    "e8f3b2c6:wlcorru1",
-                    "e8f3b2c6:wlcshads",
                 },
                 equipment = {  },
             },
@@ -5930,7 +5928,8 @@ units = {
                 resourceModifiers = {  },
                 statModifiers = {  },
                 spells = {
-                    "f82db71a:npcmulti",
+                    "f82db71a:6uix049h",
+                    "e8f3b2c6:wltorm01",
                 },
                 equipment = {  },
             },

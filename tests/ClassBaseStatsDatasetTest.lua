@@ -100,7 +100,8 @@ assertClass("e8f3b2c6", 16, "warlock1", "Warlock", {
 
 local warlockDataset = definitions["e8f3b2c6"].dataset
 local coreDataset = definitions["f82db71a"].dataset
-assertEqual(definitions["f82db71a"].version, 51, "Core dataset version")
+assertEqual(definitions["e8f3b2c6"].version, 17, "Warlock dataset version")
+assertEqual(definitions["f82db71a"].version, 52, "Core dataset version")
 assertEqual(#warlockDataset.auras, 21, "Warlock aura count")
 assertEqual(#warlockDataset.spells, 40, "Warlock spell count")
 assertEqual(#warlockDataset.pets, 5, "Warlock pet count")
@@ -144,8 +145,13 @@ end
 
 local voidwalker = findByName(coreDataset.units, "Voidwalker")
 assertEqual(voidwalker.presets[1].name, "Corruptor", "Voidwalker Corruptor preset name")
+assertEqual(#voidwalker.presets[1].spells, 2, "Voidwalker Corruptor spell count")
 assertEqual(voidwalker.presets[1].spells[1], "e8f3b2c6:wlcorru1", "Voidwalker Corruptor Corruption spell reference")
 assertEqual(voidwalker.presets[1].spells[2], "e8f3b2c6:wlcshads", "Voidwalker Corruptor Curse of Shadows spell reference")
+assertEqual(voidwalker.presets[2].name, "Tormenter", "Voidwalker Tormenter preset name")
+assertEqual(#voidwalker.presets[2].spells, 2, "Voidwalker Tormenter spell count")
+assertEqual(voidwalker.presets[2].spells[1], "f82db71a:6uix049h", "Voidwalker Tormenter Pet Attack spell reference")
+assertEqual(voidwalker.presets[2].spells[2], "e8f3b2c6:wltorm01", "Voidwalker Tormenter Torment spell reference")
 
 for _, petInfo in ipairs({
     {
