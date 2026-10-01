@@ -23,7 +23,6 @@ Import required **Aura** entries before spells that reference them.
 
 ## Deferred non-pet spells
 
-- **Death Grip** — requires pull/reposition support.
 - **Pestilence** — requires copying/spreading existing diseases.
 - **Deathchill** — requires a next-qualifying-attack guaranteed-critical mechanic.
 - **Lichborne** — requires fear/charm/sleep immunity and undead-state interactions.
@@ -2693,6 +2692,74 @@ RPE_DATASET_ENTRY_V1
             "dk_death_and_decay",
         },
         tooltipTemplate = false,
+    },
+}
+```
+
+## Death Grip
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "dknight1",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 0,
+        casterEvents = { },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    duration = 3,
+                    targetEvents = { },
+                    type = "taunt",
+                },
+                key = "dkdgta01",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = { },
+        cooldown = 3,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_deathknight_strangulate.blp",
+        id = "dkdg0001",
+        cooldownChannel = 2,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Death Grip",
+        range = 0,
+        resourceCosts = { },
+        seedNPCSpell = false,
+        spellbookCategory = "Unholy",
+        tags = { },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = { },
+            mainText = "Taunt an enemy for 3 turns.",
+            tokens = { },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
     },
 }
 ```
