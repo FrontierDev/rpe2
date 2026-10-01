@@ -36,18 +36,19 @@ Under the current Core `level_scaled_percent` mitigation model, a school-resista
 
 Holy Resistance is left at 0 because Holy currently uses direct mitigation rather than the percentage-reference model.
 
-## Base appearances
+## Appearances
 
-The base Sayaad uses two Succubus appearances:
+Sayaad appearances use FileDataID `1380189` and camera distance `0.40` (`cam = 0.4` in the Unit appearance schema).
 
-- DisplayID `77396` — modern Succubus display used by NPC 1863 in post-Legion data.
-- DisplayID `159` — classic `succubus2.m2` magenta appearance.
+The base unit uses DisplayID `159`. Each preset supplies its own appearance list, which overrides the base list when that preset is selected:
 
-No FileDataID is authored because a current FileDataID for these display records has not been verified. DisplayID-only appearances are valid in the Unit appearance schema.
+- **Temptress** — DisplayIDs `159`, `2834`
+- **Seductress** — DisplayIDs `4162`, `20214`
+- **Tormentor** — DisplayIDs `10923`, `78470`
 
 ## Presets
 
-All three presets inherit the base Sayaad challenge level, stats, resources and appearances. Their spell lists are explicit replacements.
+All three presets inherit the base Sayaad challenge level, stats and resources. Each preset supplies its own two appearances and an explicit replacement spell list.
 
 ### Temptress
 
@@ -87,7 +88,8 @@ Spells:
 - The base unit intentionally has no spells; the presets provide explicit NPC spell loadouts while Warlock Pet definitions provide player-pet abilities.
 - Damage Done and Damage Reduction are not seeded on the base unit.
 - Fire, Frost, Nature, Arcane and Shadow Resistance use level-scaled stat rows rather than fixed values.
-- The base appearance list is intentionally limited to Succubus forms. Incubus/Shivarra appearances can be added separately if required.
+- All authored Sayaad appearances use FileDataID `1380189` and `cam = 0.4`.
+- Incubus/Shivarra appearances can be added separately if required.
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -99,10 +101,9 @@ RPE_DATASET_ENTRY_V1
     entry = {
         appearances = {
             {
-                displayId = 77396,
-            },
-            {
                 displayId = 159,
+                fileDataId = 1380189,
+                cam = 0.4,
             },
         },
         attributes = {  },
@@ -116,6 +117,18 @@ RPE_DATASET_ENTRY_V1
                 name = "Temptress",
                 resourceModifiers = {  },
                 statModifiers = {  },
+                appearances = {
+                    {
+                        displayId = 159,
+                        fileDataId = 1380189,
+                        cam = 0.4,
+                    },
+                    {
+                        displayId = 2834,
+                        fileDataId = 1380189,
+                        cam = 0.4,
+                    },
+                },
                 spells = {
                     "e8f3b2c6:wlwhipl1",
                     "e8f3b2c6:wlcharm1",
@@ -126,6 +139,18 @@ RPE_DATASET_ENTRY_V1
                 name = "Seductress",
                 resourceModifiers = {  },
                 statModifiers = {  },
+                appearances = {
+                    {
+                        displayId = 4162,
+                        fileDataId = 1380189,
+                        cam = 0.4,
+                    },
+                    {
+                        displayId = 20214,
+                        fileDataId = 1380189,
+                        cam = 0.4,
+                    },
+                },
                 spells = {
                     "e8f3b2c6:wlwhipl1",
                     "e8f3b2c6:wlcorru1",
@@ -137,6 +162,18 @@ RPE_DATASET_ENTRY_V1
                 name = "Tormentor",
                 resourceModifiers = {  },
                 statModifiers = {  },
+                appearances = {
+                    {
+                        displayId = 10923,
+                        fileDataId = 1380189,
+                        cam = 0.4,
+                    },
+                    {
+                        displayId = 78470,
+                        fileDataId = 1380189,
+                        cam = 0.4,
+                    },
+                },
                 spells = {
                     "e8f3b2c6:wlwhipl1",
                     "e8f3b2c6:wlfear01",
