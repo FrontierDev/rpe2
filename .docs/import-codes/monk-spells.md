@@ -7,20 +7,20 @@ Import required **Aura** entries before spells that reference them.
 ## Authoring rules applied
 
 - Brewmaster uses the **Tank** role profile; Windwalker uses **DPS**; Mistweaver uses **Healer**.
-- Windwalker Jab and Expel Harm generate **2 Chi** directly, incorporating the launch-era Fierce Tiger +1 Chi generation because the current Trait schema cannot modify a specific spell resource component.
+- Every spell name is assigned to exactly one specialization category. Brewmaster owns tank/self-sustain abilities, Windwalker owns martial damage/control abilities, and Mistweaver owns healing/cleansing abilities. Cross-spec MoP duplicates are intentionally not reproduced.
 - Brewmaster and Windwalker spend **Energy** (`f82db71a:c3gaf7dd`) and generate/spend **Chi** (`f82db71a:p8kik0ep`).
 - Mistweaver spends **Mana** (`f82db71a:4c8mfm99`) and also generates/spends Chi.
 - The Core Chi resource already has a 4-Chi maximum and starts at zero, matching early Mists of Pandaria.
 - Authentic Energy and Chi costs are retained rather than derived from the Mana calculator.
-- Early-MoP Mana costs are used where patch history exposes them. In particular, Mistweaver Jab uses 4% base Mana (before the later 8% increase); Surging Mist uses 8% base Mana; Life Cocoon 4.5%; Revival 7%; Renewing Mist 4.5%.
+- Early-MoP Mana costs are used where patch history exposes them. Mistweaver-specific abilities retain Mana costs; cross-spec duplicates such as Mistweaver Jab and Expel Harm are omitted. Surging Mist uses 8% base Mana; Life Cocoon 4.5%; Revival 7%; Renewing Mist 4.5%.
 - RPE damage/healing values are calculated from the current Spell Authoring Specification. Historical Blizzard damage numbers are not imported.
 - RPE cooldowns are turn-based adaptations: short 8–15 second cooldowns generally use 1–2 turns; ~25–30 seconds uses 2–3; ~1 minute uses 5; major 2–3 minute cooldowns use 10.
 - Channels are converted into supported one-turn casts and/or periodic auras. They are not authored as fake instant spells with full channel output.
 - Launch-era mechanics that depend on positional checks, ground objects, statues, movement/teleports, Stagger, damage redirection, caster-specific target vulnerability, or "next specific spell" state are deliberately omitted.
-- Spinning Crane Kick does **not** generate Chi because the historical Chi generation required hitting at least 3 targets and RPE cannot currently condition resource generation on the number actually hit.
-- Brewmaster Tiger Palm is authored with no Chi cost, following Brewmaster Training. Its Power Guard interaction is omitted.
-- Brewmaster Blackout Kick applies the supported portion of Shuffle: +20 Parry Chance for 1 turn. Stagger is omitted.
-- Keg Smash uses the launch-era three-target limit, applies Dizzying Haze, and generates 2 Chi. Weakened Blows is omitted because RPE has no Physical-only damage-done modifier.
+- Spinning Crane Kick is a Windwalker Energy ability hitting up to 4 enemies sharing one raid marker. It does **not** generate Chi because RPE cannot condition resource generation on the number actually hit.
+- Tiger Palm is a Windwalker 1-Chi Bonus Action spender and grants +5 Melee Crit. Chance for 3 turns.
+- Blackout Kick is a Windwalker 2-Chi Bonus Action spender. Brewmaster-only Shuffle is omitted rather than duplicating Blackout Kick across categories.
+- Keg Smash hits up to 4 enemies sharing one raid marker, applies Dizzying Haze, and generates 2 Chi. Weakened Blows is omitted because RPE has no Physical-only damage-done modifier.
 - Breath of Fire omits its conditional Dizzying-Haze DoT because RPE cannot condition one component on each target's aura state.
 - Guard uses Melee Attack Power scaling and +30 Healing Received as the closest supported translation of its original self-healing bonus.
 - Rising Sun Kick applies -50 Healing Received. Its caster-specific +20% damage vulnerability is omitted.
@@ -34,40 +34,6 @@ Import required **Aura** entries before spells that reference them.
 - Stance of the Sturdy Ox, Stance of the Fierce Tiger, and Stance of the Wise Serpent belong in the Monk **trait** import sheet, not here.
 
 # Brewmaster
-
-## Shuffle — Aura
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "auras",
-    datasetId = "monkdata",
-    entry = {
-        description = "",
-        duration = 1,
-        effects = {
-            {
-                baseAmount = 20,
-                operation = "flat",
-                scaleWithRank = false,
-                statRef = "f82db71a:tcn0s8kx",
-                statScaling = { },
-                type = "stat",
-            },
-        },
-        events = { },
-        icon = "interface/icons/ability_monk_shuffle.blp",
-        id = "mnshuf01",
-        maxStacks = 1,
-        name = "Shuffle",
-        stackBehavior = "refresh_duration",
-        tags = { },
-        tooltipTemplate = false,
-    },
-}
-```
 
 ## Dizzying Haze — Aura
 
@@ -83,7 +49,7 @@ RPE_DATASET_ENTRY_V1
         duration = 2,
         effects = {
             {
-                baseAmount = -50,
+                baseAmount = -15,
                 operation = "flat",
                 scaleWithRank = false,
                 statRef = "f82db71a:s1mt6jh9",
@@ -190,167 +156,6 @@ RPE_DATASET_ENTRY_V1
         stackBehavior = "refresh_duration",
         tags = { },
         tooltipTemplate = false,
-    },
-}
-```
-
-## Paralysis — Aura
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "auras",
-    datasetId = "monkdata",
-    entry = {
-        description = "",
-        duration = 2,
-        effects = {
-            {
-                cancelOnDamage = true,
-                forceAutoHitAgainstTarget = true,
-                movementRangeOverride = 0,
-                preventCasting = true,
-                type = "control",
-            },
-        },
-        events = { },
-        icon = "interface/icons/ability_monk_paralysis.blp",
-        id = "mnpara01",
-        maxStacks = 1,
-        name = "Paralysis",
-        stackBehavior = "refresh_duration",
-        tags = { },
-        tooltipTemplate = false,
-    },
-}
-```
-
-## Jab
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = {
-            "on_melee_hit",
-            "on_critical_hit",
-        },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 51,
-                    damageSchoolRefs = {
-                        "f82db71a:v1azo4j6",
-                    },
-                    damageType = "melee",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.238,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_melee_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 2,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 0.68,
-                    weaponDamageMode = "main_hand",
-                },
-                key = "mnbjbdm",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    amount = 1,
-                    amountMode = "flat",
-                    resourceRef = "f82db71a:p8kik0ep",
-                    scaleWithRank = false,
-                    targetEvents = { },
-                    type = "resource",
-                },
-                key = "mnbjbch",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 0,
-                    minTargets = 0,
-                    requiresTarget = false,
-                    targetDisposition = "ally",
-                    type = "caster",
-                },
-            },
-        },
-        conditions = {
-            {
-                invert = false,
-                showOnTooltip = true,
-                slotKey = "mainhand",
-                tooltipTextOverride = "Requires Main Hand",
-                type = "item_equipped",
-                weaponTypeRefs = { },
-            },
-        },
-        cooldown = 0,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_jab.blp",
-        id = "mnbjab01",
-        cooldownChannel = 1,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = true,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Jab",
-        range = 0,
-        resourceCosts = {
-            {
-                amount = 40,
-                amountMode = "flat",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:c3gaf7dd",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Brewmaster",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
     },
 }
 ```
@@ -505,232 +310,6 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
-## Tiger Palm
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = {
-            "on_melee_hit",
-            "on_critical_hit",
-        },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 60,
-                    damageSchoolRefs = {
-                        "f82db71a:v1azo4j6",
-                    },
-                    damageType = "melee",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.28,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_melee_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 2,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 0.8,
-                    weaponDamageMode = "main_hand",
-                },
-                key = "mnbtpdm1",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-        },
-        conditions = {
-            {
-                invert = false,
-                showOnTooltip = true,
-                slotKey = "mainhand",
-                tooltipTextOverride = "Requires Main Hand",
-                type = "item_equipped",
-                weaponTypeRefs = { },
-            },
-        },
-        cooldown = 0,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_tigerpalm.blp",
-        id = "mnbtp001",
-        cooldownChannel = 1,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = true,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Tiger Palm",
-        range = 0,
-        resourceCosts = { },
-        seedNPCSpell = false,
-        spellbookCategory = "Brewmaster",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
-## Blackout Kick
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = {
-            "on_melee_hit",
-            "on_critical_hit",
-        },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 114.75,
-                    damageSchoolRefs = {
-                        "f82db71a:v1azo4j6",
-                    },
-                    damageType = "melee",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.5355,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_melee_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 2,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 1.53,
-                    weaponDamageMode = "main_hand",
-                },
-                key = "mnbbokdm",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    auraRef = "monkdata:mnshuf01",
-                    basePower = 0,
-                    duration = 1,
-                    stacks = 1,
-                    targetEvents = { },
-                    type = "apply_aura",
-                },
-                key = "mnbbokau",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 0,
-                    minTargets = 0,
-                    requiresTarget = false,
-                    targetDisposition = "ally",
-                    type = "caster",
-                },
-            },
-        },
-        conditions = {
-            {
-                invert = false,
-                showOnTooltip = true,
-                slotKey = "mainhand",
-                tooltipTextOverride = "Requires Main Hand",
-                type = "item_equipped",
-                weaponTypeRefs = { },
-            },
-        },
-        cooldown = 0,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_roundhousekick.blp",
-        id = "mnbbok01",
-        cooldownChannel = 1,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = true,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Blackout Kick",
-        range = 0,
-        resourceCosts = {
-            {
-                amount = 2,
-                amountMode = "flat",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:p8kik0ep",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Brewmaster",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
 ## Keg Smash
 
 ```text
@@ -758,7 +337,7 @@ RPE_DATASET_ENTRY_V1
                     amountMode = "flat",
                     applyAura = false,
                     auraStacks = 1,
-                    baseDamage = 32.13,
+                    baseDamage = 26.775,
                     damageSchoolRefs = {
                         "f82db71a:v1azo4j6",
                     },
@@ -768,7 +347,7 @@ RPE_DATASET_ENTRY_V1
                     projectileSpeed = 0,
                     statScaling = {
                         {
-                            coefficient = 0.14994,
+                            coefficient = 0.12495,
                             statRef = "f82db71a:u7b49vs9",
                         },
                     },
@@ -779,18 +358,18 @@ RPE_DATASET_ENTRY_V1
                     threatCoefficient = 2,
                     type = "damage",
                     usesProjectile = false,
-                    weaponDamageCoefficient = 0.4284,
+                    weaponDamageCoefficient = 0.357,
                     weaponDamageMode = "main_hand",
                 },
                 key = "mnbkegdm",
                 target = {
                     allowDeadTargets = false,
                     disableSelfCast = false,
-                    maxTargets = 3,
+                    maxTargets = 4,
                     minTargets = 1,
                     requiresTarget = true,
                     targetDisposition = "enemy",
-                    type = "multi",
+                    type = "raid_marker",
                 },
             },
             {
@@ -808,11 +387,11 @@ RPE_DATASET_ENTRY_V1
                 target = {
                     allowDeadTargets = false,
                     disableSelfCast = false,
-                    maxTargets = 3,
+                    maxTargets = 4,
                     minTargets = 1,
                     requiresTarget = true,
                     targetDisposition = "enemy",
-                    type = "multi",
+                    type = "raid_marker",
                 },
             },
             {
@@ -852,7 +431,7 @@ RPE_DATASET_ENTRY_V1
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
-        icon = "interface/icons/ability_monk_kegsmash.blp",
+        icon = "interface/icons/achievement_brewery_2.blp",
         id = "mnbkeg01",
         cooldownChannel = 1,
         learnMode = "always_learned",
@@ -1024,7 +603,7 @@ RPE_DATASET_ENTRY_V1
         description = "",
         icon = "interface/icons/ability_monk_breathoffire.blp",
         id = "mnbbof01",
-        cooldownChannel = 1,
+        cooldownChannel = 2,
         learnMode = "always_learned",
         learnLevel = 1,
         usesRanks = true,
@@ -1209,7 +788,7 @@ RPE_DATASET_ENTRY_V1
                 castPhase = "on_cast_end",
                 castingGroup = "default",
                 effect = {
-                    duration = 1,
+                    duration = 3,
                     targetEvents = {
                         "on_taunted",
                     },
@@ -1228,7 +807,7 @@ RPE_DATASET_ENTRY_V1
             },
         },
         conditions = { },
-        cooldown = 1,
+        cooldown = 3,
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
@@ -1253,350 +832,74 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
-## Spinning Crane Kick
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 1,
-        casterEvents = {
-            "on_melee_hit",
-            "on_critical_hit",
-        },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 36.45,
-                    damageSchoolRefs = {
-                        "f82db71a:v1azo4j6",
-                    },
-                    damageType = "melee",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.18,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_melee_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 2,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 0.36,
-                    weaponDamageMode = "main_hand",
-                },
-                key = "mnbsckdm",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 5,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "multi",
-                },
-            },
-        },
-        conditions = {
-            {
-                invert = false,
-                showOnTooltip = true,
-                slotKey = "mainhand",
-                tooltipTextOverride = "Requires Main Hand",
-                type = "item_equipped",
-                weaponTypeRefs = { },
-            },
-        },
-        cooldown = 0,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_cranekick_new.blp",
-        id = "mnbsck01",
-        cooldownChannel = 1,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = true,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Spinning Crane Kick",
-        range = 0,
-        resourceCosts = {
-            {
-                amount = 40,
-                amountMode = "flat",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:c3gaf7dd",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Brewmaster",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
-## Paralysis
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = { },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    auraRef = "monkdata:mnpara01",
-                    basePower = 0,
-                    duration = 2,
-                    stacks = 1,
-                    targetEvents = { },
-                    type = "apply_aura",
-                },
-                key = "mnbparau",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-        },
-        conditions = { },
-        cooldown = 2,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_paralysis.blp",
-        id = "mnbpar01",
-        cooldownChannel = 2,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = false,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Paralysis",
-        range = 20,
-        resourceCosts = {
-            {
-                amount = 20,
-                amountMode = "flat",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:c3gaf7dd",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Brewmaster",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
-## Spear Hand Strike
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = { },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    targetEvents = { },
-                    type = "interrupt",
-                },
-                key = "mnbsphin",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-        },
-        conditions = { },
-        cooldown = 2,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_spearhand.blp",
-        id = "mnbsph01",
-        cooldownChannel = 5,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = false,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Spear Hand Strike",
-        range = 0,
-        resourceCosts = {
-            {
-                amount = 30,
-                amountMode = "flat",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:c3gaf7dd",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Brewmaster",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
-## Detox
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = { },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    maxAuras = nil,
-                    tags = {
-                        "poison",
-                    },
-                    targetEvents = { },
-                    type = "remove_aura_by_tag",
-                },
-                key = "mnbdetpo",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "ally",
-                    type = "single",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    maxAuras = nil,
-                    tags = {
-                        "disease",
-                    },
-                    targetEvents = { },
-                    type = "remove_aura_by_tag",
-                },
-                key = "mnbdetdi",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "ally",
-                    type = "single",
-                },
-            },
-        },
-        conditions = { },
-        cooldown = 1,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_detox.blp",
-        id = "mnbdet01",
-        cooldownChannel = 2,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = false,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Detox",
-        range = 30,
-        resourceCosts = {
-            {
-                amount = 20,
-                amountMode = "flat",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:c3gaf7dd",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Brewmaster",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
 # Windwalker
+
+## Tiger Palm — Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "monkdata",
+    entry = {
+        description = "",
+        duration = 3,
+        effects = {
+            {
+                baseAmount = 5,
+                operation = "flat",
+                scaleWithRank = false,
+                statRef = "f82db71a:jslmczbi",
+                statScaling = { },
+                type = "stat",
+            },
+        },
+        events = { },
+        icon = "interface/icons/ability_monk_tigerpalm.blp",
+        id = "mntpcrt1",
+        maxStacks = 1,
+        name = "Tiger Palm",
+        stackBehavior = "refresh_duration",
+        tags = { },
+        tooltipTemplate = false,
+    },
+}
+```
+
+## Paralysis — Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "monkdata",
+    entry = {
+        description = "",
+        duration = 2,
+        effects = {
+            {
+                cancelOnDamage = true,
+                forceAutoHitAgainstTarget = true,
+                movementRangeOverride = 0,
+                preventCasting = true,
+                type = "control",
+            },
+        },
+        events = { },
+        icon = "interface/icons/ability_monk_paralysis.blp",
+        id = "mnpara01",
+        maxStacks = 1,
+        name = "Paralysis",
+        stackBehavior = "refresh_duration",
+        tags = { },
+        tooltipTemplate = false,
+    },
+}
+```
 
 ## Mortal Wounds — Aura
 
@@ -1764,7 +1067,7 @@ RPE_DATASET_ENTRY_V1
                 castPhase = "on_cast_end",
                 castingGroup = "default",
                 effect = {
-                    amount = 2,
+                    amount = 1,
                     amountMode = "flat",
                     resourceRef = "f82db71a:p8kik0ep",
                     scaleWithRank = false,
@@ -1826,156 +1129,6 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
-## Expel Harm
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = { },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    applyAura = false,
-                    auraStacks = 1,
-                    amountMode = "flat",
-                    baseHealing = 48.875,
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.29325,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_heal_taken",
-                        "on_critical_heal_taken",
-                    },
-                    type = "heal",
-                    usesProjectile = false,
-                },
-                key = "mnwexphl",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 0,
-                    minTargets = 0,
-                    requiresTarget = false,
-                    targetDisposition = "ally",
-                    type = "caster",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 24.4375,
-                    damageSchoolRefs = {
-                        "f82db71a:qtr10qyj",
-                    },
-                    damageType = "spell",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.146625,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_spell_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 1,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 0,
-                    weaponDamageMode = "none",
-                },
-                key = "mnwexpdm",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    amount = 2,
-                    amountMode = "flat",
-                    resourceRef = "f82db71a:p8kik0ep",
-                    scaleWithRank = false,
-                    targetEvents = { },
-                    type = "resource",
-                },
-                key = "mnwexpch",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 0,
-                    minTargets = 0,
-                    requiresTarget = false,
-                    targetDisposition = "ally",
-                    type = "caster",
-                },
-            },
-        },
-        conditions = { },
-        cooldown = 2,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_expelharm.blp",
-        id = "mnwexp01",
-        cooldownChannel = 1,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = true,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Expel Harm",
-        range = 0,
-        resourceCosts = {
-            {
-                amount = 40,
-                amountMode = "flat",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:c3gaf7dd",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Windwalker",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
 ## Tiger Palm
 
 ```text
@@ -2003,7 +1156,7 @@ RPE_DATASET_ENTRY_V1
                     amountMode = "flat",
                     applyAura = false,
                     auraStacks = 1,
-                    baseDamage = 168.75,
+                    baseDamage = 143.4375,
                     damageSchoolRefs = {
                         "f82db71a:v1azo4j6",
                     },
@@ -2013,7 +1166,7 @@ RPE_DATASET_ENTRY_V1
                     projectileSpeed = 0,
                     statScaling = {
                         {
-                            coefficient = 0.7875,
+                            coefficient = 0.669375,
                             statRef = "f82db71a:u7b49vs9",
                         },
                     },
@@ -2024,7 +1177,7 @@ RPE_DATASET_ENTRY_V1
                     threatCoefficient = 1,
                     type = "damage",
                     usesProjectile = false,
-                    weaponDamageCoefficient = 2.25,
+                    weaponDamageCoefficient = 1.9125,
                     weaponDamageMode = "main_hand",
                 },
                 key = "mnwtpdm1",
@@ -2036,6 +1189,28 @@ RPE_DATASET_ENTRY_V1
                     requiresTarget = true,
                     targetDisposition = "enemy",
                     type = "single",
+                },
+            },
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "monkdata:mntpcrt1",
+                    basePower = 0,
+                    duration = 3,
+                    stacks = 1,
+                    targetEvents = { },
+                    type = "apply_aura",
+                },
+                key = "mntpcrit",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
                 },
             },
         },
@@ -2055,7 +1230,7 @@ RPE_DATASET_ENTRY_V1
         description = "",
         icon = "interface/icons/ability_monk_tigerpalm.blp",
         id = "mnwtp001",
-        cooldownChannel = 1,
+        cooldownChannel = 2,
         learnMode = "always_learned",
         learnLevel = 1,
         usesRanks = true,
@@ -2161,7 +1336,7 @@ RPE_DATASET_ENTRY_V1
         description = "",
         icon = "interface/icons/ability_monk_roundhousekick.blp",
         id = "mnwbok01",
-        cooldownChannel = 1,
+        cooldownChannel = 2,
         learnMode = "always_learned",
         learnLevel = 1,
         usesRanks = true,
@@ -2176,6 +1351,112 @@ RPE_DATASET_ENTRY_V1
                 castPhase = "on_cast_end",
                 refundOnInterrupt = 0,
                 resourceRef = "f82db71a:p8kik0ep",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Windwalker",
+        tags = { },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
+## Spinning Crane Kick
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "monkdata",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        castTime = 1,
+        casterEvents = {
+            "on_melee_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseDamage = 50.625,
+                    damageSchoolRefs = {
+                        "f82db71a:v1azo4j6",
+                    },
+                    damageType = "melee",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.25,
+                            statRef = "f82db71a:u7b49vs9",
+                        },
+                    },
+                    targetEvents = {
+                        "on_melee_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 0.5,
+                    weaponDamageMode = "main_hand",
+                },
+                key = "mnwsckdm",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 4,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "raid_marker",
+                },
+            },
+        },
+        conditions = {
+            {
+                invert = false,
+                showOnTooltip = true,
+                slotKey = "mainhand",
+                tooltipTextOverride = "Requires Main Hand",
+                type = "item_equipped",
+                weaponTypeRefs = { },
+            },
+        },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/ability_monk_cranekick_new.blp",
+        id = "mnwsck01",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Spinning Crane Kick",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 40,
+                amountMode = "flat",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:c3gaf7dd",
             },
         },
         seedNPCSpell = false,
@@ -2289,7 +1570,7 @@ RPE_DATASET_ENTRY_V1
         description = "",
         icon = "interface/icons/ability_monk_risingsunkick.blp",
         id = "mnwrsk01",
-        cooldownChannel = 1,
+        cooldownChannel = 2,
         learnMode = "always_learned",
         learnLevel = 1,
         usesRanks = true,
@@ -2343,7 +1624,7 @@ RPE_DATASET_ENTRY_V1
                     amountMode = "flat",
                     applyAura = false,
                     auraStacks = 1,
-                    baseDamage = 113.27976562,
+                    baseDamage = 161.2058203125,
                     damageSchoolRefs = {
                         "f82db71a:v1azo4j6",
                     },
@@ -2353,7 +1634,7 @@ RPE_DATASET_ENTRY_V1
                     projectileSpeed = 0,
                     statScaling = {
                         {
-                            coefficient = 0.55940625,
+                            coefficient = 0.796078125,
                             statRef = "f82db71a:u7b49vs9",
                         },
                     },
@@ -2364,7 +1645,7 @@ RPE_DATASET_ENTRY_V1
                     threatCoefficient = 1,
                     type = "damage",
                     usesProjectile = false,
-                    weaponDamageCoefficient = 1.1188125,
+                    weaponDamageCoefficient = 1.59215625,
                     weaponDamageMode = "main_hand",
                 },
                 key = "mnwfofdm",
@@ -2411,13 +1692,13 @@ RPE_DATASET_ENTRY_V1
                 weaponTypeRefs = { },
             },
         },
-        cooldown = 3,
+        cooldown = 6,
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
         icon = "interface/icons/monk_ability_fistoffury.blp",
         id = "mnwfof01",
-        cooldownChannel = 1,
+        cooldownChannel = 2,
         learnMode = "always_learned",
         learnLevel = 1,
         usesRanks = true,
@@ -2432,112 +1713,6 @@ RPE_DATASET_ENTRY_V1
                 castPhase = "on_cast_end",
                 refundOnInterrupt = 0,
                 resourceRef = "f82db71a:p8kik0ep",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Windwalker",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
-## Spinning Crane Kick
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 1,
-        casterEvents = {
-            "on_melee_hit",
-            "on_critical_hit",
-        },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 45.5625,
-                    damageSchoolRefs = {
-                        "f82db71a:v1azo4j6",
-                    },
-                    damageType = "melee",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.225,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_melee_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 1,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 0.45,
-                    weaponDamageMode = "main_hand",
-                },
-                key = "mnwsckdm",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 5,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "multi",
-                },
-            },
-        },
-        conditions = {
-            {
-                invert = false,
-                showOnTooltip = true,
-                slotKey = "mainhand",
-                tooltipTextOverride = "Requires Main Hand",
-                type = "item_equipped",
-                weaponTypeRefs = { },
-            },
-        },
-        cooldown = 0,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_cranekick_new.blp",
-        id = "mnwsck01",
-        cooldownChannel = 1,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = true,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Spinning Crane Kick",
-        range = 0,
-        resourceCosts = {
-            {
-                amount = 40,
-                amountMode = "flat",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:c3gaf7dd",
             },
         },
         seedNPCSpell = false,
@@ -2590,7 +1765,7 @@ RPE_DATASET_ENTRY_V1
             },
         },
         conditions = { },
-        cooldown = 5,
+        cooldown = 10,
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
@@ -2655,7 +1830,7 @@ RPE_DATASET_ENTRY_V1
             },
         },
         conditions = { },
-        cooldown = 2,
+        cooldown = 6,
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
@@ -2724,8 +1899,8 @@ RPE_DATASET_ENTRY_V1
             },
         },
         conditions = { },
-        cooldown = 2,
-        cooldownGroup = "",
+        cooldown = 5,
+        cooldownGroup = "interrupt",
         cooldownScalesWithHaste = false,
         description = "",
         icon = "interface/icons/ability_monk_spearhand.blp",
@@ -2741,101 +1916,6 @@ RPE_DATASET_ENTRY_V1
         resourceCosts = {
             {
                 amount = 30,
-                amountMode = "flat",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:c3gaf7dd",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Windwalker",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
-## Detox
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = { },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    maxAuras = nil,
-                    tags = {
-                        "poison",
-                    },
-                    targetEvents = { },
-                    type = "remove_aura_by_tag",
-                },
-                key = "mnwdetpo",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "ally",
-                    type = "single",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    maxAuras = nil,
-                    tags = {
-                        "disease",
-                    },
-                    targetEvents = { },
-                    type = "remove_aura_by_tag",
-                },
-                key = "mnwdetdi",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "ally",
-                    type = "single",
-                },
-            },
-        },
-        conditions = { },
-        cooldown = 1,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_detox.blp",
-        id = "mnwdet01",
-        cooldownChannel = 2,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = false,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Detox",
-        range = 30,
-        resourceCosts = {
-            {
-                amount = 20,
                 amountMode = "flat",
                 castPhase = "on_cast_end",
                 refundOnInterrupt = 0,
@@ -3011,284 +2091,6 @@ RPE_DATASET_ENTRY_V1
         stackBehavior = "refresh_duration",
         tags = { },
         tooltipTemplate = false,
-    },
-}
-```
-
-## Jab
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = {
-            "on_melee_hit",
-            "on_critical_hit",
-        },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 44.625,
-                    damageSchoolRefs = {
-                        "f82db71a:v1azo4j6",
-                    },
-                    damageType = "melee",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.20825,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_melee_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 0.5,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 0.595,
-                    weaponDamageMode = "main_hand",
-                },
-                key = "mnmjbdm1",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    amount = 1,
-                    amountMode = "flat",
-                    resourceRef = "f82db71a:p8kik0ep",
-                    scaleWithRank = false,
-                    targetEvents = { },
-                    type = "resource",
-                },
-                key = "mnmjbchi",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 0,
-                    minTargets = 0,
-                    requiresTarget = false,
-                    targetDisposition = "ally",
-                    type = "caster",
-                },
-            },
-        },
-        conditions = {
-            {
-                invert = false,
-                showOnTooltip = true,
-                slotKey = "mainhand",
-                tooltipTextOverride = "Requires Main Hand",
-                type = "item_equipped",
-                weaponTypeRefs = { },
-            },
-        },
-        cooldown = 0,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_jab.blp",
-        id = "mnmjab01",
-        cooldownChannel = 1,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = true,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Jab",
-        range = 0,
-        resourceCosts = {
-            {
-                amount = 4,
-                amountMode = "base_percent",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:4c8mfm99",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Mistweaver",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
-## Expel Harm
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = { },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    applyAura = false,
-                    auraStacks = 1,
-                    amountMode = "flat",
-                    baseHealing = 97.75,
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.5865,
-                            statRef = "f82db71a:hj6d4kvy",
-                        },
-                    },
-                    targetEvents = {
-                        "on_heal_taken",
-                        "on_critical_heal_taken",
-                    },
-                    type = "heal",
-                    usesProjectile = false,
-                },
-                key = "mnmexphl",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 0,
-                    minTargets = 0,
-                    requiresTarget = false,
-                    targetDisposition = "ally",
-                    type = "caster",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 48.875,
-                    damageSchoolRefs = {
-                        "f82db71a:qtr10qyj",
-                    },
-                    damageType = "spell",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.29325,
-                            statRef = "f82db71a:hj6d4kvy",
-                        },
-                    },
-                    targetEvents = {
-                        "on_spell_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 0.5,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 0,
-                    weaponDamageMode = "none",
-                },
-                key = "mnmexpdm",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    amount = 1,
-                    amountMode = "flat",
-                    resourceRef = "f82db71a:p8kik0ep",
-                    scaleWithRank = false,
-                    targetEvents = { },
-                    type = "resource",
-                },
-                key = "mnmexpch",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 0,
-                    minTargets = 0,
-                    requiresTarget = false,
-                    targetDisposition = "ally",
-                    type = "caster",
-                },
-            },
-        },
-        conditions = { },
-        cooldown = 2,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_expelharm.blp",
-        id = "mnmexp01",
-        cooldownChannel = 1,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = true,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Expel Harm",
-        range = 0,
-        resourceCosts = {
-            {
-                amount = 2.5,
-                amountMode = "base_percent",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:4c8mfm99",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Mistweaver",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
     },
 }
 ```
@@ -3519,7 +2321,7 @@ RPE_DATASET_ENTRY_V1
         description = "",
         icon = "interface/icons/spell_monk_envelopingmist.blp",
         id = "mnmenv01",
-        cooldownChannel = 1,
+        cooldownChannel = 2,
         learnMode = "always_learned",
         learnLevel = 1,
         usesRanks = true,
@@ -3865,219 +2667,6 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
-## Spinning Crane Kick
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 1,
-        casterEvents = {
-            "on_melee_hit",
-            "on_critical_hit",
-        },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    alwaysHits = false,
-                    amountMode = "flat",
-                    applyAura = false,
-                    auraStacks = 1,
-                    baseDamage = 27.1096875,
-                    damageSchoolRefs = {
-                        "f82db71a:v1azo4j6",
-                    },
-                    damageType = "melee",
-                    hitType = "ability",
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.133875,
-                            statRef = "f82db71a:u7b49vs9",
-                        },
-                    },
-                    targetEvents = {
-                        "on_melee_taken",
-                        "on_critical_hit_taken",
-                    },
-                    threatCoefficient = 0.5,
-                    type = "damage",
-                    usesProjectile = false,
-                    weaponDamageCoefficient = 0.26775,
-                    weaponDamageMode = "main_hand",
-                },
-                key = "mnmsckdm",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 5,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "multi",
-                },
-            },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    applyAura = false,
-                    auraStacks = 1,
-                    amountMode = "flat",
-                    baseHealing = 55.4625,
-                    projectilePath = "",
-                    projectileSpeed = 0,
-                    statScaling = {
-                        {
-                            coefficient = 0.306,
-                            statRef = "f82db71a:hj6d4kvy",
-                        },
-                    },
-                    targetEvents = {
-                        "on_heal_taken",
-                        "on_critical_heal_taken",
-                    },
-                    type = "heal",
-                    usesProjectile = false,
-                },
-                key = "mnmsckhl",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 0,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "ally",
-                    type = "all_allies",
-                },
-            },
-        },
-        conditions = {
-            {
-                invert = false,
-                showOnTooltip = true,
-                slotKey = "mainhand",
-                tooltipTextOverride = "Requires Main Hand",
-                type = "item_equipped",
-                weaponTypeRefs = { },
-            },
-        },
-        cooldown = 0,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_cranekick_new.blp",
-        id = "mnmsck01",
-        cooldownChannel = 1,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = true,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Spinning Crane Kick",
-        range = 0,
-        resourceCosts = {
-            {
-                amount = 7.15,
-                amountMode = "base_percent",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:4c8mfm99",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Mistweaver",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
-## Paralysis
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "spells",
-    datasetId = "monkdata",
-    entry = {
-        allowDeadTargets = false,
-        canMoveWhileCasting = false,
-        castTime = 0,
-        casterEvents = { },
-        charges = 0,
-        components = {
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    auraRef = "monkdata:mnpara01",
-                    basePower = 0,
-                    duration = 2,
-                    stacks = 1,
-                    targetEvents = { },
-                    type = "apply_aura",
-                },
-                key = "mnmparau",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "enemy",
-                    type = "single",
-                },
-            },
-        },
-        conditions = { },
-        cooldown = 2,
-        cooldownGroup = "",
-        cooldownScalesWithHaste = false,
-        description = "",
-        icon = "interface/icons/ability_monk_paralysis.blp",
-        id = "mnmpar01",
-        cooldownChannel = 2,
-        learnMode = "always_learned",
-        learnLevel = 1,
-        usesRanks = false,
-        rankInterval = 8,
-        mountedCombatOnly = false,
-        name = "Paralysis",
-        range = 20,
-        resourceCosts = {
-            {
-                amount = 3,
-                amountMode = "base_percent",
-                castPhase = "on_cast_end",
-                refundOnInterrupt = 0,
-                resourceRef = "f82db71a:4c8mfm99",
-            },
-        },
-        seedNPCSpell = false,
-        spellbookCategory = "Mistweaver",
-        tags = { },
-        tooltipTemplate = false,
-        totalTicks = 0,
-        useCooldownCharges = false,
-    },
-}
-```
-
 ## Detox
 
 ```text
@@ -4144,7 +2733,7 @@ RPE_DATASET_ENTRY_V1
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
-        icon = "interface/icons/ability_monk_detox.blp",
+        icon = "interface/icons/ability_rogue_imrovedrecuperate.blp",
         id = "mnmdet01",
         cooldownChannel = 2,
         learnMode = "always_learned",
