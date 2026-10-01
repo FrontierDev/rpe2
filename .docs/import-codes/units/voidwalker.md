@@ -34,7 +34,7 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for a base Voidwalker unit in the 
 
 Under the current Core `level_scaled_percent` mitigation model, a school-resistance rating of approximately `1.333333 × level` corresponds to approximately **20% damage mitigation**. The five percentage-based school resistances therefore remain at approximately 20% from level 1 through level 60.
 
-Holy Resistance is left at 0 because Holy currently uses direct mitigation rather than the percentage-reference model.
+Holy Resistance is left at 0. Under the active global `level_scaled_percent` mitigation path, Holy has no percentage-reference amount/percent configured, so its current effective school mitigation is 0%.
 
 ## Base appearances
 
@@ -55,8 +55,8 @@ A Shadow-oriented caster/debuffer.
 
 Spells:
 
-- Corruption — `e8f3b2c6:wlcora01`
-- Curse of Shadows — `e8f3b2c6:wlcshada`
+- Corruption — `e8f3b2c6:wlcorru1`
+- Curse of Shadows — `e8f3b2c6:wlcshads`
 
 ### Tormenter
 
@@ -105,8 +105,8 @@ RPE_DATASET_ENTRY_V1
                 resourceModifiers = {  },
                 statModifiers = {  },
                 spells = {
-                    "e8f3b2c6:wlcora01",
-                    "e8f3b2c6:wlcshada",
+                    "e8f3b2c6:wlcorru1",
+                    "e8f3b2c6:wlcshads",
                 },
                 equipment = {  },
             },
