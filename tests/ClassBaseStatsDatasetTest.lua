@@ -106,7 +106,7 @@ assertClass("e8f3b2c6", 22, "warlock1", "Warlock", {
     ["f82db71a:4c8mfm99"] = { 59, 22.27 },
 }, 1, 5)
 
-assertClass("dknight1", 1, "dkclass1", "Death Knight", {
+assertClass("dknight1", 2, "dkclass1", "Death Knight", {
     ["f82db71a:zfqm8dxp"] = { 3, 1.64 },
     ["f82db71a:xqz0daz2"] = { 0, 1.02 },
     ["f82db71a:ygjno50i"] = { 2, 1.49 },
@@ -150,6 +150,7 @@ assertClass("evokdata", 1, "evoker01", "Evoker", {
 
 local shamanDataset = definitions["c4a91e7d"].dataset
 local warlockDataset = definitions["e8f3b2c6"].dataset
+local deathKnightDataset = definitions["dknight1"].dataset
 local coreDataset = definitions["f82db71a"].dataset
 assertEqual(definitions["c4a91e7d"].version, 10, "Shaman dataset version")
 assertEqual(#shamanDataset.auras, 28, "Shaman aura count")
@@ -158,6 +159,9 @@ assertEqual(#shamanDataset.traits, 14, "Shaman trait count")
 assertEqual(#shamanDataset.items, 64, "Shaman item count")
 assertEqual(definitions["e8f3b2c6"].version, 22, "Warlock dataset version")
 assertEqual(definitions["f82db71a"].version, 54, "Core dataset version")
+assertEqual(definitions["dknight1"].version, 2, "Death Knight dataset version")
+assertEqual(#deathKnightDataset.auras, 15, "Death Knight aura count")
+assertEqual(#deathKnightDataset.spells, 31, "Death Knight spell count")
 assertEqual(#warlockDataset.auras, 22, "Warlock aura count")
 assertEqual(#warlockDataset.spells, 40, "Warlock spell count")
 assertEqual(#warlockDataset.items, 32, "Warlock item count")
@@ -167,6 +171,25 @@ assertEqual(#warlockDataset.traits, 6, "Warlock trait count")
 local function findByName(collection, name)
     for index = 1, #collection do
         if collection[index].name == name then return collection[index] end
+    end
+end
+
+local deathKnightAuraRefs = {}
+for index = 1, #deathKnightDataset.auras do
+    local aura = deathKnightDataset.auras[index]
+    deathKnightAuraRefs["dknight1:" .. aura.id] = true
+    assertEqual(aura.description, "", aura.name .. " aura keeps its description generator-owned")
+    assertEqual(aura.tooltipTemplate, false, aura.name .. " aura uses generated descriptions")
+end
+for index = 1, #deathKnightDataset.spells do
+    local spell = deathKnightDataset.spells[index]
+    assertEqual(spell.description, "", spell.name .. " keeps its description generator-owned")
+    assertEqual(spell.tooltipTemplate, false, spell.name .. " uses generated descriptions")
+    for componentIndex = 1, #spell.components do
+        local effect = spell.components[componentIndex].effect
+        if effect.type == "apply_aura" then
+            assertTrue(deathKnightAuraRefs[effect.auraRef] == true, spell.name .. " references a packaged Death Knight aura")
+        end
     end
 end
 
