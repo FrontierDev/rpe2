@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 12,
+    version = 13,
     dataset = {
         achievements = {},
         auras = {
@@ -139,14 +139,15 @@ Addon.Data.DefaultDatasets:Register({
                 },
             {
                 description = "",
-                duration = 1,
+                duration = 5,
                 effects = {
                     {
-                                    cancelOnDamage = false,
-                                    forceAutoHitAgainstTarget = false,
-                                    preventCasting = true,
+                                    baseAmount = -10,
+                                    operation = "flat",
+                                    scaleWithRank = false,
+                                    statRef = "f82db71a:v2g0tw0o",
                                     statScaling = {  },
-                                    type = "control",
+                                    type = "stat",
                                 }
                 },
                 events = {  },
@@ -1716,7 +1717,7 @@ Addon.Data.DefaultDatasets:Register({
                                     effect = {
                                         auraRef = "e8f3b2c6:wlctnga1",
                                         basePower = 0,
-                                        duration = 1,
+                                        duration = 5,
                                         stacks = 1,
                                         targetEvents = {  },
                                         type = "apply_aura",
