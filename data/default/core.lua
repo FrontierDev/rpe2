@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 53,
+    version = 54,
     dataset = {
         achievements = {},
         auras = {},
@@ -2457,6 +2457,72 @@ Addon.Data.DefaultDatasets:Register({
                 seedNPCResource = false,
                 special = true,
                 startsAtZero = true,
+                tags = {},
+                valueMode = "manual"
+            },
+            {
+                baseValue = 100,
+                color = {
+                    a = 1,
+                    b = 0.05,
+                    g = 0.32,
+                    r = 0.8
+                },
+                description = "",
+                icon = "",
+                id = "fury0001",
+                multiplier = 0,
+                name = "Fury",
+                regenMode = "manual",
+                regenMultiplier = 0,
+                regenPerSecond = 0,
+                seedNPCResource = false,
+                special = false,
+                startsAtZero = true,
+                tags = {},
+                valueMode = "manual"
+            },
+            {
+                baseValue = 6,
+                color = {
+                    a = 1,
+                    b = 0.85,
+                    g = 0.75,
+                    r = 0.55
+                },
+                description = "",
+                icon = "interface/icons/spell_deathknight_frozenruneweapon.blp",
+                id = "runes001",
+                multiplier = 0,
+                name = "Runes",
+                regenMode = "manual",
+                regenMultiplier = 0,
+                regenPerSecond = 1,
+                seedNPCResource = false,
+                special = false,
+                startsAtZero = false,
+                tags = {},
+                valueMode = "manual"
+            },
+            {
+                baseValue = 5,
+                color = {
+                    a = 1,
+                    b = 0.95,
+                    g = 0.8,
+                    r = 0.45
+                },
+                description = "",
+                icon = "",
+                id = "essence1",
+                multiplier = 0,
+                name = "Essence",
+                regenMode = "manual",
+                regenMultiplier = 0,
+                regenPerSecond = 1,
+                seedNPCResource = false,
+                special = true,
+                startsAtZero = false,
                 tags = {},
                 valueMode = "manual"
             }
