@@ -6,11 +6,11 @@ Standalone `RPE_DATASET_ENTRY_V1` import codes for launch-era Mists of Pandaria 
 
 - The three Monk stances are **Traits**, not spells, and are mutually exclusive.
 - **Stance of the Sturdy Ox** implements the supported launch-era defensive effects: +25 Damage Reduction, +20% Stamina, and +10 Resource Regeneration. Stagger and critical-hit suppression are omitted because RPE does not currently model them faithfully.
-- **Stance of the Fierce Tiger** implements +20 Damage Done. Its launch-era +1 Chi generation from Jab and Expel Harm is authored directly into the Windwalker spell imports, because traits cannot modify a specific spell's resource component.
+- **Stance of the Fierce Tiger** implements +20 Damage Done. Its launch-era +1 Chi generation from Jab and Expel Harm is omitted because the shared Energy spells are authored once in the General category and traits cannot modify a specific spell resource component.
 - **Stance of the Wise Serpent** implements +20 Healing Done. AP/SP conversion, Spirit-to-Hit/Expertise conversion, and Eminence are omitted.
 - **Swift Reflexes** implements its supported +5 Parry Chance. The reactive counterattack is omitted because RPE cannot specifically trigger it from a parry while preserving the original weapon-damage behavior.
 - **Mana Meditation** grants +50 Resource Regeneration only when Mana is an allowed/current resource. This is the closest supported translation of retaining 50% Spirit-derived Mana regeneration in combat.
-- **Brewmaster Training** is not authored as a separate trait because its supported effects are already encoded directly in the Brewmaster spell imports: Tiger Palm has no Chi cost and Blackout Kick applies the supported Parry portion of Shuffle.
+- **Brewmaster Training** is not authored as a separate trait. Its Tiger Palm cost modification and Blackout Kick/Shuffle modification cannot be applied conditionally to the shared General spells with the current Trait schema.
 - **Teachings of the Monastery** is not authored separately because the supported Spinning Crane Kick healing is already encoded in the Mistweaver spell import.
 - **Ascension** is deferred because the current Trait schema cannot increase maximum Chi.
 - Way of the Monk, Leather Specialization, Sparring, Tiger Strikes, Combo Breaker, Power Strikes, Afterlife, Gift of the Ox, Gift of the Serpent, Tigereye Brew/Brewing, Eminence, Combat Conditioning, and Dematerialize are intentionally omitted rather than approximated with generic bonuses.
