@@ -748,6 +748,374 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
+
+## Fel Fireball
+
+Copies the current Mage **Fireball** implementation exactly apart from name, icon, IDs, dataset ownership and category.
+
+### Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseDamage = 17.68,
+                damageSchoolRefs = {
+                    "f82db71a:esjguw6d",
+                },
+                statScaling = {
+                    {
+                        coefficient = 0.22,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                },
+                type = "damage",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_fel_firebolt.blp",
+        id = "wlfelfba",
+        maxStacks = 1,
+        name = "Fel Fireball",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+    },
+}
+\`\`\`
+
+### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {
+            "on_spell_hit",
+            "on_critical_hit",
+        },
+        charges = 2,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = true,
+                    auraRef = "e8f3b2c6:wlfelfba",
+                    auraStacks = 1,
+                    baseDamage = 120.488,
+                    damageSchoolRefs = {
+                        "f82db71a:esjguw6d",
+                    },
+                    damageType = "spell",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 1.2496,
+                            statRef = "f82db71a:7t7xgzcx",
+                        },
+                    },
+                    targetEvents = {
+                        "on_spell_taken",
+                        "on_critical_heal_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 0,
+                    weaponDamageMode = "none",
+                },
+                key = "wlfelfbc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 1,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_fel_firebolt.blp",
+        id = "wlfelfb1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Fel Fireball",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 6.8,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Destruction",
+        tags = {  },
+        tooltipTemplate = true,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Rain of Felfire
+
+Copies the current Warlock **Rain of Fire** implementation exactly apart from name, icon and ID.
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {
+            "on_spell_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseDamage = 60.75,
+                    damageSchoolRefs = {
+                        "f82db71a:esjguw6d",
+                    },
+                    damageType = "spell",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.63,
+                            statRef = "f82db71a:7t7xgzcx",
+                        },
+                    },
+                    targetEvents = {
+                        "on_spell_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 0,
+                    weaponDamageMode = "none",
+                },
+                key = "wlrnfed1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 5,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "raid_marker",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_fire_felrainoffire.blp",
+        id = "wlrnfel1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Rain of Felfire",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 12.3,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Destruction",
+        tags = {  },
+        tooltipTemplate = true,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Fel Immolate
+
+Copies the current Warlock **Immolate** implementation exactly apart from name, icon and IDs.
+
+### Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseDamage = 20.8,
+                damageSchoolRefs = {
+                    "f82db71a:esjguw6d",
+                },
+                statScaling = {
+                    {
+                        coefficient = 0.42,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                },
+                type = "damage",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_fire_felfire.blp",
+        id = "wlfimmoa",
+        maxStacks = 1,
+        name = "Fel Immolate",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+    },
+}
+\`\`\`
+
+### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {
+            "on_spell_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlfimmoa",
+                    basePower = 0,
+                    duration = 5,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "wlfimmoc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_fire_felfire.blp",
+        id = "wlfimmo1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Fel Immolate",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 6.3,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Destruction",
+        tags = {  },
+        tooltipTemplate = true,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
 # Affliction
 
 ## Corruption
@@ -2263,6 +2631,185 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
+
+## Siphon Life
+
+Copies the current Priest **Vampiric Touch** implementation. The current source implementation already applies an independent-duration stacking **Health-healing aura** to the caster rather than restoring Mana, so Siphon Life preserves that behavior directly.
+
+### Damage Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseDamage = 17.68,
+                damageSchoolRefs = {
+                    "f82db71a:1ggt4t3v",
+                },
+                statScaling = {
+                    {
+                        coefficient = 0.32,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                },
+                type = "damage",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_shadow_requiem.blp",
+        id = "wlsiphla",
+        maxStacks = 1,
+        name = "Siphon Life",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = true,
+    },
+}
+\`\`\`
+
+### Healing Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseHealing = 8.84,
+                statScaling = {
+                    {
+                        coefficient = 0.221,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                },
+                type = "heal",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_shadow_requiem.blp",
+        id = "wlsiphhr",
+        maxStacks = 3,
+        name = "Siphoned Life",
+        stackBehavior = "independent_duration",
+        tags = {  },
+        tooltipTemplate = true,
+    },
+}
+\`\`\`
+
+### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlsiphla",
+                    basePower = 0,
+                    duration = 5,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "wlsiphdm",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlsiphhr",
+                    basePower = 0,
+                    duration = 5,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "wlsiphhl",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_shadow_requiem.blp",
+        id = "wlsiphl1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Siphon Life",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 3.4,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Affliction",
+        tags = {  },
+        tooltipTemplate = true,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
 # Demonology
 
 ## Demon Skin
@@ -2628,6 +3175,139 @@ RPE_DATASET_ENTRY_V1
 }
 ```
 
+
+
+## Summon Sayaad
+
+Uses the Core Sayaad Unit \`f82db71a:sayaad01\` through the current explicit-Unit \`summon_pet\` path.
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    targetEvents = {  },
+                    type = "summon_pet",
+                    unitRef = "f82db71a:sayaad01",
+                },
+                key = "wlsmsyac",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_shadow_summonsuccubus.blp",
+        id = "wlsmsyaa",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Summon Sayaad",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = false,
+        spellbookCategory = "Demonology",
+        tags = {  },
+        tooltipTemplate = true,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Summon Felhunter
+
+Uses the Core Felhunter Unit \`f82db71a:felhnt01\` through the current explicit-Unit \`summon_pet\` path.
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    targetEvents = {  },
+                    type = "summon_pet",
+                    unitRef = "f82db71a:felhnt01",
+                },
+                key = "wlsmfelc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_shadow_summonfelhunter.blp",
+        id = "wlsmfelh",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Summon Felhunter",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = false,
+        spellbookCategory = "Demonology",
+        tags = {  },
+        tooltipTemplate = true,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
 
 # Pet Abilities
 
