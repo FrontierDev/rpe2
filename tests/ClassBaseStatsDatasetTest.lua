@@ -100,7 +100,7 @@ assertClass("e8f3b2c6", 13, "warlock1", "Warlock", {
 
 local warlockDataset = definitions["e8f3b2c6"].dataset
 assertEqual(#warlockDataset.auras, 12, "Warlock aura count")
-assertEqual(#warlockDataset.spells, 23, "Warlock spell count")
+assertEqual(#warlockDataset.spells, 26, "Warlock spell count")
 
 local function findByName(collection, name)
     for index = 1, #collection do
@@ -113,6 +113,7 @@ for _, name in ipairs({
     "Corruption", "Life Tap", "Curse of Agony", "Curse of Weakness", "Fear", "Drain Soul",
     "Drain Life", "Drain Mana", "Chaos Bolt", "Curse of Tongues", "Curse of Elements",
     "Curse of Shadows", "Death Coil", "Howl of Terror", "Demon Skin", "Banish", "Shadow Ward",
+    "Summon Imp", "Summon Felguard", "Summon Voidwalker",
 }) do
     assertTrue(findByName(warlockDataset.spells, name) ~= nil, "Warlock includes " .. name)
 end
