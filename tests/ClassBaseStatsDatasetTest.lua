@@ -21,6 +21,10 @@ loadAddonFile("data/default/Datasets.lua", Addon)
 loadAddonFile("data/default/core.lua", Addon)
 loadAddonFile("data/default/classes/shaman.lua", Addon)
 loadAddonFile("data/default/classes/warlock.lua", Addon)
+loadAddonFile("data/default/classes/death_knight.lua", Addon)
+loadAddonFile("data/default/classes/monk.lua", Addon)
+loadAddonFile("data/default/classes/demon_hunter.lua", Addon)
+loadAddonFile("data/default/classes/evoker.lua", Addon)
 
 local definitions = Addon.Data.DefaultDatasets.Definitions
 
@@ -64,7 +68,11 @@ local function assertClass(datasetId, expectedVersion, classId, name, expectedSt
     for ref, values in pairs(expectedResources) do
         remainingResources[ref] = values
     end
-    assertEqual(#class.resourceProgressions, 2, name .. " resource progression count")
+    local expectedResourceCount = 0
+    for _ in pairs(expectedResources) do
+        expectedResourceCount = expectedResourceCount + 1
+    end
+    assertEqual(#class.resourceProgressions, expectedResourceCount, name .. " resource progression count")
     for index = 1, #class.resourceProgressions do
         local progression = class.resourceProgressions[index]
         local values = remainingResources[progression.resourceRef]
@@ -76,7 +84,7 @@ local function assertClass(datasetId, expectedVersion, classId, name, expectedSt
     assertTrue(next(remainingResources) == nil, name .. " includes Health and Mana")
 end
 
-assertClass("c4a91e7d", 2, "shaman01", "Shaman", {
+assertClass("c4a91e7d", 10, "shaman01", "Shaman", {
     ["f82db71a:zfqm8dxp"] = { 1, 1.08 },
     ["f82db71a:xqz0daz2"] = { 0, 0.59 },
     ["f82db71a:ygjno50i"] = { 1, 1.25 },
@@ -85,9 +93,9 @@ assertClass("c4a91e7d", 2, "shaman01", "Shaman", {
 }, {
     ["f82db71a:q2ktkztt"] = { 27, 21.24 },
     ["f82db71a:4c8mfm99"] = { 53, 24.86 },
-})
+}, 0, 14)
 
-assertClass("e8f3b2c6", 20, "warlock1", "Warlock", {
+assertClass("e8f3b2c6", 22, "warlock1", "Warlock", {
     ["f82db71a:zfqm8dxp"] = { 0, 0.42 },
     ["f82db71a:xqz0daz2"] = { 0, 0.51 },
     ["f82db71a:ygjno50i"] = { 1, 0.75 },
@@ -98,16 +106,61 @@ assertClass("e8f3b2c6", 20, "warlock1", "Warlock", {
     ["f82db71a:4c8mfm99"] = { 59, 22.27 },
 }, 1, 5)
 
+assertClass("dknight1", 1, "dkclass1", "Death Knight", {
+    ["f82db71a:zfqm8dxp"] = { 3, 1.64 },
+    ["f82db71a:xqz0daz2"] = { 0, 1.02 },
+    ["f82db71a:ygjno50i"] = { 2, 1.49 },
+    ["f82db71a:75y3a8ib"] = { 0, 0.17 },
+    ["f82db71a:kec9rhli"] = { 0, 0.42 },
+}, {
+    ["f82db71a:q2ktkztt"] = { 20, 28.29 },
+}, 0, 0)
+
+assertClass("monkdata", 1, "monk0001", "Monk", {
+    ["f82db71a:zfqm8dxp"] = { 1, 0.75 },
+    ["f82db71a:xqz0daz2"] = { 0, 0.68 },
+    ["f82db71a:ygjno50i"] = { 0, 0.85 },
+    ["f82db71a:75y3a8ib"] = { 2, 1.32 },
+    ["f82db71a:kec9rhli"] = { 2, 1.49 },
+}, {
+    ["f82db71a:q2ktkztt"] = { 33, 24.58 },
+    ["f82db71a:4c8mfm99"] = { 17, 20.8 },
+}, 0, 0)
+
+assertClass("dhunter1", 1, "dhclass1", "Demon Hunter", {
+    ["f82db71a:zfqm8dxp"] = { 1, 1 },
+    ["f82db71a:xqz0daz2"] = { 3, 1.81 },
+    ["f82db71a:ygjno50i"] = { 1, 0.92 },
+    ["f82db71a:75y3a8ib"] = { 0, 0.25 },
+    ["f82db71a:kec9rhli"] = { 0, 0.51 },
+}, {
+    ["f82db71a:q2ktkztt"] = { 25, 25.39 },
+}, 0, 0)
+
+assertClass("evokdata", 1, "evoker01", "Evoker", {
+    ["f82db71a:zfqm8dxp"] = { 0, 0.17 },
+    ["f82db71a:xqz0daz2"] = { 0, 0.25 },
+    ["f82db71a:ygjno50i"] = { 0, 0.42 },
+    ["f82db71a:75y3a8ib"] = { 3, 1.73 },
+    ["f82db71a:kec9rhli"] = { 2, 1.66 },
+}, {
+    ["f82db71a:q2ktkztt"] = { 31, 22.53 },
+    ["f82db71a:4c8mfm99"] = { 100, 19.88 },
+}, 0, 0)
+
 local shamanDataset = definitions["c4a91e7d"].dataset
 local warlockDataset = definitions["e8f3b2c6"].dataset
 local coreDataset = definitions["f82db71a"].dataset
-assertEqual(definitions["c4a91e7d"].version, 2, "Shaman dataset version")
-assertEqual(#shamanDataset.auras, 23, "Shaman aura count")
-assertEqual(#shamanDataset.spells, 30, "Shaman spell count")
-assertEqual(definitions["e8f3b2c6"].version, 20, "Warlock dataset version")
-assertEqual(definitions["f82db71a"].version, 52, "Core dataset version")
+assertEqual(definitions["c4a91e7d"].version, 10, "Shaman dataset version")
+assertEqual(#shamanDataset.auras, 28, "Shaman aura count")
+assertEqual(#shamanDataset.spells, 32, "Shaman spell count")
+assertEqual(#shamanDataset.traits, 14, "Shaman trait count")
+assertEqual(#shamanDataset.items, 64, "Shaman item count")
+assertEqual(definitions["e8f3b2c6"].version, 22, "Warlock dataset version")
+assertEqual(definitions["f82db71a"].version, 53, "Core dataset version")
 assertEqual(#warlockDataset.auras, 22, "Warlock aura count")
 assertEqual(#warlockDataset.spells, 40, "Warlock spell count")
+assertEqual(#warlockDataset.items, 32, "Warlock item count")
 assertEqual(#warlockDataset.pets, 5, "Warlock pet count")
 assertEqual(#warlockDataset.traits, 6, "Warlock trait count")
 
@@ -116,6 +169,23 @@ local function findByName(collection, name)
         if collection[index].name == name then return collection[index] end
     end
 end
+
+assertEqual(findByName(shamanDataset.auras, "Healing Stream").icon, "interface/icons/inv_spear_04.blp", "Healing Stream aura icon")
+assertEqual(findByName(shamanDataset.spells, "Healing Stream Totem").icon, "interface/icons/inv_spear_04.blp", "Healing Stream Totem spell icon")
+local riptideAura = findByName(shamanDataset.auras, "Riptide")
+local riptideSpell = findByName(shamanDataset.spells, "Riptide")
+assertEqual(riptideAura.duration, 3, "Riptide aura duration")
+assertEqual(#riptideAura.effects, 2, "Riptide aura effect count")
+assertEqual(riptideAura.effects[2].statRef, "f82db71a:ok80ohz3", "Riptide Healing Received stat")
+assertEqual(riptideSpell.cooldown, 3, "Riptide cooldown")
+assertEqual(#riptideSpell.components, 1, "Riptide component count")
+assertEqual(riptideSpell.components[1].effect.duration, 3, "Riptide component duration")
+assertEqual(#riptideSpell.tooltipTemplateData.auraSections, 1, "Riptide tooltip aura section count")
+assertEqual(riptideSpell.tooltipTemplateData.auraSections[1].auraRef, "c4a91e7d:shrptdha", "Riptide tooltip aura reference")
+assertEqual(riptideSpell.tooltipTemplateData.auraSections[1].tokens[2].effectIndex, 2, "Riptide tooltip Healing Received token")
+assertEqual(riptideSpell.tooltipTemplateData.auraSections[1].duration, 3, "Riptide tooltip aura duration")
+assertEqual(riptideSpell.tooltipTemplateData.mainText, "Apply Riptide to an ally for 3 turns.", "Riptide tooltip")
+assertTrue(findByName(shamanDataset.auras, "Riptide - Healing Received") == nil, "Riptide uses one aura")
 
 local function assertIds(collection, expected, label)
     assertEqual(#collection, #expected, label .. " count")
@@ -128,15 +198,130 @@ assertIds(shamanDataset.auras, {
     "shflshka", "shfrshka", "shelmsta", "shsearta", "shmagmaa", "shearthba", "shstclwa",
     "shrockba", "shstskna", "shlshlda", "shftwaua", "shsoetha", "shfbrnda", "shfbrnwa",
     "shfrresa", "shfiresa", "shnaresa", "shwndfra", "shgoaira", "shfttoma", "shhstrma",
-    "shmsprga", "shtrqara",
+    "shmsprga", "shtrqara", "shrptdha", "sheashla", "sheldvau", "shflryau", "shanchea",
 }, "Shaman aura")
 assertIds(shamanDataset.spells, {
     "shlbolt1", "sherthsk", "shflmshk", "shfrtshk", "shlavabr", "shelmast", "shseartm",
     "shfirnva", "shmagmat", "shchnltn", "shearthbd", "shstclwt", "shrockbt", "shstsknt",
     "shlshldt", "shflmtwg", "shsoetht", "shfbrnwt", "shfrrest", "shfirest", "shnarest",
     "shwndfry", "shgoairt", "shfttomt", "shhealwv", "shhstrmt", "shleshwv", "shmsprgt",
-    "shchnhel", "shtrqart",
+    "shchnhel", "shtrqart", "shriptid", "sheashld",
 }, "Shaman spell")
+
+assertIds(shamanDataset.traits, {
+    "shelward", "sheldevt", "shancnow", "shthstrk", "shshspec", "shantici", "shflurry",
+    "shtoughn", "shwepmst", "shanchel", "shnatgui", "shhealgr", "shtidmas", "shpurify",
+}, "Shaman trait")
+
+assertIds(shamanDataset.items, {
+    "s05echst",
+    "s05efeet",
+    "s05ehnds",
+    "s05ehead",
+    "s05elegs",
+    "s05eshld",
+    "s05ewais",
+    "s05ewrst",
+    "s05nchst",
+    "s05nfeet",
+    "s05nhnds",
+    "s05nhead",
+    "s05nlegs",
+    "s05nshld",
+    "s05nwais",
+    "s05nwrst",
+    "s05rchst",
+    "s05rfeet",
+    "s05rhnds",
+    "s05rhead",
+    "s05rlegs",
+    "s05rshld",
+    "s05rwais",
+    "s05rwrst",
+    "s05tchst",
+    "s05tfeet",
+    "s05thnds",
+    "s05thead",
+    "s05tlegs",
+    "s05tshld",
+    "s05twais",
+    "s05twrst",
+    "s2elchst",
+    "s2elfeet",
+    "s2elhnds",
+    "s2elhead",
+    "s2ellegs",
+    "s2elshld",
+    "s2elwais",
+    "s2elwrst",
+    "s2enchst",
+    "s2enfeet",
+    "s2enhnds",
+    "s2enhead",
+    "s2enlegs",
+    "s2enshld",
+    "s2enwais",
+    "s2enwrst",
+    "s2rhchst",
+    "s2rhfeet",
+    "s2rhhnds",
+    "s2rhhead",
+    "s2rhlegs",
+    "s2rhshld",
+    "s2rhwais",
+    "s2rhwrst",
+    "s2tnchst",
+    "s2tnfeet",
+    "s2tnhnds",
+    "s2tnhead",
+    "s2tnlegs",
+    "s2tnshld",
+    "s2tnwais",
+    "s2tnwrst",
+}, "Shaman item")
+
+assertIds(warlockDataset.items, {
+    "wl2drobe",
+    "wl2dboot",
+    "wl2dglov",
+    "wl2dhead",
+    "wl2dlegs",
+    "wl2dshld",
+    "wl2dbelt",
+    "wl2dwrst",
+    "wl2tgarb",
+    "wl2ttrds",
+    "wl2thand",
+    "wl2tcowl",
+    "wl2tpant",
+    "wl2tshld",
+    "wl2tcord",
+    "wl2twrap",
+    "w05drobe",
+    "w05dsand",
+    "w05dwrap",
+    "w05dmask",
+    "w05dlegs",
+    "w05dmant",
+    "w05dbelt",
+    "w05dbrac",
+    "w05tembr",
+    "w05ttrds",
+    "w05tgrsp",
+    "w05thood",
+    "w05tpant",
+    "w05tepau",
+    "w05tcord",
+    "w05tbind",
+}, "Warlock item")
+
+local shamanClass = shamanDataset.classes[1]
+for index, traitId in ipairs({
+    "shelward", "sheldevt", "shancnow", "shthstrk", "shshspec", "shantici", "shflurry",
+    "shtoughn", "shwepmst", "shanchel", "shnatgui", "shhealgr", "shtidmas", "shpurify",
+}) do
+    assertEqual(shamanClass.talentTraitRefs[index], "c4a91e7d:" .. traitId, "Shaman talent trait reference " .. index)
+end
 
 local warlockClass = warlockDataset.classes[1]
 assertEqual(warlockClass.passiveTraitRefs[1], "e8f3b2c6:wldemarc", "Warlock Demonic Arcana passive reference")

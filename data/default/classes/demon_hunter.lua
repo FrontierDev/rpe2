@@ -1,0 +1,80 @@
+local _, Addon = ...
+
+Addon.Data.DefaultDatasets:Register({
+    version = 1,
+    dataset = {
+        achievements = {},
+        auras = {},
+        authorName = "Ortellus-ArgentDawn",
+        classes = {
+            {
+                armorWeights = {},
+                description = "",
+                icon = "interface/icons/classicon_demonhunter.blp",
+                id = "dhclass1",
+                name = "Demon Hunter",
+                passiveTraitRefs = {},
+                resourceProgressions = {
+                    {
+                        initialValue = 25,
+                        perLevelValue = 25.39,
+                        resourceRef = "f82db71a:q2ktkztt",
+                    },
+                },
+                skillBonuses = {},
+                statProgressions = {
+                    {
+                        initialValue = 1,
+                        perLevelValue = 1,
+                        statRef = "f82db71a:zfqm8dxp",
+                    },
+                    {
+                        initialValue = 3,
+                        perLevelValue = 1.81,
+                        statRef = "f82db71a:xqz0daz2",
+                    },
+                    {
+                        initialValue = 1,
+                        perLevelValue = 0.92,
+                        statRef = "f82db71a:ygjno50i",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.25,
+                        statRef = "f82db71a:75y3a8ib",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.51,
+                        statRef = "f82db71a:kec9rhli",
+                    },
+                },
+                talentTraitRefs = {},
+                weaponTypeRefs = {},
+            },
+        },
+        currencies = {},
+        damageSchools = {},
+        datasetType = "class",
+        dependencies = { "f82db71a" },
+        description = "",
+        groupName = "Core",
+        guildSettings = {},
+        id = "dhunter1",
+        interactions = {},
+        itemSlots = {},
+        items = {},
+        loot = {},
+        mounts = {},
+        pets = {},
+        races = {},
+        recipes = {},
+        resources = {},
+        skills = {},
+        spells = {},
+        stats = {},
+        traits = {},
+        units = {},
+        weaponTypes = {},
+    },
+})

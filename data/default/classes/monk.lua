@@ -1,0 +1,85 @@
+local _, Addon = ...
+
+Addon.Data.DefaultDatasets:Register({
+    version = 1,
+    dataset = {
+        achievements = {},
+        auras = {},
+        authorName = "Ortellus-ArgentDawn",
+        classes = {
+            {
+                armorWeights = {},
+                description = "",
+                icon = "interface/icons/classicon_monk.blp",
+                id = "monk0001",
+                name = "Monk",
+                passiveTraitRefs = {},
+                resourceProgressions = {
+                    {
+                        initialValue = 33,
+                        perLevelValue = 24.58,
+                        resourceRef = "f82db71a:q2ktkztt",
+                    },
+                    {
+                        initialValue = 17,
+                        perLevelValue = 20.8,
+                        resourceRef = "f82db71a:4c8mfm99",
+                    },
+                },
+                skillBonuses = {},
+                statProgressions = {
+                    {
+                        initialValue = 1,
+                        perLevelValue = 0.75,
+                        statRef = "f82db71a:zfqm8dxp",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.68,
+                        statRef = "f82db71a:xqz0daz2",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.85,
+                        statRef = "f82db71a:ygjno50i",
+                    },
+                    {
+                        initialValue = 2,
+                        perLevelValue = 1.32,
+                        statRef = "f82db71a:75y3a8ib",
+                    },
+                    {
+                        initialValue = 2,
+                        perLevelValue = 1.49,
+                        statRef = "f82db71a:kec9rhli",
+                    },
+                },
+                talentTraitRefs = {},
+                weaponTypeRefs = {},
+            },
+        },
+        currencies = {},
+        damageSchools = {},
+        datasetType = "class",
+        dependencies = { "f82db71a" },
+        description = "",
+        groupName = "Core",
+        guildSettings = {},
+        id = "monkdata",
+        interactions = {},
+        itemSlots = {},
+        items = {},
+        loot = {},
+        mounts = {},
+        pets = {},
+        races = {},
+        recipes = {},
+        resources = {},
+        skills = {},
+        spells = {},
+        stats = {},
+        traits = {},
+        units = {},
+        weaponTypes = {},
+    },
+})

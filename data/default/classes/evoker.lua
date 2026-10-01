@@ -1,0 +1,85 @@
+local _, Addon = ...
+
+Addon.Data.DefaultDatasets:Register({
+    version = 1,
+    dataset = {
+        achievements = {},
+        auras = {},
+        authorName = "Ortellus-ArgentDawn",
+        classes = {
+            {
+                armorWeights = {},
+                description = "",
+                icon = "interface/icons/classicon_evoker.blp",
+                id = "evoker01",
+                name = "Evoker",
+                passiveTraitRefs = {},
+                resourceProgressions = {
+                    {
+                        initialValue = 31,
+                        perLevelValue = 22.53,
+                        resourceRef = "f82db71a:q2ktkztt",
+                    },
+                    {
+                        initialValue = 100,
+                        perLevelValue = 19.88,
+                        resourceRef = "f82db71a:4c8mfm99",
+                    },
+                },
+                skillBonuses = {},
+                statProgressions = {
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.17,
+                        statRef = "f82db71a:zfqm8dxp",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.25,
+                        statRef = "f82db71a:xqz0daz2",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.42,
+                        statRef = "f82db71a:ygjno50i",
+                    },
+                    {
+                        initialValue = 3,
+                        perLevelValue = 1.73,
+                        statRef = "f82db71a:75y3a8ib",
+                    },
+                    {
+                        initialValue = 2,
+                        perLevelValue = 1.66,
+                        statRef = "f82db71a:kec9rhli",
+                    },
+                },
+                talentTraitRefs = {},
+                weaponTypeRefs = {},
+            },
+        },
+        currencies = {},
+        damageSchools = {},
+        datasetType = "class",
+        dependencies = { "f82db71a" },
+        description = "",
+        groupName = "Core",
+        guildSettings = {},
+        id = "evokdata",
+        interactions = {},
+        itemSlots = {},
+        items = {},
+        loot = {},
+        mounts = {},
+        pets = {},
+        races = {},
+        recipes = {},
+        resources = {},
+        skills = {},
+        spells = {},
+        stats = {},
+        traits = {},
+        units = {},
+        weaponTypes = {},
+    },
+})

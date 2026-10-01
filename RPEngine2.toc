@@ -26,6 +26,10 @@ data/default/classes/rogue.lua
 data/default/classes/shaman.lua
 data/default/classes/warlock.lua
 data/default/classes/warrior.lua
+data/default/classes/death_knight.lua
+data/default/classes/monk.lua
+data/default/classes/demon_hunter.lua
+data/default/classes/evoker.lua
 data/default/professions/fishing.lua
 data/default/professions/alchemy.lua
 data/default/professions/alchemy_daily_rewards.lua

@@ -20,7 +20,7 @@ Import each listed **Aura** before its associated **Spell**. All entries use the
 - **Lightning Shield** applies 3 stacks. Each melee hit taken deals Nature damage to the attacker and removes one stack.
 - Group stat/resistance totems last 5 turns, matching their 5-turn spell cooldown. Strength/Agility/Armor/Spell Power buffs use +10%; resistance totems use +30 resistance, matching the current fixed Frost Resistance magnitude used by Ice Armor.
 - **Healing Stream Totem** applies a 5-turn all-allies HoT. Its per-target tick uses the standard 5-target periodic-healing reduction from the current Renew archetype.
-- **Riptide** is an instant Bonus Action 5-turn HoT with a meaningful secondary effect. Its HoT uses the Renew healing archetype reduced by the 0.85 secondary-effect modifier: **17.68 + 0.5304 Healing Power per turn**. It also grants **+5 percentage points Healing Received for 1 turn** and costs **15% base Mana**.
+- **Riptide** is an instant Bonus Action 3-turn HoT with its Healing Received increase on the same aura. Its HoT uses the Renew healing archetype reduced by the 0.85 secondary-effect modifier: **17.68 + 0.5304 Healing Power per turn**. It also grants **+5 percentage points Healing Received for 3 turns** and costs **15% base Mana**.
 - **Earth Shield** uses the current Prayer of Mending reactive-heal pattern: **2% Max Health** when the owner takes a basic attack, followed by removal of one stack. It applies **8 stacks**, lasts **10 turns**, is a Buff Action with a **1-turn cooldown**, and costs **5% base Mana**.
 - The Mana Spring request says allies gain “Healing Stream”; this sheet treats that as a naming slip and applies a **Mana Spring** aura instead. It restores **2% Base Mana per turn for 5 turns** (10% total per ally).
 - **Tranquil Air Totem** targets between 1 and 10 selected allies and applies -30% Threat Generated for 5 turns.
@@ -4469,7 +4469,7 @@ RPE_DATASET_ENTRY_V1
     datasetId = "c4a91e7d",
     entry = {
         description = "",
-        duration = 5,
+        duration = 3,
         effects = {
             {
                 amountMode = "flat",
@@ -4483,47 +4483,6 @@ RPE_DATASET_ENTRY_V1
                 },
                 type = "heal",
             },
-        },
-        events = {  },
-        icon = "interface/icons/spell_nature_riptide.blp",
-        id = "shrptdha",
-        maxStacks = 1,
-        name = "Riptide",
-        stackBehavior = "refresh_duration",
-        tags = {  },
-        tooltipTemplate = true,
-        tooltipTemplateData = {
-            bodyText = "Heals for {AURA_HEAL_1} health each turn.",
-            bodyTokens = {
-                {
-                    applyMode = "heal_amount",
-                    baseField = "baseHealing",
-                    effectIndex = 1,
-                    key = "AURA_HEAL_1",
-                    tokenType = "aura_amount",
-                },
-            },
-            stackingText = "",
-            stackingTokens = {  },
-            version = 1,
-        },
-    },
-}
-```
-
-#### Healing Received Aura
-
-```text
-RPE_DATASET_ENTRY_V1
-{
-    format = "rpe-dataset-entry",
-    version = 1,
-    collectionKey = "auras",
-    datasetId = "c4a91e7d",
-    entry = {
-        description = "",
-        duration = 1,
-        effects = {
             {
                 baseAmount = 5,
                 operation = "flat",
@@ -4535,15 +4494,30 @@ RPE_DATASET_ENTRY_V1
         },
         events = {  },
         icon = "interface/icons/spell_nature_riptide.blp",
-        id = "shrptdba",
+        id = "shrptdha",
         maxStacks = 1,
-        name = "Riptide - Healing Received",
+        name = "Riptide",
         stackBehavior = "refresh_duration",
         tags = {  },
         tooltipTemplate = true,
         tooltipTemplateData = {
-            bodyText = "Increases Healing Received by 5%.",
-            bodyTokens = {  },
+            bodyText = "Heals for {AURA_HEAL_1} health each turn. Increases Healing Received by {AURA_STAT_2}%.",
+            bodyTokens = {
+                {
+                    applyMode = "heal_amount",
+                    baseField = "baseHealing",
+                    effectIndex = 1,
+                    key = "AURA_HEAL_1",
+                    tokenType = "aura_amount",
+                },
+                {
+                    applyMode = "stat_amount",
+                    baseField = "baseAmount",
+                    effectIndex = 2,
+                    key = "AURA_STAT_2",
+                    tokenType = "aura_amount",
+                },
+            },
             stackingText = "",
             stackingTokens = {  },
             version = 1,
@@ -4574,7 +4548,7 @@ RPE_DATASET_ENTRY_V1
                 effect = {
                     auraRef = "c4a91e7d:shrptdha",
                     basePower = 0,
-                    duration = 5,
+                    duration = 3,
                     stacks = 1,
                     targetEvents = {  },
                     type = "apply_aura",
@@ -4591,31 +4565,9 @@ RPE_DATASET_ENTRY_V1
                     type = "single",
                 },
             },
-            {
-                castPhase = "on_cast_end",
-                castingGroup = "default",
-                effect = {
-                    auraRef = "c4a91e7d:shrptdba",
-                    basePower = 0,
-                    duration = 1,
-                    stacks = 1,
-                    targetEvents = {  },
-                    type = "apply_aura",
-                },
-                key = "shrptdb1",
-                target = {
-                    allowDeadTargets = false,
-                    disableSelfCast = false,
-                    maxTargets = 1,
-                    minTargets = 1,
-                    requiresTarget = true,
-                    targetDisposition = "ally",
-                    type = "single",
-                },
-            },
         },
         conditions = {  },
-        cooldown = 0,
+        cooldown = 3,
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
@@ -4647,8 +4599,8 @@ RPE_DATASET_ENTRY_V1
                 {
                     auraRef = "c4a91e7d:shrptdha",
                     datasetId = "c4a91e7d",
-                    descriptionText = "Heals for {AURA_HEAL_1} health each turn.",
-                    duration = 5,
+                    descriptionText = "Heals for {AURA_HEAL_1} health each turn. Increases Healing Received by {AURA_STAT_2}%.",
+                    duration = 3,
                     icon = "interface/icons/spell_nature_riptide.blp",
                     nameText = "Riptide",
                     powerLevel = 0,
@@ -4668,28 +4620,17 @@ RPE_DATASET_ENTRY_V1
                             key = "AURA_HEAL_1",
                             tokenType = "aura_amount",
                         },
+                        {
+                            applyMode = "stat_amount",
+                            baseField = "baseAmount",
+                            effectIndex = 2,
+                            key = "AURA_STAT_2",
+                            tokenType = "aura_amount",
+                        },
                     },
-                },
-                {
-                    auraRef = "c4a91e7d:shrptdba",
-                    datasetId = "c4a91e7d",
-                    descriptionText = "Increases Healing Received by 5%.",
-                    duration = 1,
-                    icon = "interface/icons/spell_nature_riptide.blp",
-                    nameText = "Riptide - Healing Received",
-                    powerLevel = 0,
-                    spellDatasetId = "c4a91e7d",
-                    stacks = 1,
-                    targetContext = {
-                        object = "an ally",
-                        possessive = "the ally's",
-                        reflexive = "themselves",
-                        subject = "an ally",
-                    },
-                    tokens = {  },
                 },
             },
-            mainText = "Apply Riptide to an ally for 5 turns and increase their Healing Received by 5% for 1 turn.",
+            mainText = "Apply Riptide to an ally for 3 turns.",
             tokens = {  },
             version = 1,
         },

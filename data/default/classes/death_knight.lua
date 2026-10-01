@@ -1,0 +1,80 @@
+local _, Addon = ...
+
+Addon.Data.DefaultDatasets:Register({
+    version = 1,
+    dataset = {
+        achievements = {},
+        auras = {},
+        authorName = "Ortellus-ArgentDawn",
+        classes = {
+            {
+                armorWeights = {},
+                description = "",
+                icon = "interface/icons/classicon_deathknight.blp",
+                id = "dkclass1",
+                name = "Death Knight",
+                passiveTraitRefs = {},
+                resourceProgressions = {
+                    {
+                        initialValue = 20,
+                        perLevelValue = 28.29,
+                        resourceRef = "f82db71a:q2ktkztt",
+                    },
+                },
+                skillBonuses = {},
+                statProgressions = {
+                    {
+                        initialValue = 3,
+                        perLevelValue = 1.64,
+                        statRef = "f82db71a:zfqm8dxp",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 1.02,
+                        statRef = "f82db71a:xqz0daz2",
+                    },
+                    {
+                        initialValue = 2,
+                        perLevelValue = 1.49,
+                        statRef = "f82db71a:ygjno50i",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.17,
+                        statRef = "f82db71a:75y3a8ib",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0.42,
+                        statRef = "f82db71a:kec9rhli",
+                    },
+                },
+                talentTraitRefs = {},
+                weaponTypeRefs = {},
+            },
+        },
+        currencies = {},
+        damageSchools = {},
+        datasetType = "class",
+        dependencies = { "f82db71a" },
+        description = "",
+        groupName = "Core",
+        guildSettings = {},
+        id = "dknight1",
+        interactions = {},
+        itemSlots = {},
+        items = {},
+        loot = {},
+        mounts = {},
+        pets = {},
+        races = {},
+        recipes = {},
+        resources = {},
+        skills = {},
+        spells = {},
+        stats = {},
+        traits = {},
+        units = {},
+        weaponTypes = {},
+    },
+})

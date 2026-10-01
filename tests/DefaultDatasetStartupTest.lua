@@ -50,6 +50,10 @@ local packagedDataFiles = {
     "data/default/classes/shaman.lua",
     "data/default/classes/warlock.lua",
     "data/default/classes/warrior.lua",
+    "data/default/classes/death_knight.lua",
+    "data/default/classes/monk.lua",
+    "data/default/classes/demon_hunter.lua",
+    "data/default/classes/evoker.lua",
     "data/default/professions/fishing.lua",
     "data/default/professions/alchemy.lua",
     "data/default/professions/alchemy_daily_rewards.lua",
@@ -89,6 +93,61 @@ end
 
 local coreDefinition = definitions["f82db71a"]
 assertTrue(type(coreDefinition) == "table" and type(coreDefinition.dataset) == "table", "Core packaged definition exists")
+
+local coreGuildSetting = coreDefinition.dataset.guildSettings and coreDefinition.dataset.guildSettings[1]
+assertTrue(type(coreGuildSetting) == "table", "Core packaged Guild Shop setting exists")
+
+local guildShopArmourByItemRef = {}
+for index = 1, #(coreGuildSetting.requisitions or {}) do
+    local requisition = coreGuildSetting.requisitions[index]
+    if requisition.shopCategoryId == "a6r4m2ur" then
+        guildShopArmourByItemRef[requisition.itemRef] = requisition
+    end
+end
+
+local function endsWithAny(value, suffixes)
+    for index = 1, #suffixes do
+        local suffix = suffixes[index]
+        if value:sub(-#suffix) == suffix then
+            return true
+        end
+    end
+    return false
+end
+
+local function expectedGuildShopArmourCost(itemId)
+    if endsWithAny(itemId, { "belt", "brac", "bind", "cord", "wais", "wrst", "wrap" }) then
+        return 1250
+    end
+    if endsWithAny(itemId, { "boot", "feet", "glov", "hand", "hnds", "grsp", "sand", "trds" }) then
+        return 1750
+    end
+    return 2250
+end
+
+for _, datasetId in ipairs({ "c4a91e7d", "e8f3b2c6" }) do
+    local classDataset = definitions[datasetId].dataset
+    for index = 1, #(classDataset.items or {}) do
+        local item = classDataset.items[index]
+        local itemRef = datasetId .. ":" .. item.id
+        local requisition = guildShopArmourByItemRef[itemRef]
+        assertTrue(type(requisition) == "table", "Guild Shop includes " .. itemRef)
+        assertEqual(requisition.quantity, 1, "Guild Shop quantity for " .. itemRef)
+        assertEqual(requisition.costs[1].currencyRef, "justice", "Guild Shop currency for " .. itemRef)
+        assertEqual(requisition.costs[1].amount, expectedGuildShopArmourCost(item.id), "Guild Shop price for " .. itemRef)
+    end
+end
+
+local function assertCoreGuildDependency(datasetId)
+    for index = 1, #(coreDefinition.dataset.dependencies or {}) do
+        if coreDefinition.dataset.dependencies[index] == datasetId then
+            return
+        end
+    end
+    error("Core Guild Shop dependency is missing: " .. datasetId, 2)
+end
+assertCoreGuildDependency("c4a91e7d")
+assertCoreGuildDependency("e8f3b2c6")
 
 local function findCoreSpell(spellId)
     for index = 1, #(coreDefinition.dataset.spells or {}) do
