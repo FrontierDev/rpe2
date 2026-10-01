@@ -4235,8 +4235,15 @@ RPE_DATASET_ENTRY_V1
         tags = {  },
         tooltipTemplate = true,
         tooltipTemplateData = {
-            bodyText = "Restores 2% of Base Mana each turn.",
-            bodyTokens = {  },
+            bodyText = "Restores {AURA_RESOURCE_GAIN_1} Mana each turn.",
+            bodyTokens = {
+                {
+                    applyMode = "resource_gain_amount",
+                    effectIndex = 1,
+                    key = "AURA_RESOURCE_GAIN_1",
+                    tokenType = "aura_amount",
+                },
+            },
             stackingText = "",
             stackingTokens = {  },
             version = 1,
