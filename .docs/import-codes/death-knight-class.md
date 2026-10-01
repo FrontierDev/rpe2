@@ -14,6 +14,8 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for the synthetic Classic-style De
 
 Armor, weapon proficiencies, passive traits, talents, and spells are intentionally left unassigned.
 
+- Spell import codes: `.docs/import-codes/death-knight-spells.md`
+
 ```text
 RPE_DATASET_ENTRY_V1
 {
