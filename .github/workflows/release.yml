@@ -42,6 +42,8 @@ jobs:
           lua5.1 tests/ClassBaseStatsDatasetTest.lua
           lua5.1 tests/TooltipBuilderRegressionTest.lua
           lua5.1 tests/PeriodicAuraAuthoringTest.lua
+          lua5.1 tests/SpellRankAuraTest.lua
+          lua5.1 tests/NpcRolePresetsTest.lua
           lua5.1 tests/ClassSetRestrictionTest.lua
           lua5.1 tests/RuntimeExternalManagerStartupTest.lua
           lua5.1 tests/CompatibilityHashCanonicalizationTest.lua
