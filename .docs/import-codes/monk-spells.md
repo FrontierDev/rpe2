@@ -7,6 +7,7 @@ Import required **Aura** entries before spells that reference them.
 ## Authoring rules applied
 
 - Brewmaster uses the **Tank** role profile; Windwalker uses **DPS**; Mistweaver uses **Healer**.
+- Windwalker Jab and Expel Harm generate **2 Chi** directly, incorporating the launch-era Fierce Tiger +1 Chi generation because the current Trait schema cannot modify a specific spell resource component.
 - Brewmaster and Windwalker spend **Energy** (`f82db71a:c3gaf7dd`) and generate/spend **Chi** (`f82db71a:p8kik0ep`).
 - Mistweaver spends **Mana** (`f82db71a:4c8mfm99`) and also generates/spends Chi.
 - The Core Chi resource already has a 4-Chi maximum and starts at zero, matching early Mists of Pandaria.
@@ -1763,7 +1764,7 @@ RPE_DATASET_ENTRY_V1
                 castPhase = "on_cast_end",
                 castingGroup = "default",
                 effect = {
-                    amount = 1,
+                    amount = 2,
                     amountMode = "flat",
                     resourceRef = "f82db71a:p8kik0ep",
                     scaleWithRank = false,
@@ -1922,7 +1923,7 @@ RPE_DATASET_ENTRY_V1
                 castPhase = "on_cast_end",
                 castingGroup = "default",
                 effect = {
-                    amount = 1,
+                    amount = 2,
                     amountMode = "flat",
                     resourceRef = "f82db71a:p8kik0ep",
                     scaleWithRank = false,
