@@ -2152,13 +2152,20 @@ RPE_DATASET_ENTRY_V1
                         },
                         type = "damage",
                     },
+                },
+                triggerTarget = "event_source",
+            },
+            {
+                chance = 100,
+                combatEventId = "on_melee_taken",
+                effects = {
                     {
                         auraRef = "c4a91e7d:shlshlda",
                         stacks = 1,
                         type = "remove_aura",
                     },
                 },
-                triggerTarget = "event_source",
+                triggerTarget = "aura_target",
             },
         },
         icon = "interface/icons/spell_nature_lightningshield.blp",
