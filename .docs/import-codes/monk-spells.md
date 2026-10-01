@@ -1279,7 +1279,7 @@ RPE_DATASET_ENTRY_V1
                     amountMode = "flat",
                     applyAura = false,
                     auraStacks = 1,
-                    baseDamage = 30.9825,
+                    baseDamage = 36.45,
                     damageSchoolRefs = {
                         "f82db71a:v1azo4j6",
                     },
@@ -1289,7 +1289,7 @@ RPE_DATASET_ENTRY_V1
                     projectileSpeed = 0,
                     statScaling = {
                         {
-                            coefficient = 0.153,
+                            coefficient = 0.18,
                             statRef = "f82db71a:u7b49vs9",
                         },
                     },
@@ -1300,7 +1300,7 @@ RPE_DATASET_ENTRY_V1
                     threatCoefficient = 2,
                     type = "damage",
                     usesProjectile = false,
-                    weaponDamageCoefficient = 0.306,
+                    weaponDamageCoefficient = 0.36,
                     weaponDamageMode = "main_hand",
                 },
                 key = "mnbsckdm",
@@ -1454,7 +1454,7 @@ RPE_DATASET_ENTRY_V1
                     targetEvents = { },
                     type = "interrupt",
                 },
-                key = "mnbspHin",
+                key = "mnbsphin",
                 target = {
                     allowDeadTargets = false,
                     disableSelfCast = false,
@@ -1472,7 +1472,7 @@ RPE_DATASET_ENTRY_V1
         cooldownScalesWithHaste = false,
         description = "",
         icon = "interface/icons/ability_monk_spearhand.blp",
-        id = "mnbspH01",
+        id = "mnbsph01",
         cooldownChannel = 5,
         learnMode = "always_learned",
         learnLevel = 1,
@@ -2470,7 +2470,7 @@ RPE_DATASET_ENTRY_V1
                     amountMode = "flat",
                     applyAura = false,
                     auraStacks = 1,
-                    baseDamage = 38.728125,
+                    baseDamage = 45.5625,
                     damageSchoolRefs = {
                         "f82db71a:v1azo4j6",
                     },
@@ -2480,7 +2480,7 @@ RPE_DATASET_ENTRY_V1
                     projectileSpeed = 0,
                     statScaling = {
                         {
-                            coefficient = 0.19125,
+                            coefficient = 0.225,
                             statRef = "f82db71a:u7b49vs9",
                         },
                     },
@@ -2491,7 +2491,7 @@ RPE_DATASET_ENTRY_V1
                     threatCoefficient = 1,
                     type = "damage",
                     usesProjectile = false,
-                    weaponDamageCoefficient = 0.3825,
+                    weaponDamageCoefficient = 0.45,
                     weaponDamageMode = "main_hand",
                 },
                 key = "mnwsckdm",
@@ -3211,7 +3211,7 @@ RPE_DATASET_ENTRY_V1
                     statScaling = {
                         {
                             coefficient = 0.29325,
-                            statRef = "f82db71a:u7b49vs9",
+                            statRef = "f82db71a:hj6d4kvy",
                         },
                     },
                     targetEvents = {
