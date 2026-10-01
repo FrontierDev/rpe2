@@ -22,7 +22,7 @@ Standalone `RPE_DATASET_ENTRY_V1` import codes for the Warlock class dataset `e8
 - **Drain Life** independently budgets its damage and self-heal as secondary outputs: **114.75 + 1.19 Spell Power** Shadow damage and **61.625 + 0.34 Spell Power** self-healing. The calculated 1-turn hybrid cost is **3.4% base Mana**.
 - **Drain Mana** has no current same-mechanic Warlock analogue and the transfer magnitude was not specified. This code uses **15% base Mana drained** and **15% base Mana restored**, reusing Life Tap's explicit 15% resource-conversion magnitude. It also deals the secondary-output Shadow damage budget (**114.75 + 1.19 Spell Power**) and costs **6.8% base Mana**, matching the standard 1-turn nuke cost rather than treating Mana generation as free.
 
-- **Curse of Tongues** is authored as an instant Main Action, 1-turn silence, costing **5% base Mana**. Silence uses the existing control effect with `preventCasting = true` and does not add movement control or auto-hit behavior.
+- **Curse of Tongues** is an instant Main Action, 5-turn curse costing **5% base Mana**. It reduces **Spell Hit Chance by 10 percentage points**, giving it a sustained anti-caster role distinct from Spell Lock rather than preventing casting outright.
 - **Curse of Elements** lasts 5 turns and reduces the percentage-point **Magic Resistance** stat by **5 + 0.01 × Spell Power**. This means its magnitude increases by 20% of the base reduction per 100 Spell Power.
 - **Curse of Shadows** uses ranks and the same **5-turn curse duration**. It reduces both Arcane and Shadow Resistance by **25 + 0.05 × Spell Power**, preserving the same 20%-of-base-per-100-SP scaling convention as Curse of Elements.
 - **Death Coil** is a Bonus Action that applies the existing Warlock Fear aura for **1 turn** and heals the caster for **27.625 + 0.16575 × Spell Power**. Its heal uses the current DPS secondary-healing budget and costs **15% base Mana**.
@@ -2060,14 +2060,15 @@ RPE_DATASET_ENTRY_V1
     datasetId = "e8f3b2c6",
     entry = {
         description = "",
-        duration = 1,
+        duration = 5,
         effects = {
             {
-                            cancelOnDamage = false,
-                            forceAutoHitAgainstTarget = false,
-                            preventCasting = true,
+                            baseAmount = -10,
+                            operation = "flat",
+                            scaleWithRank = false,
+                            statRef = "f82db71a:v2g0tw0o",
                             statScaling = {  },
-                            type = "control",
+                            type = "stat",
                         }
         },
         events = {  },
@@ -2105,7 +2106,7 @@ RPE_DATASET_ENTRY_V1
                             effect = {
                                 auraRef = "e8f3b2c6:wlctnga1",
                                 basePower = 0,
-                                duration = 1,
+                                duration = 5,
                                 stacks = 1,
                                 targetEvents = {  },
                                 type = "apply_aura",
