@@ -15,6 +15,7 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for the synthetic Classic-style Mo
 Armor, weapon proficiencies, passive traits, talents, and spells are intentionally left unassigned.
 
 - Spell import codes: `.docs/import-codes/monk-spells.md`
+- Trait import codes: `.docs/import-codes/monk-traits.md`
 
 ```text
 RPE_DATASET_ENTRY_V1
