@@ -75,6 +75,7 @@ loadAddonFile("data/default/classes/warrior.lua")
 loadAddonFile("data/default/classes/rogue.lua")
 loadAddonFile("data/default/classes/priest.lua")
 loadAddonFile("data/default/classes/mage.lua")
+loadAddonFile("data/default/classes/warlock.lua")
 
 local Unit = Addon.Internal.Database.Classes.Unit
 local core = definitions["f82db71a"]
@@ -217,6 +218,32 @@ for datasetId, dataset in pairs(definitions) do
             entityRefs[collection][datasetId .. ":" .. tostring(entity.id)] = true
         end
     end
+end
+
+local voidwalker
+for index = 1, #(core.units or {}) do
+    if core.units[index].id == "voidw001" then
+        voidwalker = core.units[index]
+        break
+    end
+end
+assert(voidwalker, "Voidwalker Unit exists in Core")
+assertEqual(#voidwalker.presets, 2, "Voidwalker has two role presets")
+
+local corruptor
+for index = 1, #voidwalker.presets do
+    if voidwalker.presets[index].name == "Corruptor" then
+        corruptor = voidwalker.presets[index]
+        break
+    end
+end
+assert(corruptor, "Voidwalker Corruptor preset exists")
+assert(deepEqual(corruptor.spells, {
+    "e8f3b2c6:wlcorru1",
+    "e8f3b2c6:wlcshads",
+}), "Voidwalker Corruptor uses Warlock Spell refs rather than Aura refs")
+for spellIndex = 1, #corruptor.spells do
+    assert(entityRefs.spells[corruptor.spells[spellIndex]], "Voidwalker Corruptor Spell ref resolves: " .. corruptor.spells[spellIndex])
 end
 
 assertEqual(#human.presets, 8, "Human has eight role presets")

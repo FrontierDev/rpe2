@@ -5920,6 +5920,8 @@ units = {
                 spells = {
                     "e8f3b2c6:wlcorru1",
                     "e8f3b2c6:wlcshads",
+                    "e8f3b2c6:wlcorru1",
+                    "e8f3b2c6:wlcshads",
                 },
                 equipment = {  },
             },

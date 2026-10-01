@@ -34,7 +34,7 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for a base Voidwalker unit in the 
 
 Under the current Core `level_scaled_percent` mitigation model, a school-resistance rating of approximately `1.333333 × level` corresponds to approximately **20% damage mitigation**. The five percentage-based school resistances therefore remain at approximately 20% from level 1 through level 60.
 
-Holy Resistance is left at 0 because Holy currently uses direct mitigation rather than the percentage-reference model.
+Holy Resistance is left at 0. Under the active global `level_scaled_percent` mitigation path, Holy has no percentage-reference amount/percent configured, so its current effective school mitigation is 0%.
 
 ## Base appearances
 
@@ -55,16 +55,17 @@ A Shadow-oriented caster/debuffer.
 
 Spells:
 
-- Corruption — `e8f3b2c6:wlcora01`
-- Curse of Shadows — `e8f3b2c6:wlcshada`
+- Corruption — `e8f3b2c6:wlcorru1`
+- Curse of Shadows — `e8f3b2c6:wlcshads`
 
 ### Tormenter
 
-A melee pressure variant.
+A defensive melee/tank-pressure variant built around the Voidwalker's dedicated taunt.
 
 Spells:
 
-- Multiattack — `f82db71a:npcmulti`
+- Pet Attack — `f82db71a:6uix049h`
+- Torment — `e8f3b2c6:wltorm01`
 
 ## Authoring notes
 
@@ -76,6 +77,8 @@ Spells:
 - Fire, Frost, Nature, Arcane and Shadow Resistance use level-scaled stat rows rather than fixed values.
 - Damage Done and Damage Reduction are not seeded on the base unit.
 - Preset spell lists are explicit replacements under the current Unit preset spell-resolution implementation.
+- Corruptor references the Warlock **Spell** IDs for Corruption and Curse of Shadows, not their Aura IDs.
+- Tormenter uses the Core Pet Attack plus the Warlock import-code Torment ability; it does not use the generic NPC Multiattack.
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -105,8 +108,8 @@ RPE_DATASET_ENTRY_V1
                 resourceModifiers = {  },
                 statModifiers = {  },
                 spells = {
-                    "e8f3b2c6:wlcora01",
-                    "e8f3b2c6:wlcshada",
+                    "e8f3b2c6:wlcorru1",
+                    "e8f3b2c6:wlcshads",
                 },
                 equipment = {  },
             },
@@ -115,7 +118,8 @@ RPE_DATASET_ENTRY_V1
                 resourceModifiers = {  },
                 statModifiers = {  },
                 spells = {
-                    "f82db71a:npcmulti",
+                    "f82db71a:6uix049h",
+                    "e8f3b2c6:wltorm01",
                 },
                 equipment = {  },
             },
