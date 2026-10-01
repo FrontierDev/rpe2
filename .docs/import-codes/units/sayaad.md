@@ -45,6 +45,38 @@ The base Sayaad uses two Succubus appearances:
 
 No FileDataID is authored because a current FileDataID for these display records has not been verified. DisplayID-only appearances are valid in the Unit appearance schema.
 
+## Presets
+
+All three presets inherit the base Sayaad challenge level, stats, resources and appearances. Their spell lists are explicit replacements.
+
+### Temptress
+
+Crowd-control focused.
+
+Spells:
+
+- Whiplash — `e8f3b2c6:wlwhipl1`
+- Charm — `e8f3b2c6:wlcharm1`
+
+### Seductress
+
+Sustained Shadow-pressure/debuff variant.
+
+Spells:
+
+- Whiplash — `e8f3b2c6:wlwhipl1`
+- Corruption — `e8f3b2c6:wlcorru1`
+- Curse of Shadows — `e8f3b2c6:wlcshads`
+
+### Tormentor
+
+Aggressive melee/control variant.
+
+Spells:
+
+- Whiplash — `e8f3b2c6:wlwhipl1`
+- Fear — `e8f3b2c6:wlfear01`
+
 ## Authoring notes
 
 - Creature type: `demon`
@@ -52,7 +84,7 @@ No FileDataID is authored because a current FileDataID for these display records
 - Base challenge level: `normal`
 - The Sayaad is an agile melee/spell hybrid with less durability than Felguard or Voidwalker.
 - It has sufficient Melee Attack Power for physical pet attacks and sufficient Spell Power for Shadow/control-oriented abilities.
-- The base unit intentionally has no spells; Pet definitions and presets can provide role-specific abilities later.
+- The base unit intentionally has no spells; the presets provide explicit NPC spell loadouts while Warlock Pet definitions provide player-pet abilities.
 - Damage Done and Damage Reduction are not seeded on the base unit.
 - Fire, Frost, Nature, Arcane and Shadow Resistance use level-scaled stat rows rather than fixed values.
 - The base appearance list is intentionally limited to Succubus forms. Incubus/Shivarra appearances can be added separately if required.
@@ -79,7 +111,39 @@ RPE_DATASET_ENTRY_V1
         creatureType = "demon",
         id = "sayaad01",
         name = "Sayaad",
-        presets = {  },
+        presets = {
+            {
+                name = "Temptress",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "e8f3b2c6:wlwhipl1",
+                    "e8f3b2c6:wlcharm1",
+                },
+                equipment = {  },
+            },
+            {
+                name = "Seductress",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "e8f3b2c6:wlwhipl1",
+                    "e8f3b2c6:wlcorru1",
+                    "e8f3b2c6:wlcshads",
+                },
+                equipment = {  },
+            },
+            {
+                name = "Tormentor",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "e8f3b2c6:wlwhipl1",
+                    "e8f3b2c6:wlfear01",
+                },
+                equipment = {  },
+            },
+        },
         resistances = {  },
         resources = {
             {

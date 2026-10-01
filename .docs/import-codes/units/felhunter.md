@@ -58,9 +58,36 @@ The base Felhunter is an anti-magic melee/spell hybrid:
 
 ## Presets
 
-No presets are authored yet.
+All three presets inherit the base Felhunter challenge level, stats, resources and appearance. Their spell lists are explicit replacements.
 
-Future Felhunter presets should inherit the base stats and appearance unless a specific encounter role requires overrides.
+### Spellbreaker
+
+Reactive anti-caster variant.
+
+Spells:
+
+- Pet Attack — `f82db71a:6uix049h`
+- Spell Lock — `e8f3b2c6:wlspklk1`
+
+### Devourer
+
+Sustained mana-pressure/anti-caster variant.
+
+Spells:
+
+- Pet Attack — `f82db71a:6uix049h`
+- Devour Mana — `e8f3b2c6:wldevmn1`
+- Spell Lock — `e8f3b2c6:wlspklk1`
+
+### Nullifier
+
+Anti-magic debuff variant.
+
+Spells:
+
+- Pet Attack — `f82db71a:6uix049h`
+- Curse of Tongues — `e8f3b2c6:wlctngs1`
+- Curse of Shadows — `e8f3b2c6:wlcshads`
 
 ## Authoring notes
 
@@ -70,8 +97,9 @@ Future Felhunter presets should inherit the base stats and appearance unless a s
 - Uses Health and Mana.
 - Damage Done and Damage Reduction are not seeded on the base unit.
 - Fire, Frost, Nature, Arcane and Shadow Resistance use level-scaled stat rows rather than fixed values.
-- The base unit deliberately contains no spells. Warlock Pet abilities should be defined on the Warlock Pet definition, while NPC variants should use explicit Unit preset spell lists.
-- Felhunter-specific abilities such as Spell Lock or Devour Magic are not currently implemented in the repository and are therefore not fabricated in this import code.
+- The base unit deliberately contains no spells. Warlock Pet abilities should be defined on the Warlock Pet definition, while NPC variants use the explicit Unit preset spell lists above.
+- The Spellbreaker and Devourer variants use the Felhunter-specific Spell Lock and Devour Mana import entries from the Warlock spell import sheet.
+- Curse of Tongues in the Nullifier preset is the current 5-turn Spell Hit Chance reduction, not a casting lockout.
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -92,7 +120,40 @@ RPE_DATASET_ENTRY_V1
         creatureType = "demon",
         id = "felhnt01",
         name = "Felhunter",
-        presets = {  },
+        presets = {
+            {
+                name = "Spellbreaker",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "f82db71a:6uix049h",
+                    "e8f3b2c6:wlspklk1",
+                },
+                equipment = {  },
+            },
+            {
+                name = "Devourer",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "f82db71a:6uix049h",
+                    "e8f3b2c6:wldevmn1",
+                    "e8f3b2c6:wlspklk1",
+                },
+                equipment = {  },
+            },
+            {
+                name = "Nullifier",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "f82db71a:6uix049h",
+                    "e8f3b2c6:wlctngs1",
+                    "e8f3b2c6:wlcshads",
+                },
+                equipment = {  },
+            },
+        },
         resistances = {  },
         resources = {
             {
