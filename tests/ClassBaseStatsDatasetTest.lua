@@ -43,7 +43,7 @@ local function assertProgressions(class, fieldName, expected, label)
     assertTrue(next(remaining) == nil, label .. " includes every expected stat")
 end
 
-local function assertClass(datasetId, expectedVersion, classId, name, expectedStats, expectedResources)
+local function assertClass(datasetId, expectedVersion, classId, name, expectedStats, expectedResources, expectedPassiveTraitCount, expectedTalentTraitCount)
     local definition = definitions[datasetId]
     assertTrue(type(definition) == "table", name .. " definition is registered")
     assertEqual(definition.version, expectedVersion, name .. " dataset version")
@@ -56,8 +56,8 @@ local function assertClass(datasetId, expectedVersion, classId, name, expectedSt
     local class = dataset.classes[1]
     assertEqual(class.id, classId, name .. " class ID")
     assertEqual(class.name, name, name .. " class name")
-    assertEqual(#class.passiveTraitRefs, 0, name .. " has no packaged passives")
-    assertEqual(#class.talentTraitRefs, 0, name .. " has no packaged talents")
+    assertEqual(#class.passiveTraitRefs, expectedPassiveTraitCount or 0, name .. " passive trait selection")
+    assertEqual(#class.talentTraitRefs, expectedTalentTraitCount or 0, name .. " talent trait selection")
     assertProgressions(class, "statProgressions", expectedStats, name)
 
     local remainingResources = {}
@@ -76,7 +76,7 @@ local function assertClass(datasetId, expectedVersion, classId, name, expectedSt
     assertTrue(next(remainingResources) == nil, name .. " includes Health and Mana")
 end
 
-assertClass("c4a91e7d", 1, "shaman01", "Shaman", {
+assertClass("c4a91e7d", 2, "shaman01", "Shaman", {
     ["f82db71a:zfqm8dxp"] = { 1, 1.08 },
     ["f82db71a:xqz0daz2"] = { 0, 0.59 },
     ["f82db71a:ygjno50i"] = { 1, 1.25 },
@@ -87,7 +87,7 @@ assertClass("c4a91e7d", 1, "shaman01", "Shaman", {
     ["f82db71a:4c8mfm99"] = { 53, 24.86 },
 })
 
-assertClass("e8f3b2c6", 16, "warlock1", "Warlock", {
+assertClass("e8f3b2c6", 20, "warlock1", "Warlock", {
     ["f82db71a:zfqm8dxp"] = { 0, 0.42 },
     ["f82db71a:xqz0daz2"] = { 0, 0.51 },
     ["f82db71a:ygjno50i"] = { 1, 0.75 },
@@ -96,21 +96,73 @@ assertClass("e8f3b2c6", 16, "warlock1", "Warlock", {
 }, {
     ["f82db71a:q2ktkztt"] = { 23, 23.58 },
     ["f82db71a:4c8mfm99"] = { 59, 22.27 },
-})
+}, 1, 5)
 
+local shamanDataset = definitions["c4a91e7d"].dataset
 local warlockDataset = definitions["e8f3b2c6"].dataset
 local coreDataset = definitions["f82db71a"].dataset
-assertEqual(definitions["e8f3b2c6"].version, 17, "Warlock dataset version")
+assertEqual(definitions["c4a91e7d"].version, 2, "Shaman dataset version")
+assertEqual(#shamanDataset.auras, 23, "Shaman aura count")
+assertEqual(#shamanDataset.spells, 30, "Shaman spell count")
+assertEqual(definitions["e8f3b2c6"].version, 20, "Warlock dataset version")
 assertEqual(definitions["f82db71a"].version, 52, "Core dataset version")
-assertEqual(#warlockDataset.auras, 21, "Warlock aura count")
+assertEqual(#warlockDataset.auras, 22, "Warlock aura count")
 assertEqual(#warlockDataset.spells, 40, "Warlock spell count")
 assertEqual(#warlockDataset.pets, 5, "Warlock pet count")
+assertEqual(#warlockDataset.traits, 6, "Warlock trait count")
 
 local function findByName(collection, name)
     for index = 1, #collection do
         if collection[index].name == name then return collection[index] end
     end
 end
+
+local function assertIds(collection, expected, label)
+    assertEqual(#collection, #expected, label .. " count")
+    for index, id in ipairs(expected) do
+        assertEqual(collection[index].id, id, label .. " " .. index)
+    end
+end
+
+assertIds(shamanDataset.auras, {
+    "shflshka", "shfrshka", "shelmsta", "shsearta", "shmagmaa", "shearthba", "shstclwa",
+    "shrockba", "shstskna", "shlshlda", "shftwaua", "shsoetha", "shfbrnda", "shfbrnwa",
+    "shfrresa", "shfiresa", "shnaresa", "shwndfra", "shgoaira", "shfttoma", "shhstrma",
+    "shmsprga", "shtrqara",
+}, "Shaman aura")
+assertIds(shamanDataset.spells, {
+    "shlbolt1", "sherthsk", "shflmshk", "shfrtshk", "shlavabr", "shelmast", "shseartm",
+    "shfirnva", "shmagmat", "shchnltn", "shearthbd", "shstclwt", "shrockbt", "shstsknt",
+    "shlshldt", "shflmtwg", "shsoetht", "shfbrnwt", "shfrrest", "shfirest", "shnarest",
+    "shwndfry", "shgoairt", "shfttomt", "shhealwv", "shhstrmt", "shleshwv", "shmsprgt",
+    "shchnhel", "shtrqart",
+}, "Shaman spell")
+
+local warlockClass = warlockDataset.classes[1]
+assertEqual(warlockClass.passiveTraitRefs[1], "e8f3b2c6:wldemarc", "Warlock Demonic Arcana passive reference")
+assertEqual(#warlockClass.talentTraitRefs, 5, "Warlock talent trait selection")
+for index, traitId in ipairs({ "wlsuppr6", "wldembr15", "wldance2", "wldemtac3", "wlaftrmt" }) do
+    assertEqual(warlockClass.talentTraitRefs[index], "e8f3b2c6:" .. traitId, "Warlock talent trait reference " .. index)
+end
+for index, traitId in ipairs({ "wldemarc", "wlsuppr6", "wldembr15", "wldance2", "wldemtac3", "wlaftrmt" }) do
+    assertEqual(warlockDataset.traits[index].id, traitId, "Warlock trait " .. index)
+end
+local demonicArcana = findByName(warlockDataset.traits, "Demonic Arcana")
+assertEqual(demonicArcana.category, "Class Passive", "Warlock Demonic Arcana category")
+assertEqual(demonicArcana.icon, "interface/icons/spell_warlock_demonsoul.blp", "Warlock Demonic Arcana icon")
+assertEqual(demonicArcana.statBonuses[1].statRef, "f82db71a:qh534ffl", "Warlock Demonic Arcana demon damage stat")
+assertEqual(demonicArcana.statBonuses[1].value, 5, "Warlock Demonic Arcana demon damage value")
+local aftermathAura = findByName(warlockDataset.auras, "Aftermath")
+assertEqual(aftermathAura.id, "wlaftrma", "Warlock Aftermath aura")
+assertEqual(aftermathAura.effects[1].type, "control", "Warlock Aftermath control effect")
+assertEqual(findByName(warlockDataset.traits, "Suppression").icon, "interface/icons/spell_shadow_unsummonbuilding.blp", "Warlock Suppression icon")
+assertEqual(findByName(warlockDataset.traits, "Demonic Embrace").icon, "interface/icons/spell_shadow_metamorphosis.blp", "Warlock Demonic Embrace icon")
+local danceOfTheWicked = findByName(warlockDataset.traits, "Dance of the Wicked")
+assertEqual(danceOfTheWicked.icon, "interface/icons/ability_warlock_eradication.blp", "Warlock Dance of the Wicked icon")
+assertEqual(danceOfTheWicked.statBonuses[1].statRef, "f82db71a:o6113cir", "Warlock Dance of the Wicked Dodge stat")
+assertEqual(danceOfTheWicked.statBonuses[1].value, 5, "Warlock Dance of the Wicked Dodge value")
+assertEqual(findByName(warlockDataset.traits, "Demonic Tactics").icon, "interface/icons/spell_shadow_demonictactics.blp", "Warlock Demonic Tactics icon")
+assertEqual(findByName(warlockDataset.traits, "Aftermath").icon, "interface/icons/spell_fire_fire.blp", "Warlock Aftermath icon")
 
 for _, unitInfo in ipairs({
     { name = "Felhunter", id = "felhnt01", presetCount = 3 },
