@@ -6,7 +6,7 @@ Standalone `RPE_DATASET_ENTRY_V1` import codes for the Warlock class dataset `e8
 
 - Pet abilities in this sheet use `learnMode = "unavailable"`; they are dataset-owned abilities intended to be granted through Warlock Pet definitions rather than learned by the player.
 - These entries follow the current RPE2 spell-authoring specification and current shipped spell schemas.
-- All spell and aura `description` fields are intentionally empty and `tooltipTemplate = true`; the runtime description generators should derive descriptions from the actual components and aura effects rather than relying on hand-authored descriptions.
+ All spell and aura `description` fields are intentionally empty and `tooltipTemplate = false`; the runtime tooltip template generator derives descriptions from the actual components and aura effects.
 - **Shadow Bolt** uses the standard 1-turn single-target Main Action DPS budget: **135 + 1.40 Spell Power** Shadow damage, costing **6.8% base Mana**.
 - **Immolate** is a pure 5-turn active DoT using the current pure-active-DoT reference budget: **20.8 + 0.42 Spell Power per turn**. Its requested 1-turn cast remains on Main Action; the DoT uses the standard periodic **6.3% base Mana** cost convention.
 - **Searing Pain** uses the standard instant single-target damage budget, but `threatCoefficient = 2` so the generated tooltip identifies it as high threat.
@@ -128,7 +128,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -172,7 +172,7 @@ RPE_DATASET_ENTRY_V1
         name = "Immolate",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -248,7 +248,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -347,7 +347,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -446,7 +446,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -545,7 +545,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -644,7 +644,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -741,7 +741,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -788,7 +788,7 @@ RPE_DATASET_ENTRY_V1
         name = "Fel Fireball",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 \`\`\`
@@ -886,7 +886,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -987,7 +987,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1033,7 +1033,7 @@ RPE_DATASET_ENTRY_V1
         name = "Fel Immolate",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 \`\`\`
@@ -1109,7 +1109,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1155,7 +1155,7 @@ RPE_DATASET_ENTRY_V1
         name = "Corruption",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -1231,7 +1231,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1308,7 +1308,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1352,7 +1352,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Agony",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -1428,7 +1428,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1470,7 +1470,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Weakness",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -1546,7 +1546,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1584,7 +1584,7 @@ RPE_DATASET_ENTRY_V1
         name = "Fear",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -1660,7 +1660,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1765,7 +1765,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1898,7 +1898,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2039,7 +2039,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2078,7 +2078,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Tongues",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2153,7 +2153,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2196,7 +2196,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Elements",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2271,7 +2271,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2327,7 +2327,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Shadows",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2402,7 +2402,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2513,7 +2513,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2550,7 +2550,7 @@ RPE_DATASET_ENTRY_V1
         name = "Howl of Terror",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2625,7 +2625,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2672,7 +2672,7 @@ RPE_DATASET_ENTRY_V1
         name = "Siphon Life",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 \`\`\`
@@ -2709,7 +2709,7 @@ RPE_DATASET_ENTRY_V1
         name = "Siphoned Life",
         stackBehavior = "independent_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 \`\`\`
@@ -2804,7 +2804,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2852,7 +2852,7 @@ RPE_DATASET_ENTRY_V1
         name = "Demon Skin",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2927,7 +2927,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Demonology",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2965,7 +2965,7 @@ RPE_DATASET_ENTRY_V1
         name = "Banish",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -3050,7 +3050,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Demonology",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -3094,7 +3094,7 @@ RPE_DATASET_ENTRY_V1
         name = "Shadow Ward",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -3169,7 +3169,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Demonology",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -3237,7 +3237,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Demonology",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -3271,7 +3271,7 @@ RPE_DATASET_ENTRY_V1
                     type = "summon_pet",
                     unitRef = "f82db71a:felhnt01",
                 },
-                key = "wlsmfelc",
+                key = "wlsmfelhc",
                 target = {
                     allowDeadTargets = false,
                     disableSelfCast = false,
@@ -3303,7 +3303,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Demonology",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -3357,7 +3357,7 @@ RPE_DATASET_ENTRY_V1
         name = "Blood Pact",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 \`\`\`
@@ -3430,7 +3430,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Pet - Imp",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -3474,7 +3474,7 @@ RPE_DATASET_ENTRY_V1
         name = "Flame Ward",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 \`\`\`
@@ -3548,7 +3548,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Pet - Imp",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -3614,7 +3614,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Pet - Voidwalker",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -3653,7 +3653,7 @@ RPE_DATASET_ENTRY_V1
         name = "Legion Strike",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 \`\`\`
@@ -3760,7 +3760,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Pet - Felguard",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -3853,7 +3853,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Pet - Sayaad",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -3891,7 +3891,7 @@ RPE_DATASET_ENTRY_V1
         name = "Charm",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 \`\`\`
@@ -3964,7 +3964,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Pet - Sayaad",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -4086,7 +4086,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Pet - Felhunter",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -4123,7 +4123,7 @@ RPE_DATASET_ENTRY_V1
         name = "Spell Lock",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 \`\`\`
@@ -4206,7 +4206,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Pet - Felhunter",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },

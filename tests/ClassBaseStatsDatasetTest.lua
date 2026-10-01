@@ -87,7 +87,7 @@ assertClass("c4a91e7d", 1, "shaman01", "Shaman", {
     ["f82db71a:4c8mfm99"] = { 53, 24.86 },
 })
 
-assertClass("e8f3b2c6", 6, "warlock1", "Warlock", {
+assertClass("e8f3b2c6", 16, "warlock1", "Warlock", {
     ["f82db71a:zfqm8dxp"] = { 0, 0.42 },
     ["f82db71a:xqz0daz2"] = { 0, 0.51 },
     ["f82db71a:ygjno50i"] = { 1, 0.75 },
@@ -99,8 +99,11 @@ assertClass("e8f3b2c6", 6, "warlock1", "Warlock", {
 })
 
 local warlockDataset = definitions["e8f3b2c6"].dataset
-assertEqual(#warlockDataset.auras, 12, "Warlock aura count")
-assertEqual(#warlockDataset.spells, 23, "Warlock spell count")
+local coreDataset = definitions["f82db71a"].dataset
+assertEqual(definitions["f82db71a"].version, 51, "Core dataset version")
+assertEqual(#warlockDataset.auras, 21, "Warlock aura count")
+assertEqual(#warlockDataset.spells, 40, "Warlock spell count")
+assertEqual(#warlockDataset.pets, 5, "Warlock pet count")
 
 local function findByName(collection, name)
     for index = 1, #collection do
@@ -108,18 +111,112 @@ local function findByName(collection, name)
     end
 end
 
+for _, unitInfo in ipairs({
+    { name = "Felhunter", id = "felhnt01", presetCount = 3 },
+    { name = "Sayaad", id = "sayaad01", presetCount = 3 },
+}) do
+    local unit = findByName(coreDataset.units, unitInfo.name)
+    assertTrue(unit ~= nil, "Core includes " .. unitInfo.name)
+    assertEqual(unit.id, unitInfo.id, unitInfo.name .. " unit ID")
+    assertEqual(#unit.presets, unitInfo.presetCount, unitInfo.name .. " preset count")
+end
+
+local sayaad = findByName(coreDataset.units, "Sayaad")
+assertEqual(#sayaad.appearances, 1, "Sayaad base appearance count")
+assertEqual(sayaad.appearances[1].displayId, 159, "Sayaad base display ID")
+assertEqual(sayaad.appearances[1].fileDataId, 1380189, "Sayaad base FileData ID")
+assertEqual(sayaad.appearances[1].cam, 0.4, "Sayaad base camera distance")
+for index, expected in ipairs({
+    { name = "Temptress", displays = { 159, 2834 } },
+    { name = "Seductress", displays = { 4162, 20214 } },
+    { name = "Tormentor", displays = { 10923, 78470 } },
+}) do
+    local preset = sayaad.presets[index]
+    assertEqual(preset.name, expected.name, expected.name .. " preset name")
+    assertEqual(#preset.appearances, 2, expected.name .. " appearance count")
+    for appearanceIndex, displayId in ipairs(expected.displays) do
+        local appearance = preset.appearances[appearanceIndex]
+        assertEqual(appearance.displayId, displayId, expected.name .. " display ID " .. appearanceIndex)
+        assertEqual(appearance.fileDataId, 1380189, expected.name .. " FileData ID " .. appearanceIndex)
+        assertEqual(appearance.cam, 0.4, expected.name .. " camera distance " .. appearanceIndex)
+    end
+end
+
+local voidwalker = findByName(coreDataset.units, "Voidwalker")
+assertEqual(voidwalker.presets[1].name, "Corruptor", "Voidwalker Corruptor preset name")
+assertEqual(voidwalker.presets[1].spells[1], "e8f3b2c6:wlcorru1", "Voidwalker Corruptor Corruption spell reference")
+assertEqual(voidwalker.presets[1].spells[2], "e8f3b2c6:wlcshads", "Voidwalker Corruptor Curse of Shadows spell reference")
+
+for _, petInfo in ipairs({
+    {
+        name = "Summoned Felguard",
+        unitRef = "f82db71a:felgrd01",
+        spells = { "f82db71a:6uix049h", "7bbb4cb9:e0mooybr", "e8f3b2c6:wllgstr1" },
+    },
+    {
+        name = "Summoned Imp",
+        unitRef = "f82db71a:imp00001",
+        spells = { "f82db71a:6uix049h", "d7c874c4:68dy7na1", "e8f3b2c6:wlbldp01", "e8f3b2c6:wlflmwr1" },
+    },
+    {
+        name = "Summoned Voidwalker",
+        unitRef = "f82db71a:voidw001",
+        spells = { "e8f3b2c6:wlshwads", "e8f3b2c6:wltorm01", "f82db71a:6uix049h" },
+    },
+    {
+        name = "Summoned Felhunter",
+        unitRef = "f82db71a:felhnt01",
+        spells = { "f82db71a:6uix049h", "e8f3b2c6:wldevmn1", "e8f3b2c6:wlspklk1" },
+    },
+    {
+        name = "Summoned Sayaad",
+        unitRef = "f82db71a:sayaad01",
+        spells = { "f82db71a:6uix049h", "e8f3b2c6:wlwhipl1", "e8f3b2c6:wlcharm1" },
+    },
+}) do
+    local pet = findByName(warlockDataset.pets, petInfo.name)
+    assertTrue(pet ~= nil, "Warlock includes " .. petInfo.name)
+    assertEqual(pet.unitRef, petInfo.unitRef, petInfo.name .. " unit reference")
+    assertEqual(#pet.spells, #petInfo.spells, petInfo.name .. " spell count")
+    for _, spellRef in ipairs(petInfo.spells) do
+        local found = false
+        for _, petSpellRef in ipairs(pet.spells) do
+            if petSpellRef == spellRef then
+                found = true
+                break
+            end
+        end
+        assertTrue(found, petInfo.name .. " includes " .. spellRef)
+    end
+end
+
+for _, summonInfo in ipairs({
+    { name = "Summon Felhunter", unitRef = "f82db71a:felhnt01" },
+    { name = "Summon Sayaad", unitRef = "f82db71a:sayaad01" },
+}) do
+    local spell = findByName(warlockDataset.spells, summonInfo.name)
+    local effect = spell and spell.components and spell.components[1] and spell.components[1].effect
+    assertTrue(type(effect) == "table", summonInfo.name .. " has a summon effect")
+    assertEqual(effect.type, "summon_pet", summonInfo.name .. " uses summon_pet")
+    assertEqual(effect.unitRef, summonInfo.unitRef, summonInfo.name .. " unit reference")
+end
+
 for _, name in ipairs({
     "Shadow Bolt", "Immolate", "Searing Pain", "Rain of Fire", "Hellfire", "Soul Fire",
     "Corruption", "Life Tap", "Curse of Agony", "Curse of Weakness", "Fear", "Drain Soul",
     "Drain Life", "Drain Mana", "Chaos Bolt", "Curse of Tongues", "Curse of Elements",
     "Curse of Shadows", "Death Coil", "Howl of Terror", "Demon Skin", "Banish", "Shadow Ward",
+    "Summon Felguard", "Summon Imp", "Summon Voidwalker", "Fel Fireball", "Rain of Felfire",
+    "Fel Immolate", "Siphon Life", "Summon Sayaad", "Summon Felhunter", "Blood Pact", "Flame Ward",
+    "Torment", "Legion Strike", "Whiplash", "Charm", "Devour Mana", "Spell Lock",
 }) do
     assertTrue(findByName(warlockDataset.spells, name) ~= nil, "Warlock includes " .. name)
 end
 for _, name in ipairs({
     "Immolate", "Corruption", "Curse of Agony", "Curse of Weakness", "Fear",
     "Curse of Tongues", "Curse of Elements", "Curse of Shadows", "Howl of Terror",
-    "Demon Skin", "Banish", "Shadow Ward",
+    "Demon Skin", "Banish", "Shadow Ward", "Fel Fireball", "Fel Immolate", "Siphon Life",
+    "Siphoned Life", "Blood Pact", "Flame Ward", "Legion Strike", "Charm", "Spell Lock",
 }) do
     local aura = findByName(warlockDataset.auras, name)
     assertTrue(aura ~= nil, "Warlock includes " .. name .. " aura")

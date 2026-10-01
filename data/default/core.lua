@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 48,
+    version = 51,
     dataset = {
         achievements = {},
         auras = {},
@@ -5918,8 +5918,8 @@ units = {
                 resourceModifiers = {  },
                 statModifiers = {  },
                 spells = {
-                    "e8f3b2c6:wlcora01",
-                    "e8f3b2c6:wlcshada",
+                    "e8f3b2c6:wlcorru1",
+                    "e8f3b2c6:wlcshads",
                 },
                 equipment = {  },
             },
@@ -6066,6 +6066,401 @@ units = {
         },
         tags = {  },
     },
+            {
+                appearances = {
+                    {
+                        displayId = 850,
+                    },
+                },
+                attributes = {  },
+                challengeLevel = "normal",
+                creatureSize = "medium",
+                creatureType = "demon",
+                id = "felhnt01",
+                name = "Felhunter",
+                presets = {
+                    {
+                        name = "Spellbreaker",
+                        resourceModifiers = {  },
+                        statModifiers = {  },
+                        spells = {
+                            "f82db71a:6uix049h",
+                            "e8f3b2c6:wlspklk1",
+                        },
+                        equipment = {  },
+                    },
+                    {
+                        name = "Devourer",
+                        resourceModifiers = {  },
+                        statModifiers = {  },
+                        spells = {
+                            "f82db71a:6uix049h",
+                            "e8f3b2c6:wldevmn1",
+                            "e8f3b2c6:wlspklk1",
+                        },
+                        equipment = {  },
+                    },
+                    {
+                        name = "Nullifier",
+                        resourceModifiers = {  },
+                        statModifiers = {  },
+                        spells = {
+                            "f82db71a:6uix049h",
+                            "e8f3b2c6:wlctngs1",
+                            "e8f3b2c6:wlcshads",
+                        },
+                        equipment = {  },
+                    },
+                },
+                resistances = {  },
+                resources = {
+                    {
+                        initialValue = 160,
+                        perLevelValue = 39.661017,
+                        resourceRef = "f82db71a:q2ktkztt",
+                    },
+                    {
+                        initialValue = 120,
+                        perLevelValue = 33.559322,
+                        resourceRef = "f82db71a:4c8mfm99",
+                    },
+                },
+                spells = {  },
+                stats = {
+                    {
+                        initialValue = 75,
+                        perLevelValue = 24.152542,
+                        statRef = "f82db71a:v42albuv",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:wbj4zuf3",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:dd88li4c",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:v2g0tw0o",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:tcn0s8kx",
+                    },
+                    {
+                        initialValue = 3,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:o6113cir",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:p8syz5ba",
+                    },
+                    {
+                        initialValue = 10,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:zs1nbz13",
+                    },
+                    {
+                        initialValue = 55,
+                        perLevelValue = 5.423729,
+                        statRef = "f82db71a:u7b49vs9",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:v2rs9cpy",
+                    },
+                    {
+                        initialValue = 25,
+                        perLevelValue = 2.542373,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                    {
+                        initialValue = 5,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:jslmczbi",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:fercjhm5",
+                    },
+                    {
+                        initialValue = 5,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:69hfqhne",
+                    },
+                    {
+                        initialValue = 1.666667,
+                        perLevelValue = 1.666667,
+                        statRef = "f82db71a:0w7c7p09",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:hj6d4kvy",
+                    },
+                    {
+                        initialValue = 1.666667,
+                        perLevelValue = 1.666667,
+                        statRef = "f82db71a:jjn0my8k",
+                    },
+                    {
+                        initialValue = 1.666667,
+                        perLevelValue = 1.666667,
+                        statRef = "f82db71a:pg0ytacb",
+                    },
+                    {
+                        initialValue = 1.666667,
+                        perLevelValue = 1.666667,
+                        statRef = "f82db71a:954yunb9",
+                    },
+                    {
+                        initialValue = 1.666667,
+                        perLevelValue = 1.666667,
+                        statRef = "f82db71a:itpo751d",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:hlyrsstn",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:rgnrtg01",
+                    },
+                    {
+                        initialValue = 30,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:s1mt6jh9",
+                    },
+                },
+                tags = {  },
+            },
+            {
+                appearances = {
+                    {
+                        displayId = 159,
+                        fileDataId = 1380189,
+                        cam = 0.4,
+                    },
+                },
+                attributes = {  },
+                challengeLevel = "normal",
+                creatureSize = "medium",
+                creatureType = "demon",
+                id = "sayaad01",
+                name = "Sayaad",
+                presets = {
+                    {
+                        name = "Temptress",
+                        resourceModifiers = {  },
+                        statModifiers = {  },
+                        appearances = {
+                            {
+                                displayId = 159,
+                                fileDataId = 1380189,
+                                cam = 0.4,
+                            },
+                            {
+                                displayId = 2834,
+                                fileDataId = 1380189,
+                                cam = 0.4,
+                            },
+                        },
+                        spells = {
+                            "e8f3b2c6:wlwhipl1",
+                            "e8f3b2c6:wlcharm1",
+                        },
+                        equipment = {  },
+                    },
+                    {
+                        name = "Seductress",
+                        resourceModifiers = {  },
+                        statModifiers = {  },
+                        appearances = {
+                            {
+                                displayId = 4162,
+                                fileDataId = 1380189,
+                                cam = 0.4,
+                            },
+                            {
+                                displayId = 20214,
+                                fileDataId = 1380189,
+                                cam = 0.4,
+                            },
+                        },
+                        spells = {
+                            "e8f3b2c6:wlwhipl1",
+                            "e8f3b2c6:wlcorru1",
+                            "e8f3b2c6:wlcshads",
+                        },
+                        equipment = {  },
+                    },
+                    {
+                        name = "Tormentor",
+                        resourceModifiers = {  },
+                        statModifiers = {  },
+                        appearances = {
+                            {
+                                displayId = 10923,
+                                fileDataId = 1380189,
+                                cam = 0.4,
+                            },
+                            {
+                                displayId = 78470,
+                                fileDataId = 1380189,
+                                cam = 0.4,
+                            },
+                        },
+                        spells = {
+                            "e8f3b2c6:wlwhipl1",
+                            "e8f3b2c6:wlfear01",
+                        },
+                        equipment = {  },
+                    },
+                },
+                resistances = {  },
+                resources = {
+                    {
+                        initialValue = 150,
+                        perLevelValue = 34.745763,
+                        resourceRef = "f82db71a:q2ktkztt",
+                    },
+                    {
+                        initialValue = 120,
+                        perLevelValue = 28.474576,
+                        resourceRef = "f82db71a:4c8mfm99",
+                    },
+                },
+                spells = {  },
+                stats = {
+                    {
+                        initialValue = 50,
+                        perLevelValue = 24.576271,
+                        statRef = "f82db71a:v42albuv",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:wbj4zuf3",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:dd88li4c",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:v2g0tw0o",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:tcn0s8kx",
+                    },
+                    {
+                        initialValue = 5,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:o6113cir",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:p8syz5ba",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:zs1nbz13",
+                    },
+                    {
+                        initialValue = 50,
+                        perLevelValue = 5.932203,
+                        statRef = "f82db71a:u7b49vs9",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:v2rs9cpy",
+                    },
+                    {
+                        initialValue = 30,
+                        perLevelValue = 3.728814,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                    {
+                        initialValue = 5,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:jslmczbi",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:fercjhm5",
+                    },
+                    {
+                        initialValue = 5,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:69hfqhne",
+                    },
+                    {
+                        initialValue = 1.333333,
+                        perLevelValue = 1.333333,
+                        statRef = "f82db71a:0w7c7p09",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:hj6d4kvy",
+                    },
+                    {
+                        initialValue = 1.333333,
+                        perLevelValue = 1.333333,
+                        statRef = "f82db71a:jjn0my8k",
+                    },
+                    {
+                        initialValue = 1.333333,
+                        perLevelValue = 1.333333,
+                        statRef = "f82db71a:pg0ytacb",
+                    },
+                    {
+                        initialValue = 1.333333,
+                        perLevelValue = 1.333333,
+                        statRef = "f82db71a:954yunb9",
+                    },
+                    {
+                        initialValue = 1.333333,
+                        perLevelValue = 1.333333,
+                        statRef = "f82db71a:itpo751d",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:hlyrsstn",
+                    },
+                    {
+                        initialValue = 0,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:rgnrtg01",
+                    },
+                    {
+                        initialValue = 30,
+                        perLevelValue = 0,
+                        statRef = "f82db71a:s1mt6jh9",
+                    },
+                },
+                tags = {  },
+            },
         },
         weaponTypes = {
             {
