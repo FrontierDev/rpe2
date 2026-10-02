@@ -1476,7 +1476,7 @@ RPE_DATASET_ENTRY_V1
                                 applyAura = false,
                                 auraStacks = 1,
                                 baseDamage = 71.825,
-                                damageSchoolRefs = { "f82db71a:dtxhglqg" },
+                                damageSchoolRefs = { "f82db71a:hx7pnwv4", "f82db71a:dtxhglqg" },
                                 damageType = "spell",
                                 hitType = "ability",
                                 projectilePath = "",
@@ -1561,7 +1561,7 @@ RPE_DATASET_ENTRY_V1
         tooltipTemplate = true,
         tooltipTemplateData = {
             auraSections = { },
-            mainText = "Deal {DAMAGE_1} Arcane damage to an enemy and apply Shattering Star for 2 turns, reducing its Damage Reduction by 10.",
+            mainText = "Deal {DAMAGE_1} Spellfrost damage to an enemy and apply Shattering Star for 2 turns, reducing its Damage Reduction by 10.",
             tokens = {
                 {
                     applyMode = "damage_range",
