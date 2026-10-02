@@ -16,7 +16,7 @@ The sheet preserves the recognizable **Devastation**, **Preservation**, and **Au
 - Periodic healing uses current HoT analogues. Dream Breath's HoT is 85% of Wild Growth's current per-turn profile because Dream Breath also has an independently useful direct heal.
 - Fire Breath's DoT is deliberately modest because the parent spell also has direct five-target damage.
 - **Quell** uses the native RPE interrupt effect rather than a fake silence aura.
-- **Cauterizing Flame** uses `remove_aura_by_tag` for `bleed`, `poison`, `curse`, and `disease`.
+- **Cauterizing Flame** uses `remove_aura_by_tag` for `bleed`, `poison`, `curse`, and `disease`. Its conditional heal-on-success is omitted because the current effect model cannot make the heal contingent on actually removing an aura.
 - Movement-defining spells such as Deep Breath, Rescue, Hover, Verdant Embrace's movement component, and Dream Flight are omitted.
 - Spell-storage/replay and historical-damage mechanics such as Echo, Stasis, Rewind, Temporal Anomaly, Time Skip, and Breath of Eons are omitted rather than approximated.
 - All icons use the Evoker spell/talent icon identities rather than generic placeholders.
@@ -130,7 +130,7 @@ RPE_DATASET_ENTRY_V1
         events = {
 
         },
-        icon = "interface/icons/ability_evoker_shatteringstar.blp",
+        icon = "interface/icons/ability_evoker_chargedblast.blp",
         id = "evshsta1",
         maxStacks = 1,
         name = "Shattering Star",
@@ -259,6 +259,38 @@ RPE_DATASET_ENTRY_V1
     },
 }
 ```
+## Emerald Communion — Aura
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "evokdata",
+    entry = {
+        description = "",
+        duration = 2,
+        effects = {
+            {
+                amountMode = "max_percent",
+                baseHealing = 20,
+                statScaling = { },
+                type = "heal",
+            },
+        },
+        events = { },
+        icon = "interface/icons/ability_evoker_green_01.blp",
+        id = "evemcoa1",
+        maxStacks = 1,
+        name = "Emerald Communion",
+        stackBehavior = "refresh_duration",
+        tags = { },
+        tooltipTemplate = true,
+    },
+}
+```
+
 ## Zephyr — Aura
 
 ```text
@@ -319,7 +351,7 @@ RPE_DATASET_ENTRY_V1
         events = {
 
         },
-        icon = "interface/icons/ability_evoker_ebonmight.blp",
+        icon = "interface/icons/spell_sarkareth.blp",
         id = "evebona1",
         maxStacks = 1,
         name = "Ebon Might",
@@ -1058,7 +1090,7 @@ RPE_DATASET_ENTRY_V1
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
-        icon = "interface/icons/ability_evoker_cauterizingflame.blp",
+        icon = "interface/icons/ability_evoker_fontofmagic_red.blp",
         id = "evcautf1",
         cooldownChannel = 2,
         learnMode = "always_learned",
@@ -1070,7 +1102,7 @@ RPE_DATASET_ENTRY_V1
         range = 0,
         resourceCosts = {
             {
-                amount = 5,
+                amount = 10,
                 amountMode = "base_percent",
                 castPhase = "on_cast_end",
                 refundOnInterrupt = 0,
@@ -1504,7 +1536,7 @@ RPE_DATASET_ENTRY_V1
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
-        icon = "interface/icons/ability_evoker_shatteringstar.blp",
+        icon = "interface/icons/ability_evoker_chargedblast.blp",
         id = "evshstr1",
         cooldownChannel = 2,
         learnMode = "always_learned",
@@ -2107,49 +2139,38 @@ RPE_DATASET_ENTRY_V1
         allowDeadTargets = false,
         canMoveWhileCasting = false,
         castTime = 0,
-        casterEvents = {
-            "on_heal",
-            "on_critical_heal",
-        },
+        casterEvents = { },
         charges = 0,
         components = {
             {
-                        castPhase = "on_cast_end",
-                        castingGroup = "default",
-                        effect = {
-                                amountMode = "max_percent",
-                                applyAura = false,
-                                auraStacks = 1,
-                                baseHealing = 20,
-                                projectilePath = "",
-                                projectileSpeed = 0,
-                                statScaling = { },
-                                targetEvents = {
-                                    "on_heal_taken",
-                                    "on_critical_heal_taken",
-                                },
-                                threatCoefficient = 0.5,
-                                type = "heal",
-                                usesProjectile = false,
-                            },
-                        key = "evechl01",
-                        target = {
-                                allowDeadTargets = false,
-                                disableSelfCast = false,
-                                maxTargets = 0,
-                                minTargets = 0,
-                                requiresTarget = false,
-                                targetDisposition = "ally",
-                                type = "all_allies",
-                            },
-                    }
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "evokdata:evemcoa1",
+                    basePower = 0,
+                    duration = 2,
+                    stacks = 1,
+                    targetEvents = { },
+                    type = "apply_aura",
+                },
+                key = "evecau01",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
+                },
+            },
         },
         conditions = { },
         cooldown = 10,
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
-        icon = "interface/icons/ability_evoker_emeraldcommunion.blp",
+        icon = "interface/icons/ability_evoker_green_01.blp",
         id = "evemcomm",
         cooldownChannel = 3,
         learnMode = "always_learned",
@@ -2166,15 +2187,8 @@ RPE_DATASET_ENTRY_V1
         tooltipTemplate = true,
         tooltipTemplateData = {
             auraSections = { },
-            mainText = "Heal all allies for 20% of their maximum health.",
-            tokens = {
-                {
-                    applyMode = "heal_range",
-                    componentIndex = 1,
-                    key = "HEAL_1",
-                    tokenType = "spell_heal_range",
-                }
-            },
+            mainText = "Apply Emerald Communion to yourself for 2 turns, restoring 20% of maximum health each turn.",
+            tokens = { },
             version = 1,
         },
         totalTicks = 0,
@@ -2336,7 +2350,7 @@ RPE_DATASET_ENTRY_V1
         cooldownGroup = "",
         cooldownScalesWithHaste = false,
         description = "",
-        icon = "interface/icons/ability_evoker_ebonmight.blp",
+        icon = "interface/icons/spell_sarkareth.blp",
         id = "evebonmt",
         cooldownChannel = 3,
         learnMode = "always_learned",
