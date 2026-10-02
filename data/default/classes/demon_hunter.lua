@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 1,
+    version = 2,
     dataset = {
         achievements = {},
         auras = {},
@@ -66,6 +66,7 @@ Addon.Data.DefaultDatasets:Register({
         items = {},
         loot = {},
         mounts = {},
+        name = "Demon Hunter",
         pets = {},
         races = {},
         recipes = {},

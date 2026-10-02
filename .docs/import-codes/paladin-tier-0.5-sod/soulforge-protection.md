@@ -480,8 +480,8 @@ RPE_DATASET_ENTRY_V1
                 value = 26,
             },
             {
-                sourceStatRef = "f82db71a:p8syz5ba",
-                value = 1,
+                sourceStatRef = "f82db71a:sblkval1",
+                value = 19,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",
@@ -674,8 +674,8 @@ RPE_DATASET_ENTRY_V1
                 value = 15,
             },
             {
-                sourceStatRef = "f82db71a:p8syz5ba",
-                value = 1,
+                sourceStatRef = "f82db71a:sblkval1",
+                value = 15,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",

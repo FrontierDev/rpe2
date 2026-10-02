@@ -106,7 +106,7 @@ assertClass("e8f3b2c6", 22, "warlock1", "Warlock", {
     ["f82db71a:4c8mfm99"] = { 59, 22.27 },
 }, 1, 5)
 
-assertClass("dknight1", 2, "dkclass1", "Death Knight", {
+assertClass("dknight1", 8, "dkclass1", "Death Knight", {
     ["f82db71a:zfqm8dxp"] = { 3, 1.64 },
     ["f82db71a:xqz0daz2"] = { 0, 1.02 },
     ["f82db71a:ygjno50i"] = { 2, 1.49 },
@@ -114,9 +114,9 @@ assertClass("dknight1", 2, "dkclass1", "Death Knight", {
     ["f82db71a:kec9rhli"] = { 0, 0.42 },
 }, {
     ["f82db71a:q2ktkztt"] = { 20, 28.29 },
-}, 0, 0)
+}, 0, 18)
 
-assertClass("monkdata", 1, "monk0001", "Monk", {
+assertClass("monkdata", 9, "monk0001", "Monk", {
     ["f82db71a:zfqm8dxp"] = { 1, 0.75 },
     ["f82db71a:xqz0daz2"] = { 0, 0.68 },
     ["f82db71a:ygjno50i"] = { 0, 0.85 },
@@ -125,9 +125,9 @@ assertClass("monkdata", 1, "monk0001", "Monk", {
 }, {
     ["f82db71a:q2ktkztt"] = { 33, 24.58 },
     ["f82db71a:4c8mfm99"] = { 17, 20.8 },
-}, 0, 0)
+}, 0, 5)
 
-assertClass("dhunter1", 1, "dhclass1", "Demon Hunter", {
+assertClass("dhunter1", 2, "dhclass1", "Demon Hunter", {
     ["f82db71a:zfqm8dxp"] = { 1, 1 },
     ["f82db71a:xqz0daz2"] = { 3, 1.81 },
     ["f82db71a:ygjno50i"] = { 1, 0.92 },
@@ -137,7 +137,7 @@ assertClass("dhunter1", 1, "dhclass1", "Demon Hunter", {
     ["f82db71a:q2ktkztt"] = { 25, 25.39 },
 }, 0, 0)
 
-assertClass("evokdata", 1, "evoker01", "Evoker", {
+assertClass("evokdata", 2, "evoker01", "Evoker", {
     ["f82db71a:zfqm8dxp"] = { 0, 0.17 },
     ["f82db71a:xqz0daz2"] = { 0, 0.25 },
     ["f82db71a:ygjno50i"] = { 0, 0.42 },
@@ -151,6 +151,7 @@ assertClass("evokdata", 1, "evoker01", "Evoker", {
 local shamanDataset = definitions["c4a91e7d"].dataset
 local warlockDataset = definitions["e8f3b2c6"].dataset
 local deathKnightDataset = definitions["dknight1"].dataset
+local monkDataset = definitions["monkdata"].dataset
 local coreDataset = definitions["f82db71a"].dataset
 assertEqual(definitions["c4a91e7d"].version, 10, "Shaman dataset version")
 assertEqual(#shamanDataset.auras, 28, "Shaman aura count")
@@ -158,10 +159,17 @@ assertEqual(#shamanDataset.spells, 32, "Shaman spell count")
 assertEqual(#shamanDataset.traits, 14, "Shaman trait count")
 assertEqual(#shamanDataset.items, 64, "Shaman item count")
 assertEqual(definitions["e8f3b2c6"].version, 22, "Warlock dataset version")
-assertEqual(definitions["f82db71a"].version, 54, "Core dataset version")
-assertEqual(definitions["dknight1"].version, 2, "Death Knight dataset version")
-assertEqual(#deathKnightDataset.auras, 15, "Death Knight aura count")
+assertEqual(definitions["f82db71a"].version, 58, "Core dataset version")
+assertEqual(definitions["dknight1"].version, 8, "Death Knight dataset version")
+assertEqual(#deathKnightDataset.auras, 18, "Death Knight aura count")
 assertEqual(#deathKnightDataset.spells, 31, "Death Knight spell count")
+assertEqual(#deathKnightDataset.traits, 18, "Death Knight trait count")
+assertEqual(#deathKnightDataset.items, 48, "Death Knight item count")
+assertEqual(definitions["monkdata"].version, 9, "Monk dataset version")
+assertEqual(#monkDataset.auras, 12, "Monk aura count")
+assertEqual(#monkDataset.spells, 23, "Monk spell count")
+assertEqual(#monkDataset.traits, 5, "Monk trait count")
+assertEqual(#monkDataset.items, 48, "Monk item count")
 assertEqual(#warlockDataset.auras, 22, "Warlock aura count")
 assertEqual(#warlockDataset.spells, 40, "Warlock spell count")
 assertEqual(#warlockDataset.items, 32, "Warlock item count")
@@ -173,6 +181,18 @@ local function findByName(collection, name)
         if collection[index].name == name then return collection[index] end
     end
 end
+
+local runeStrike = findByName(deathKnightDataset.spells, "Rune Strike")
+assertEqual(runeStrike.components[1].effect.baseDamage, 135, "Rune Strike tank spender base damage")
+assertEqual(runeStrike.components[1].effect.statScaling[1].coefficient, 0.63, "Rune Strike tank spender MAP coefficient")
+assertEqual(runeStrike.components[1].effect.weaponDamageCoefficient, 1.8, "Rune Strike tank spender weapon coefficient")
+
+local monkGuard = findByName(monkDataset.spells, "Guard")
+assertEqual(monkGuard.cooldownChannel, 3, "Monk Guard buff action channel")
+local energizingBrew = findByName(monkDataset.spells, "Energizing Brew")
+assertEqual(energizingBrew.cooldownChannel, 3, "Monk Energizing Brew buff action channel")
+local spearHandStrike = findByName(monkDataset.spells, "Spear Hand Strike")
+assertEqual(spearHandStrike.resourceCosts[1].amount, 5, "Monk Spear Hand Strike energy cost")
 
 local deathKnightAuraRefs = {}
 for index = 1, #deathKnightDataset.auras do

@@ -611,6 +611,10 @@ local function buildCombatResult(entry, resultToken, resultType)
         absorbedAmount = 0,
         absorptionChanges = {},
         amount = 0,
+        blocked = entry and entry.blocked == true or false,
+        shieldBlockValueStatRef = entry and entry.shieldBlockValueStatRef or nil,
+        shieldBlockValue = 0,
+        blockedAmount = 0,
         checkId = entry and entry.checkId or nil,
         eventId = entry and entry.eventId or nil,
         spellRef = entry and entry.spellRef or nil,
@@ -637,6 +641,7 @@ local function buildCombatRuleSnapshot(self)
         damageDealtStat = normalizeToken(self:GetCombatRule("damage_dealt_stat", "")),
         spellDamageVsCreatureTypeStats = spellDamageVsCreatureTypeStats,
         damageReductionStat = normalizeToken(self:GetCombatRule("damage_reduction_stat", "")),
+        shieldBlockValueStat = normalizeToken(self:GetCombatRule("shield_block_value_stat", "")),
         threatGeneratedStat = normalizeToken(self:GetCombatRule("threat_generated_stat", "")),
     }
 end
@@ -1354,6 +1359,10 @@ buildResolvedDamageResult = function(self, entry)
         threatTotal = 0,
         threatUpdate = nil,
         threatCommitted = false,
+        blocked = false,
+        shieldBlockValueStatRef = nil,
+        shieldBlockValue = 0,
+        blockedAmount = 0,
         critMitigationStatRef = nil,
         critMitigationStatValue = 0,
         critMitigation = nil,
@@ -1449,6 +1458,25 @@ buildResolvedDamageResult = function(self, entry)
     end
 
     finalDamage = math.max(0, Common.Round(finalDamage))
+    local postMitigationDamage = finalDamage
+    local shieldBlockValueStatRef = normalizeToken(
+        combatRules.shieldBlockValueStat
+        or (entry.blocked == true and entry.shieldBlockValueStatRef or nil)
+        or (type(hitContext) == "table" and hitContext.shieldBlockValueStatRef or nil)
+    )
+    local explicitlyBlocked = entry.blocked == true
+        or (type(hitContext) == "table" and hitContext.blocked == true)
+    if explicitlyBlocked and shieldBlockValueStatRef then
+        local shieldBlockValue = math.max(
+            0,
+            tonumber(getCachedStatValue(hitContext, entry.defenderUnit, shieldBlockValueStatRef)) or 0
+        )
+        finalDamage = math.max(0, postMitigationDamage - shieldBlockValue)
+        result.blocked = true
+        result.shieldBlockValueStatRef = shieldBlockValueStatRef
+        result.shieldBlockValue = shieldBlockValue
+        result.blockedAmount = math.min(postMitigationDamage, shieldBlockValue)
+    end
     scaledRawDamage = math.max(0, Common.Round(scaledRawDamage))
     result.preAbsorbAmount = finalDamage
     result.amount = finalDamage
@@ -1683,12 +1711,21 @@ function Combat:ResolveHitCheckOutcome(entry, action)
         return nil, nil
     end
 
+    local function finishResolution(resultToken, resolution)
+        if resultToken == RESULT_FAIL
+            and type(self.MarkShieldBlockValueDamageContext) == "function"
+        then
+            self:MarkShieldBlockValueDamageContext(entry, action, resultToken, resolution)
+        end
+        return resultToken, resolution
+    end
+
     local actionId = type(action) == "table" and action.id or action
     if normalizeResultToken(actionId) == RESULT_PASS then
-        return RESULT_PASS, {
+        return finishResolution(RESULT_PASS, {
             attackerTotal = tonumber(entry.attackerTotal) or 0,
             defenceSystem = RESULT_PASS,
-        }
+        })
     end
 
     local resolvedSystem = type(action) == "table" and tostring(action.resolutionSystem or entry.defenceSystem or "") or tostring(entry.defenceSystem or "")
@@ -1700,12 +1737,15 @@ function Combat:ResolveHitCheckOutcome(entry, action)
     if resolvedSystem == "ac" then
         local armorClassStat = self:ResolveDefenceStatRef("ac", entry.attackType)
         local armorClass = armorClassStat and (self.GetCachedCombatStatValue and self:GetCachedCombatStatValue(entry.context, entry.defenderUnit, armorClassStat, 0) or 0) or 0
-        return attackerTotal > armorClass and RESULT_PASS or RESULT_FAIL, {
-            attackerTotal = attackerTotal,
-            defenderTotal = armorClass,
-            defenceStatRef = armorClassStat,
-            defenceSystem = "ac",
-        }
+        return finishResolution(
+            attackerTotal > armorClass and RESULT_PASS or RESULT_FAIL,
+            {
+                attackerTotal = attackerTotal,
+                defenderTotal = armorClass,
+                defenceStatRef = armorClassStat,
+                defenceSystem = "ac",
+            }
+        )
     end
 
     if resolvedSystem == "simple" then
@@ -1713,12 +1753,15 @@ function Combat:ResolveHitCheckOutcome(entry, action)
         local roll = self:RollDiceExpression(entry.context, self:GetCombatRule("defence_roll_dice", DEFAULT_DEFENCE_ROLL_DICE))
         local defenceValue = defenceStatRef and (self.GetCachedCombatStatValue and self:GetCachedCombatStatValue(entry.context, entry.defenderUnit, defenceStatRef, 0) or 0) or 0
         local defenderTotal = roll + defenceValue
-        return attackerTotal > defenderTotal and RESULT_PASS or RESULT_FAIL, {
-            attackerTotal = attackerTotal,
-            defenderTotal = defenderTotal,
-            defenceStatRef = defenceStatRef,
-            defenceSystem = "simple",
-        }
+        return finishResolution(
+            attackerTotal > defenderTotal and RESULT_PASS or RESULT_FAIL,
+            {
+                attackerTotal = attackerTotal,
+                defenderTotal = defenderTotal,
+                defenceStatRef = defenceStatRef,
+                defenceSystem = "simple",
+            }
+        )
     end
 
     if resolvedSystem == "complex" then
@@ -1726,12 +1769,15 @@ function Combat:ResolveHitCheckOutcome(entry, action)
         local roll = self:RollDiceExpression(entry.context, self:GetCombatRule("defence_roll_dice", DEFAULT_DEFENCE_ROLL_DICE))
         local defenceValue = defenceStatRef and (self.GetCachedCombatStatValue and self:GetCachedCombatStatValue(entry.context, entry.defenderUnit, defenceStatRef, 0) or 0) or 0
         local defenderTotal = roll + defenceValue
-        return attackerTotal > defenderTotal and RESULT_PASS or RESULT_FAIL, {
-            attackerTotal = attackerTotal,
-            defenderTotal = defenderTotal,
-            defenceStatRef = defenceStatRef,
-            defenceSystem = "complex",
-        }
+        return finishResolution(
+            attackerTotal > defenderTotal and RESULT_PASS or RESULT_FAIL,
+            {
+                attackerTotal = attackerTotal,
+                defenderTotal = defenderTotal,
+                defenceStatRef = defenceStatRef,
+                defenceSystem = "complex",
+            }
+        )
     end
 
     if resolvedSystem == "percent" then
@@ -1746,14 +1792,17 @@ function Combat:ResolveHitCheckOutcome(entry, action)
         local resistanceValue = self:SumStatValues(entry.defenderUnit, chosenResistanceStats, entry.context)
         local basePenalty = tonumber(self:GetCombatRule("percent_base_penalty", 0)) or 0
         local defenderThreshold = Common.Round(basePenalty + resistanceValue)
-        return attackerTotal > defenderThreshold and RESULT_PASS or RESULT_FAIL, {
-            attackerTotal = attackerTotal,
-            defenderTotal = defenderThreshold,
-            resistanceTotal = resistanceValue,
-            basePenalty = basePenalty,
-            defenceStatRef = chosenDefenceStatRef,
-            defenceSystem = "percent",
-        }
+        return finishResolution(
+            attackerTotal > defenderThreshold and RESULT_PASS or RESULT_FAIL,
+            {
+                attackerTotal = attackerTotal,
+                defenderTotal = defenderThreshold,
+                resistanceTotal = resistanceValue,
+                basePenalty = basePenalty,
+                defenceStatRef = chosenDefenceStatRef,
+                defenceSystem = "percent",
+            }
+        )
     end
 
     return nil, nil
@@ -1876,7 +1925,12 @@ function Combat:BeginHitCheck(context, effect, component)
         if completed and type(Combat.RecordResolvedCombatAttackHistory) == "function" then
             Combat:RecordResolvedCombatAttackHistory(Client, entry, resultToken, action, resolution)
         end
-        if completed and resultToken == RESULT_PASS then
+        if completed and resultToken == RESULT_FAIL and entry.blocked == true
+            and type(Combat.EmitSuccessfulDefenceEvent) == "function"
+        then
+            Combat:EmitSuccessfulDefenceEvent(Client, entry, action, resultToken, resolution)
+        end
+        if completed and (resultToken == RESULT_PASS or entry.blocked == true) then
             local applyDamageStartTime = timingEnabled and getNowMilliseconds() or nil
             local _, damageResult = self:ApplyResolvedDamage(entry)
             entry.lastDamageResult = damageResult

@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 54,
+    version = 58,
     dataset = {
         achievements = {},
         auras = {},
@@ -1309,6 +1309,7 @@ Addon.Data.DefaultDatasets:Register({
                 stats = {
                     { sourceStatRef = "f82db71a:v42albuv", value = 32 },
                     { sourceStatRef = "f82db71a:p8syz5ba", value = 1 },
+                    { sourceStatRef = "f82db71a:sblkval1", value = 3 },
                 },
                 tags = { "starter" },
                 targetArmorWeight = "none",
@@ -3981,6 +3982,32 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Parry Chance",
                 priority = 26,
                 seedNPCStat = true,
+                tags = {},
+                valueMode = "derived",
+                visibility = true
+            },
+            {
+                baseValue = 0,
+                category = "Defense",
+                color = {
+                    a = 1,
+                    b = 0,
+                    g = 1,
+                    r = 0
+                },
+                derivedSources = {
+                    {
+                        coefficient = 0.05,
+                        sourceStatRef = "f82db71a:zfqm8dxp"
+                    }
+                },
+                description = "Reduces damage taken from a successful Block by a flat amount when configured by the active Ruleset. Increases by 1 for every 20 Strength.",
+                displayMode = "equip",
+                icon = "interface/icons/inv_shield_06.blp",
+                id = "sblkval1",
+                name = "Shield Block Value",
+                priority = 21,
+                seedNPCStat = false,
                 tags = {},
                 valueMode = "derived",
                 visibility = true

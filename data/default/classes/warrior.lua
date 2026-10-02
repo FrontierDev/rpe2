@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 45,
+    version = 46,
     dataset = {
         achievements = {},
         auras = {
@@ -3059,8 +3059,8 @@ Addon.Data.DefaultDatasets:Register({
                         value = 29,
                     },
                     {
-                        sourceStatRef = "f82db71a:p8syz5ba",
-                        value = 1,
+                        sourceStatRef = "f82db71a:sblkval1",
+                        value = 15,
                     },
                     {
                         sourceStatRef = "f82db71a:0wyp78x9",
@@ -3419,8 +3419,8 @@ Addon.Data.DefaultDatasets:Register({
                         value = 25,
                     },
                     {
-                        sourceStatRef = "f82db71a:p8syz5ba",
-                        value = 1,
+                        sourceStatRef = "f82db71a:sblkval1",
+                        value = 21,
                     },
                     {
                         sourceStatRef = "f82db71a:0wyp78x9",

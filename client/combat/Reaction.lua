@@ -472,15 +472,6 @@ local function unitHasShield(unit)
     return false
 end
 
-local function normalizeComparisonToken(value)
-    local text = trimText(value or "")
-    if text == "" then
-        return ""
-    end
-
-    return string.lower((text:gsub("[%s%p_]+", "")))
-end
-
 local function resolveDismountResistanceThreshold()
     local statRef = normalizeToken(getMountRuleValue("dismount_resistance_stat", ""))
     if not statRef then
@@ -703,6 +694,10 @@ local function buildCombatResult(entry, resultToken, resultType)
         landed = resultToken == RESULT_PASS,
         pending = resultToken == nil,
         amount = 0,
+        blocked = entry and entry.blocked == true or false,
+        shieldBlockValueStatRef = entry and entry.shieldBlockValueStatRef or nil,
+        shieldBlockValue = 0,
+        blockedAmount = 0,
         checkId = entry and entry.checkId or nil,
         eventId = entry and entry.eventId or nil,
         spellRef = entry and entry.spellRef or nil,
@@ -1130,8 +1125,6 @@ function Combat:BuildReactionActions(entry)
     local blockChanceStatRef = normalizeToken(getCombatRuleValue("block_chance_stat", ""))
     local allowBlockWithoutShield = getCombatRuleValue("allow_block_without_shield", true) ~= false
     local defenderHasShield = unitHasShield(entry.defenderUnit)
-    local blockActionLabel = blockChanceStatRef and self:ResolveDefenceTextForStat(blockChanceStatRef) or ""
-    local normalizedBlockActionLabel = normalizeComparisonToken(blockActionLabel)
 
     local function applyShieldEligibility(action)
         if type(action) ~= "table" then
@@ -1139,10 +1132,7 @@ function Combat:BuildReactionActions(entry)
         end
 
         local matchesBlockStat = blockChanceStatRef ~= nil and action.statRef == blockChanceStatRef
-        local normalizedActionLabel = normalizeComparisonToken(action.label)
-        local matchesBlockLabel = normalizedBlockActionLabel ~= ""
-            and normalizedActionLabel == normalizedBlockActionLabel
-        if matchesBlockStat ~= true and matchesBlockLabel ~= true then
+        if matchesBlockStat ~= true then
             return action
         end
 
@@ -1576,6 +1566,83 @@ local function normalizeDefenceStatRef(value)
     return reference and reference ~= "" and reference or nil
 end
 
+local function isShieldBlockValueResolution(entry, action, resultToken, resolution)
+    if normalizeResultToken(resultToken) ~= RESULT_FAIL
+        or type(entry) ~= "table"
+        or type(resolution) ~= "table"
+    then
+        return false, nil
+    end
+
+    local defenceSystem = tostring(resolution.defenceSystem or entry.defenceSystem or "")
+    if defenceSystem ~= "ac"
+        and defenceSystem ~= "simple"
+        and defenceSystem ~= "complex"
+        and defenceSystem ~= "percent"
+    then
+        return false, nil
+    end
+
+    if type(action) == "table"
+        and (action.enabled == false or normalizeResultToken(action.id) == RESULT_PASS)
+    then
+        return false, nil
+    end
+
+    local blockChanceStatRef = normalizeDefenceStatRef(getCombatRuleValue("block_chance_stat", ""))
+    local defenceStatRef = normalizeDefenceStatRef(resolution.defenceStatRef)
+    if not defenceStatRef and type(action) == "table" then
+        defenceStatRef = normalizeDefenceStatRef(action.statRef)
+    end
+    if not blockChanceStatRef or defenceStatRef ~= blockChanceStatRef then
+        return false, nil
+    end
+    if type(action) == "table"
+        and normalizeDefenceStatRef(action.statRef)
+        and normalizeDefenceStatRef(action.statRef) ~= blockChanceStatRef
+    then
+        return false, nil
+    end
+
+    local shieldBlockValueStatRef = normalizeDefenceStatRef(getCombatRuleValue("shield_block_value_stat", ""))
+    if not shieldBlockValueStatRef then
+        return false, nil
+    end
+
+    return true, shieldBlockValueStatRef
+end
+
+function Combat:MarkShieldBlockValueDamageContext(entry, action, resultToken, resolution)
+    local isBlocked, shieldBlockValueStatRef = isShieldBlockValueResolution(
+        entry,
+        action,
+        resultToken,
+        resolution
+    )
+    if isBlocked ~= true then
+        return false
+    end
+
+    entry.blocked = true
+    entry.successfullyDefended = true
+    entry.shieldBlockValueStatRef = shieldBlockValueStatRef
+    entry.context = entry.context or {}
+    entry.context.blocked = true
+    entry.context.shieldBlockValueStatRef = shieldBlockValueStatRef
+
+    local hitContext = entry.hitResolutionContext
+    if type(hitContext) == "table" then
+        hitContext.blocked = true
+        hitContext.shieldBlockValueStatRef = shieldBlockValueStatRef
+        hitContext.resolvedResult = nil
+    end
+    entry.damagePreview = nil
+    if type(entry.sharedHitPreview) == "table" then
+        entry.sharedHitPreview.damagePreview = nil
+    end
+    return true
+end
+
 function Combat:EmitSuccessfulDefenceEvent(client, entry, action, resultToken, resolution)
     if type(client) ~= "table"
         or type(entry) ~= "table"
@@ -1663,6 +1730,7 @@ function Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, ac
 
     local landed = normalizedResult == RESULT_PASS
     local successfullyDefended = defendedOverride == true
+        or entry.successfullyDefended == true
         or isSuccessfulDefensiveResolution(entry, action, normalizedResult, resolution)
     return client:RecordCombatAttack(
         entry.eventState,
@@ -1763,11 +1831,17 @@ function Client:ResolveCombatReactionAction(actionId)
                 Combat:EmitSuccessfulDefenceEvent(self, entry, action, resultToken, resolution)
             end
         end
-        if completed and resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
+        if completed
+            and (resultToken == RESULT_PASS or entry.blocked == true)
+            and type(Combat.ApplyResolvedDamage) == "function"
+        then
             local _, damageResult = Combat:ApplyResolvedDamage(entry)
             entry.lastDamageResult = damageResult
             Combat:FinalizeLocalDamageResult(entry, damageResult)
         elseif completed and resultToken == RESULT_FAIL then
+            Combat:ShowDefenceCombatText(entry, resolution)
+        end
+        if completed and resultToken == RESULT_FAIL and entry.blocked == true then
             Combat:ShowDefenceCombatText(entry, resolution)
         end
         self:ShowNextQueuedCombatReaction()
@@ -1776,6 +1850,7 @@ function Client:ResolveCombatReactionAction(actionId)
 
     local attackerName = resolveSenderForUnit(entry.eventState, entry.attackerUnit)
     local successfullyDefended = isSuccessfulDefensiveResolution(entry, action, resultToken, resolution)
+    entry.successfullyDefended = successfullyDefended
     local defenceStatRef = successfullyDefended and normalizeDefenceStatRef(resolution and resolution.defenceStatRef) or nil
     local responseArguments = {
         entry.checkId,
@@ -1784,6 +1859,15 @@ function Client:ResolveCombatReactionAction(actionId)
         successfullyDefended and "defended" or "",
         defenceStatRef or "",
     }
+    if entry.blocked == true then
+        -- Keep the original five response fields stable. The blocked marker
+        -- is appended after the existing optional authoritative-result slots.
+        responseArguments[#responseArguments + 1] = ""
+        responseArguments[#responseArguments + 1] = ""
+        responseArguments[#responseArguments + 1] = ""
+        responseArguments[#responseArguments + 1] = "blocked"
+        responseArguments[#responseArguments + 1] = entry.shieldBlockValueStatRef or ""
+    end
     if attackerName == "" or not sendCombatWhisper(attackerName, HIT_CHECK_RESPONSE_OPCODE, responseArguments) then
         return false
     end
@@ -1791,7 +1875,9 @@ function Client:ResolveCombatReactionAction(actionId)
     Combat:EmitSuccessfulDefenceEvent(self, entry, action, resultToken, resolution)
     self:HideCombatReaction()
     Combat:RecordResolvedCombatAttackHistory(self, entry, resultToken, action, resolution)
-    if resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
+    if (resultToken == RESULT_PASS or entry.blocked == true)
+        and type(Combat.ApplyResolvedDamage) == "function"
+    then
         local _, damageResult = Combat:ApplyResolvedDamage(entry)
         entry.lastDamageResult = damageResult
         Combat:FinalizeLocalDamageResult(entry, damageResult)
@@ -1915,6 +2001,8 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
     local hasAuthoritativeDamageOutcome = authoritativeDamageOutcomeToken == "0"
         or authoritativeDamageOutcomeToken == "1"
     local authoritativeDamageApplied = tostring(arguments and arguments[8] or "") == "1"
+    local blockedResponse = tostring(arguments and arguments[9] or "") == "blocked"
+    local shieldBlockValueStatRef = normalizeDefenceStatRef(arguments and arguments[10])
     local entry = checkId and client:GetPendingCombatHitCheck(checkId) or nil
     if not entry or not eventId or eventId ~= entry.eventId or not resultToken then
         return false
@@ -1930,9 +2018,22 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
             defenceSystem = entry.defenceSystem,
             defenceStatRef = defenceStatRef,
         }
+        entry.successfullyDefended = true
+        if blockedResponse and type(Combat.MarkShieldBlockValueDamageContext) == "function" then
+            Combat:MarkShieldBlockValueDamageContext(
+                entry,
+                nil,
+                RESULT_FAIL,
+                {
+                    defenceSystem = entry.defenceSystem,
+                    defenceStatRef = defenceStatRef,
+                    shieldBlockValueStatRef = shieldBlockValueStatRef,
+                }
+            )
+        end
     end
 
-    if resultToken == RESULT_PASS and not hasAuthoritativeDamageOutcome then
+    if (resultToken == RESULT_PASS or entry.blocked == true) and not hasAuthoritativeDamageOutcome then
         entry.damageResolutionPending = true
         entry.pendingDamageResultToken = RESULT_PASS
         return true, buildCombatResult(entry, nil, "damage_pending")

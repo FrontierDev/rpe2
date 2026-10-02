@@ -20,7 +20,7 @@ The codes target the Paladin dataset `b0211ab3`, use the current `RPE_DATASET_EN
   - Holy uses **Spell Hit Chance** / **Spell Crit. Chance**.
   - Protection retains both melee and spell hit where the source item grants generic hit, matching the existing Paladin protection import convention.
 - Holy-only healing bonuses map directly to RPE **Healing Power**. Spell Power is not invented where the SoD item grants healing only.
-- RPE has **Block Chance** and **Defense Rating**, but no **Shield Block Value**. Protection pieces with Shield Block Value and no native Block Chance receive **+1% Block Chance** as the same approximation used by the Paladin Tier 2 protection imports.
+- Protection pieces map source Shield Block Value directly to RPE's **Shield Block Value** stat; native **Block Chance** remains an independent authored bonus.
 - The base Soulforge slot icon family is used for all three specialization variants of the corresponding slot.
 
 ## Soulforge set bonuses

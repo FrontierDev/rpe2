@@ -51,7 +51,7 @@ RPE_DATASET_ENTRY_V1
                 effects = {
                     {
                         amountMode = "max_percent",
-                        baseHealing = 4,
+                        baseHealing = 2,
                         scaleWithRank = false,
                         statScaling = { },
                         type = "heal",
@@ -77,7 +77,7 @@ RPE_DATASET_ENTRY_V1
                 effects = {
                     {
                         amountMode = "max_percent",
-                        baseHealing = 4,
+                        baseHealing = 2,
                         scaleWithRank = false,
                         statScaling = { },
                         type = "heal",
@@ -103,7 +103,7 @@ RPE_DATASET_ENTRY_V1
                 effects = {
                     {
                         amountMode = "max_percent",
-                        baseHealing = 4,
+                        baseHealing = 2,
                         scaleWithRank = false,
                         statScaling = { },
                         type = "heal",
@@ -740,7 +740,7 @@ RPE_DATASET_ENTRY_V1
                     amountMode = "flat",
                     applyAura = false,
                     auraStacks = 1,
-                    baseDamage = 60,
+                    baseDamage = 135,
                     damageSchoolRefs = {
                         "f82db71a:v1azo4j6",
                     },
@@ -750,7 +750,7 @@ RPE_DATASET_ENTRY_V1
                     projectileSpeed = 0,
                     statScaling = {
                         {
-                            coefficient = 0.28,
+                            coefficient = 0.63,
                             statRef = "f82db71a:u7b49vs9",
                         },
                     },
@@ -761,7 +761,7 @@ RPE_DATASET_ENTRY_V1
                     threatCoefficient = 2.5,
                     type = "damage",
                     usesProjectile = false,
-                    weaponDamageCoefficient = 0.8,
+                    weaponDamageCoefficient = 1.8,
                     weaponDamageMode = "main_hand",
                 },
                 key = "dkrsdm01",

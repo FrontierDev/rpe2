@@ -43,8 +43,10 @@ local guildSettingDependencyIds = {
     "538a54a0", -- Leatherworking
     "072d4851", -- Inscription
     "7259f1d3", -- Tailoring
+    "dknight1", -- Death Knight
     "6e4d2a91", -- Druid
     "a93f7c12", -- Hunter
+    "monkdata", -- Monk
     "c4a91e7d", -- Shaman
     "e8f3b2c6", -- Warlock
 }
@@ -386,6 +388,18 @@ local armourStockGroups = {
             "c4a91e7d:s2rhwrst",
             "c4a91e7d:s2tnwais",
             "c4a91e7d:s2tnwrst",
+            "dknight1:dk05bwai",
+            "dknight1:dk05bwri",
+            "dknight1:dk05fbel",
+            "dknight1:dk05fbra",
+            "dknight1:dk05ugir",
+            "dknight1:dk05uvam",
+            "monkdata:mn05dbel",
+            "monkdata:mn05dbnd",
+            "monkdata:mn05twst",
+            "monkdata:mn05twri",
+            "monkdata:mn05hcor",
+            "monkdata:mn05hcuf",
         },
     },
     {
@@ -448,6 +462,18 @@ local armourStockGroups = {
             "c4a91e7d:s2rhhnds",
             "c4a91e7d:s2tnfeet",
             "c4a91e7d:s2tnhnds",
+            "dknight1:dk05bgri",
+            "dknight1:dk05bsab",
+            "dknight1:dk05fgau",
+            "dknight1:dk05fboo",
+            "dknight1:dk05uhan",
+            "dknight1:dk05ugre",
+            "monkdata:mn05dgrp",
+            "monkdata:mn05dft1",
+            "monkdata:mn05thnd",
+            "monkdata:mn05ttrd",
+            "monkdata:mn05hgau",
+            "monkdata:mn05hsan",
         },
     },
     {
@@ -569,6 +595,30 @@ local armourStockGroups = {
             "c4a91e7d:s2tnhead",
             "c4a91e7d:s2tnlegs",
             "c4a91e7d:s2tnshld",
+            "dknight1:dk05bfac",
+            "dknight1:dk05bsho",
+            "dknight1:dk05bchs",
+            "dknight1:dk05bleg",
+            "dknight1:dk05fcro",
+            "dknight1:dk05fspa",
+            "dknight1:dk05fchs",
+            "dknight1:dk05fleg",
+            "dknight1:dk05uhel",
+            "dknight1:dk05upau",
+            "dknight1:dk05uchs",
+            "dknight1:dk05uleg",
+            "monkdata:mn05dcap",
+            "monkdata:mn05dspa",
+            "monkdata:mn05dtun",
+            "monkdata:mn05dpnt",
+            "monkdata:mn05tfac",
+            "monkdata:mn05tpau",
+            "monkdata:mn05tarm",
+            "monkdata:mn05tleg",
+            "monkdata:mn05hhea",
+            "monkdata:mn05hman",
+            "monkdata:mn05hemb",
+            "monkdata:mn05hleg",
         },
     },
 }
