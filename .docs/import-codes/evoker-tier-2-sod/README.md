@@ -1,10 +1,9 @@
 # Evoker Tier 2 — Wyrmforged Regalia — RPE Import Codes
 
-This folder contains three invented level-60 Evoker Tier 2 variants under the shared **Wyrmforged Regalia** appearance family:
+This folder contains two invented level-60 Evoker Tier 2 variants under the shared **Wyrmforged Regalia** appearance family:
 
-- **Wyrmforged Fury — Devastation DPS** — 8 pieces.
+- **Wyrmforged Fury — Devastation / Augmentation** — 8 pieces.
 - **Wyrmforged Grace — Preservation** — 8 pieces.
-- **Wyrmforged Dominion — Augmentation** — 8 pieces.
 
 The shared eight-slot RPE Tier 2 family consists of **Wyrmforged Hauberk, Sabatons, Grips, Crown, Legguards, Mantle, Girdle, and Bracers**.
 
@@ -17,14 +16,12 @@ The shared eight-slot RPE Tier 2 family consists of **Wyrmforged Hauberk, Sabato
 - Quality: **Epic**
 - Binding: **Bind on Pickup**
 - Armor weight: **Mail**
-- Devastation set key: `t2_evoker_devastation`
+- Shared Devastation/Augmentation caster set key: `t2_evoker_caster`
 - Preservation set key: `t2_evoker_preservation`
-- Augmentation set key: `t2_evoker_augmentation`
 - Every piece supports generic modifier key `mod`, capped at **1**.
-- **Devastation** reproduces the existing Shaman **Eruption of the Ten Storms** Elemental Tier 2 budget slot-for-slot.
-- **Augmentation** reproduces the same Elemental mail-caster budget slot-for-slot because current RPE Augmentation remains an Intellect/Spell Power caster and has no separate support-power equipment stat.
+- **Wyrmforged Fury** is shared by **Devastation and Augmentation** and reproduces the existing Shaman **Eruption of the Ten Storms** Elemental Tier 2 budget slot-for-slot. Augmentation does not receive a separate gear variant because it uses the same Intellect/Spell Power caster itemization in RPE.
 - **Preservation** reproduces the existing Shaman **Relief of the Ten Storms** Restoration Tier 2 budget slot-for-slot.
-- Devastation and Augmentation use the Elemental socket pattern: chest 2 red + 1 yellow; helm 1 meta + 1 red; legs 1 red + 1 yellow; belt 1 yellow.
+- Wyrmforged Fury uses the Elemental socket pattern: chest 2 red + 1 yellow; helm 1 meta + 1 red; legs 1 red + 1 yellow; belt 1 yellow.
 - Preservation uses the Restoration socket pattern: chest red + yellow + blue; helm meta + red; legs red + blue; belt blue.
 - Nature and Frost Resistance placement is retained exactly from the source sets.
 - No additional item-budget points are introduced.
@@ -33,7 +30,7 @@ The shared eight-slot RPE Tier 2 family consists of **Wyrmforged Hauberk, Sabato
 
 ## Full-set totals
 
-### Devastation
+### Devastation / Augmentation
 - Armor: **2773**
 - Stamina: **105**
 - Intellect: **126**
@@ -53,21 +50,11 @@ The shared eight-slot RPE Tier 2 family consists of **Wyrmforged Hauberk, Sabato
 - Healing Power: **438**
 - Spell Power: **150**
 
-### Augmentation
-- Armor: **2773**
-- Stamina: **105**
-- Intellect: **126**
-- Nature Resistance: **50**
-- Frost Resistance: **50**
-- Spell Crit. Chance: **6**
-- Spell Hit Chance: **3**
-- Spell Power: **240**
 
 ## Files
 
-- `wyrmforged-fury-devastation.md`
+- `wyrmforged-fury-caster.md`
 - `wyrmforged-grace-preservation.md`
-- `wyrmforged-dominion-augmentation.md`
 
 ## RPE source basis
 
