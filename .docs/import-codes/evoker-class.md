@@ -16,6 +16,7 @@ Armor, weapon proficiencies, passive traits, talents, and spells are intentional
 
 - Spell import codes: `.docs/import-codes/evoker-spells.md`
 - Trait import codes: `.docs/import-codes/evoker-traits.md`
+- Tier 2 import codes: `.docs/import-codes/evoker-tier-2-sod/README.md`
 
 ```text
 RPE_DATASET_ENTRY_V1
