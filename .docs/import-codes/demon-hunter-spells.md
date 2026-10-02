@@ -480,11 +480,10 @@ RPE_DATASET_ENTRY_V1
                 type = "resource",
             },
             {
-                amount = 8,
                 amountMode = "max_percent",
-                resourceRef = "f82db71a:q2ktkztt",
-                scaleWithRank = false,
-                type = "resource",
+                baseHealing = 8,
+                statScaling = { },
+                type = "heal",
             },
         },
         events = { },
@@ -496,7 +495,7 @@ RPE_DATASET_ENTRY_V1
         tags = { },
         tooltipTemplate = true,
         tooltipTemplateData = {
-            bodyText = "Each turn restores 10 Fury, 1 Soul Fragment, and 8% of Max Health.",
+            bodyText = "Each turn restores 10 Fury, generates 1 Soul Fragment, and heals you for 8% of Max Health.",
             bodyTokens = { },
             stackingText = "",
             stackingTokens = { },
