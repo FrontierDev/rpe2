@@ -8,10 +8,13 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for the synthetic Classic-style De
 - Primary stats: Rogue progression
 - Base Health: Rogue progression
 - Base Mana: none
-- Core resource ref relevant to Demon Hunter setup:
+- Resource refs relevant to Demon Hunter setup:
   - Fury: `f82db71a:fury0001`
+  - Soul Fragments: `dhunter1:dhsoul01` (special resource; import from the Demon Hunter spell sheet)
 
 Armor, weapon proficiencies, passive traits, talents, and spells are intentionally left unassigned.
+
+- Spell and Soul Fragment import codes: `.docs/import-codes/demon-hunter-spells.md`
 
 ```text
 RPE_DATASET_ENTRY_V1
