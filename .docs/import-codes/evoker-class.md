@@ -14,6 +14,8 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for the synthetic Classic-style Ev
 
 Armor, weapon proficiencies, passive traits, talents, and spells are intentionally left unassigned.
 
+- Spell import codes: `.docs/import-codes/evoker-spells.md`
+
 ```text
 RPE_DATASET_ENTRY_V1
 {
