@@ -14,7 +14,8 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for the synthetic Classic-style De
 
 Armor, weapon proficiencies, passive traits, talents, and spells are intentionally left unassigned.
 
-- Trait import codes: `.docs/import-codes/demon-hunter-traits.md`\n- Spell and Soul Fragment import codes: `.docs/import-codes/demon-hunter-spells.md`
+- Trait import codes: `.docs/import-codes/demon-hunter-traits.md`
+- Tier 2 import codes: `.docs/import-codes/demon-hunter-tier-2-sod/README.md`\n- Spell and Soul Fragment import codes: `.docs/import-codes/demon-hunter-spells.md`
 
 ```text
 RPE_DATASET_ENTRY_V1
