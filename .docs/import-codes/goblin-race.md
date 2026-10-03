@@ -1,12 +1,49 @@
-# Goblin Race Import Code
+# Goblin Race Import Codes
 
 Standalone `RPE_DATASET_ENTRY_V1` import code for the Goblin race in the Core dataset.
 
 - Base attributes (STR / AGI / STA / INT / SPI): 17 / 22 / 20 / 23 / 18
-- Trait import codes: `.docs/import-codes/cataclysm-race-traits.md`
+- Race-specific trait import codes are included below.
 - Active or unsupported racial mechanics are intentionally omitted.
 
-Import the racial Traits before importing this Race entry.
+Import the race-specific Traits below before importing the Race entry.
+
+
+## Race-Specific Traits
+
+### Better Living Through Chemistry
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {  },
+        icon = "interface/icons/trade_alchemy.blp",
+        id = "gobalch15",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Better Living Through Chemistry",
+        skillBonuses = {
+            {
+                skillRef = "f82db71a:pdyzyudy",
+                value = 15,
+            },
+        },
+        statBonuses = {  },
+        unlockLevel = 1,
+    },
+}
+```
+
+## Race
 
 ```text
 RPE_DATASET_ENTRY_V1
