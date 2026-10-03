@@ -13,7 +13,7 @@ These entries follow the same Core-race authoring approach as `.docs/import-code
 - Draenei Gemcutting grants +5 Jewelcrafting.
 - Draenei Shadow Resistance grants +10 Shadow Resistance.
 - Blood Elf Arcane Affinity grants +10 Enchanting.
-- Blood Elf Magic Resistance grants +5 Fire, Frost, Nature, Arcane, and Shadow Resistance. Holy Resistance is intentionally excluded.
+- Blood Elf Magic Resistance grants +1 Magic Resistance.
 
 Import the supporting Aura first, then the racial Traits, then the Race entries:
 
@@ -229,28 +229,8 @@ RPE_DATASET_ENTRY_V1
         statBonuses = {
             {
                 operation = "flat",
-                statRef = "f82db71a:0w7c7p09",
-                value = 5,
-            },
-            {
-                operation = "flat",
-                statRef = "f82db71a:jjn0my8k",
-                value = 5,
-            },
-            {
-                operation = "flat",
-                statRef = "f82db71a:pg0ytacb",
-                value = 5,
-            },
-            {
-                operation = "flat",
-                statRef = "f82db71a:954yunb9",
-                value = 5,
-            },
-            {
-                operation = "flat",
-                statRef = "f82db71a:itpo751d",
-                value = 5,
+                statRef = "f82db71a:zs1nbz13",
+                value = 1,
             },
         },
         unlockLevel = 1,
