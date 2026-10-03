@@ -1,14 +1,90 @@
-# Undead Race Import Code
+# Undead Race Import Codes
 
 Standalone `RPE_DATASET_ENTRY_V1` import code for the Undead race in the Core dataset.
 
 The base attributes come from `.docs/RPE2_WoW_Classic_Base_Stats_Reference.md`.
 
 - Base attributes (STR / AGI / STA / INT / SPI): 19 / 18 / 21 / 18 / 25
-- Trait import codes: `.docs/import-codes/classic-race-traits.md`
+- Shared trait import codes: `.docs/import-codes/shared-race-traits.md`
+- Race-specific trait import codes are included below.
 - Human and Dwarf are intentionally not modified by this import sheet.
 
-Import the referenced racial Traits before importing this Race entry.
+Import **Shadow Resistance** from `.docs/import-codes/shared-race-traits.md`, then import the race-specific Traits below, then import the Race entry.
+
+
+## Race-Specific Traits
+
+### Touch of the Grave
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {
+            {
+                chance = 10,
+                combatEventId = "on_melee_hit",
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseDamage = 0,
+                        damageSchoolRefs = {
+                            "f82db71a:1ggt4t3v",
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.5,
+                                statRef = "f82db71a:ygjno50i",
+                            },
+                        },
+                        type = "damage",
+                    },
+                },
+                triggerTarget = "event_other",
+            },
+            {
+                chance = 10,
+                combatEventId = "on_auto_attack_hit",
+                effects = {
+                    {
+                        amountMode = "flat",
+                        baseDamage = 0,
+                        damageSchoolRefs = {
+                            "f82db71a:1ggt4t3v",
+                        },
+                        statScaling = {
+                            {
+                                coefficient = 0.5,
+                                statRef = "f82db71a:ygjno50i",
+                            },
+                        },
+                        type = "damage",
+                    },
+                },
+                triggerTarget = "event_other",
+            },
+        },
+        icon = "interface/icons/spell_shadow_lifedrain02.blp",
+        id = "udtouch1",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Touch of the Grave",
+        skillBonuses = {  },
+        statBonuses = {  },
+        unlockLevel = 1,
+    },
+}
+```
+
+## Race
 
 ```text
 RPE_DATASET_ENTRY_V1
