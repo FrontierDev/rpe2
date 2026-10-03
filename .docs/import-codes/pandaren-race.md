@@ -1,12 +1,145 @@
-# Pandaren Race Import Code
+# Pandaren Race Import Codes
 
 Standalone `RPE_DATASET_ENTRY_V1` import code for the Pandaren race in the Core dataset.
 
 - Base attributes (STR / AGI / STA / INT / SPI): 20 / 18 / 21 / 19 / 22
-- Trait import codes: `.docs/import-codes/mop-race-traits.md`
+- Race-specific trait import codes are included below.
 - Active or unsupported racial mechanics are intentionally omitted or translated into supported non-combat skills.
 
-Import the racial Traits before importing this Race entry.
+Import the race-specific Traits below before importing the Race entry.
+
+
+## Race-Specific Traits
+
+### Gourmand
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {  },
+        icon = "interface/icons/ability_racial_pandaren_gourmand.blp",
+        id = "pangrm15",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Gourmand",
+        skillBonuses = {
+            {
+                skillRef = "f82db71a:l9sc8rji",
+                value = 15,
+            },
+        },
+        statBonuses = {  },
+        unlockLevel = 1,
+    },
+}
+```
+
+### Bouncy
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {  },
+        icon = "interface/icons/ability_racial_pandaren_bouncy.blp",
+        id = "panboun5",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Bouncy",
+        skillBonuses = {
+            {
+                skillRef = "f82db71a:65v0ycbw",
+                value = 5,
+            },
+        },
+        statBonuses = {  },
+        unlockLevel = 1,
+    },
+}
+```
+
+### Inner Peace
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {  },
+        icon = "interface/icons/ability_racial_pandaren_innerpeace.blp",
+        id = "paninr05",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Inner Peace",
+        skillBonuses = {
+            {
+                skillRef = "f82db71a:axfdnyb4",
+                value = 5,
+            },
+        },
+        statBonuses = {  },
+        unlockLevel = 1,
+    },
+}
+```
+
+### Epicurean
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {  },
+        icon = "interface/icons/ability_racial_pandaren_epicurean.blp",
+        id = "panepic5",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Epicurean",
+        skillBonuses = {
+            {
+                skillRef = "f82db71a:0ybj39g9",
+                value = 5,
+            },
+        },
+        statBonuses = {  },
+        unlockLevel = 1,
+    },
+}
+```
+
+## Race
 
 ```text
 RPE_DATASET_ENTRY_V1
