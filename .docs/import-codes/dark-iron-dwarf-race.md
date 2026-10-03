@@ -1,12 +1,147 @@
-# Dark Iron Dwarf Race Import Code
+# Dark Iron Dwarf Race Import Codes
 
 Standalone `RPE_DATASET_ENTRY_V1` import code for the Dark Iron Dwarf race in the Core dataset.
 
 - Base attributes (STR / AGI / STA / INT / SPI): 22 / 16 / 23 / 19 / 19
-- Trait import codes: `.docs/import-codes/bfa-race-traits.md`
+- Race-specific trait import codes are included below.
 - RPE deliberately uses the Dwarf base-stat chassis for this allied-race variant.
 
-Import the racial Traits before importing this Race entry.
+Import the race-specific Traits below before importing the Race entry.
+
+
+## Race-Specific Traits
+
+### Dungeon Delver
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {  },
+        icon = "interface/icons/inv_professions_inscription_scribesmagnifyingglass_gold.blp",
+        id = "didung05",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Dungeon Delver",
+        skillBonuses = {
+            {
+                skillRef = "f82db71a:2eaj9uvp",
+                value = 5,
+            },
+        },
+        statBonuses = {  },
+        unlockLevel = 1,
+    },
+}
+```
+
+### Forged in Flames
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {  },
+        icon = "interface/icons/ability_dualwieldspecialization.blp",
+        id = "diforge1",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Forged in Flames",
+        skillBonuses = {  },
+        statBonuses = {
+            {
+                operation = "flat",
+                statRef = "f82db71a:pu05li08",
+                value = 1,
+            },
+        },
+        unlockLevel = 1,
+    },
+}
+```
+
+### Mass Production
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {  },
+        icon = "interface/icons/inv_10_specialization_professionbook_blacksmithing_orig.blp",
+        id = "dimass15",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Mass Production",
+        skillBonuses = {
+            {
+                skillRef = "f82db71a:6hydytdf",
+                value = 15,
+            },
+        },
+        statBonuses = {  },
+        unlockLevel = 1,
+    },
+}
+```
+
+### Fireblood
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "traits",
+    datasetId = "f82db71a",
+    entry = {
+        automaticAuras = {  },
+        category = "",
+        conditions = {  },
+        description = "",
+        events = {  },
+        icon = "interface/icons/spell_fire_sealoffire.blp",
+        id = "difire15",
+        isEnvironmental = false,
+        mutuallyExclusiveTraitRefs = {  },
+        name = "Fireblood",
+        skillBonuses = {  },
+        statBonuses = {
+            {
+                operation = "flat",
+                statRef = "f82db71a:0w7c7p09",
+                value = 15,
+            },
+        },
+        unlockLevel = 1,
+    },
+}
+```
+
+## Race
 
 ```text
 RPE_DATASET_ENTRY_V1
