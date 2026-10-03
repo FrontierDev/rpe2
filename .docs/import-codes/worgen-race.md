@@ -51,6 +51,7 @@ RPE_DATASET_ENTRY_V1
         },
         traitRefs = {
             "f82db71a:worgcrit",
+            "f82db71a:worgaber",
         },
     },
 }

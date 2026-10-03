@@ -21,6 +21,7 @@ Import these Traits before the corresponding Race entries:
 - Primary-stat percentage bonuses use `operation = "percent"`.
 - Percentage-point combat stats such as Dodge Chance, Melee Hit Chance, and Damage vs. Beasts use `operation = "flat"`.
 - Resistance and Defense Rating bonuses use flat stat bonuses.
+- Racial resistance bonuses are standardized at +15 for one school or +8/+8 when split across two schools.
 - Night Elf increased Stealth is represented as +5 Stealth skill.
 - Orc Hardiness is represented as +10 Defense Rating.
 - Undead Touch of the Grave has a 10% chance on a successful melee ability hit or melee auto-attack hit to deal Shadow damage equal to `0.5 × Stamina`.
@@ -55,7 +56,7 @@ RPE_DATASET_ENTRY_V1
             {
                 operation = "flat",
                 statRef = "f82db71a:pg0ytacb",
-                value = 10,
+                value = 15,
             },
         },
         unlockLevel = 1,
@@ -88,7 +89,7 @@ RPE_DATASET_ENTRY_V1
             {
                 operation = "flat",
                 statRef = "f82db71a:954yunb9",
-                value = 10,
+                value = 15,
             },
         },
         unlockLevel = 1,
@@ -121,7 +122,7 @@ RPE_DATASET_ENTRY_V1
             {
                 operation = "flat",
                 statRef = "f82db71a:itpo751d",
-                value = 10,
+                value = 15,
             },
         },
         unlockLevel = 1,
