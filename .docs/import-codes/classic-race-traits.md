@@ -16,6 +16,7 @@ Import these Traits before the corresponding Race entries:
 ## Authoring rules applied
 
 - Only passives that map to mechanics currently supported by RPE are authored.
+- All crafting skill bonuses use +15; all non-combat skill bonuses use +5. Weapon-skill bonuses retain their explicitly authored values.
 - Weapon and profession specialisations use `skillBonuses`.
 - Primary-stat percentage bonuses use `operation = "percent"`.
 - Percentage-point combat stats such as Dodge Chance, Melee Hit Chance, and Damage vs. Beasts use `operation = "flat"`.

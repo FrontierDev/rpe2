@@ -5,6 +5,7 @@ Standalone `RPE_DATASET_ENTRY_V1` import codes for Worgen and Goblin racial pass
 ## Authoring rules applied
 
 - Only passive racial mechanics that RPE currently supports cleanly are authored.
+- All crafting skill bonuses use +15; all non-combat skill bonuses use +5.
 - Active racial abilities are omitted.
 - Worgen **Viciousness** grants +1 Melee Crit. Chance, +1 Ranged Crit. Chance, and +1 Spell Crit. Chance.
 - Worgen **Aberration** is omitted because RPE does not currently expose a racial mechanic for reducing curse/disease duration or school-specific damage taken by a percentage.

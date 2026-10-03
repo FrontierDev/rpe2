@@ -7,12 +7,13 @@ These entries follow the same Core-race authoring approach as `.docs/import-code
 ## Authoring rules applied
 
 - Only passive racials that map cleanly onto mechanics supported by RPE are included.
+- All crafting skill bonuses use +15; all non-combat skill bonuses use +5.
 - Active racial abilities are omitted.
 - Draenei's original TBC Heroic Presence / Inspiring Presence class split is represented as one RPE **Heroic Presence** aura granting +1 Melee, Ranged, and Spell Hit Chance to all allies. This avoids introducing Core-to-class-dataset dependencies and preserves the intended party-wide hit benefit.
 - The Heroic Presence aura has `maxStacks = 1`, so multiple Draenei do not stack the same racial aura.
-- Draenei Gemcutting grants +5 Jewelcrafting.
+- Draenei Gemcutting grants +15 Jewelcrafting.
 - Draenei Shadow Resistance grants +10 Shadow Resistance.
-- Blood Elf Arcane Affinity grants +10 Enchanting.
+- Blood Elf Arcane Affinity grants +15 Enchanting.
 - Blood Elf Magic Resistance grants +1 Magic Resistance.
 
 Import the supporting Aura first, then the racial Traits, then the Race entries:
@@ -129,7 +130,7 @@ RPE_DATASET_ENTRY_V1
         skillBonuses = {
             {
                 skillRef = "f82db71a:fxp3vo4o",
-                value = 5,
+                value = 15,
             },
         },
         statBonuses = {  },
@@ -196,7 +197,7 @@ RPE_DATASET_ENTRY_V1
         skillBonuses = {
             {
                 skillRef = "f82db71a:4keh3nf1",
-                value = 10,
+                value = 15,
             },
         },
         statBonuses = {  },
