@@ -1,4 +1,4 @@
-# Ghoul Unit and Ability Import Codes
+# Ghoul Unit Import Code
 
 Standalone `RPE_DATASET_ENTRY_V1` import code for the base Ghoul unit and its three Normal-challenge variants in the Core dataset (`f82db71a`).
 
