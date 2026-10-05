@@ -953,30 +953,7 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Holy Shield",
                 stackBehavior = "refresh_duration",
                 tags = {},
-                tooltipTemplate = true,
-                tooltipTemplateData = {
-                    bodyText = "Increases Block Chance by {AURA_STAT_1}%. When you successfully block an attack, the attacker takes {AURA_EVENT_DAMAGE_1} Holy damage.",
-                    bodyTokens = {
-                        {
-                            applyMode = "stat_amount",
-                            baseField = "baseAmount",
-                            effectIndex = 1,
-                            key = "AURA_STAT_1",
-                            tokenType = "aura_amount"
-                        },
-                        {
-                            applyMode = "damage_amount",
-                            baseField = "baseDamage",
-                            effectIndex = 1,
-                            eventIndex = 1,
-                            key = "AURA_EVENT_DAMAGE_1",
-                            tokenType = "aura_amount"
-                        }
-                    },
-                    stackingText = "",
-                    stackingTokens = {},
-                    version = 1
-                }
+                tooltipTemplate = false,
             },
             {
                 description = "",

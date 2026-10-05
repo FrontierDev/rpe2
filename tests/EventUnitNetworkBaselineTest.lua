@@ -376,12 +376,12 @@ local authoredPetFields = splitPreservingEmpty(
 assertEqual(authoredPetFields[34], "1", "authored pet snapshots serialize the pet-role marker extension")
 local authoredPetDelta = Event.SerializeUnitDeltaBatchForNetwork({
     { operation = "upsert", eventID = 4, unit = authoredPet },
-})
+}, { level = 1, difficulty = "normal", playerCount = 1 })
 local authoredPetDeltaEntries = Event.DeserializeUnitDeltaBatchFromNetwork(authoredPetDelta)
 assertEqual(authoredPetDeltaEntries[1].unit.isPet, true, "authored pet deltas preserve the pet-role marker")
 local genericSummonDelta = Event.SerializeUnitDeltaBatchForNetwork({
     { operation = "upsert", eventID = 2, unit = genericSummon },
-})
+}, { level = 1, difficulty = "normal", playerCount = 1 })
 local genericSummonDeltaFields = splitPreservingEmpty(
     splitPreservingEmpty(genericSummonDelta, string.char(23))[1],
     string.char(22)

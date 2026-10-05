@@ -20,6 +20,8 @@ local function assertRow(rows, index, kind, eventId, message)
     return row
 end
 
+local TestSupport = dofile("tests/support/RuntimeStubs.lua")
+
 local Addon = {
     Client = {
         HasUnitAttackedTargetOnTurn = function(_, eventState, attackerEventId, targetEventId, turnNumber)
@@ -39,6 +41,7 @@ local Addon = {
             EventWidget = {
                 EnsureCombatLogHistoryUI = function() end,
                 ShowEventUtilityWindow = function() end,
+                HideEventUtilityWindow = function() end,
                 RefreshPortraitsForEventIds = function() return true end,
                 IsEventUnitActive = function(_, unit)
                     return unit and unit.active ~= false
@@ -76,11 +79,10 @@ local Addon = {
         },
     },
 }
+TestSupport.EnsureUI(Addon)
 
 local function loadAddonFile(path)
-    local chunk, loadError = loadfile(path)
-    assert(chunk, loadError)
-    chunk("RPEngine2", Addon)
+    TestSupport.LoadAddonFile(path, Addon, "RPEngine2")
 end
 
 loadAddonFile("client/ui/widgets/widget_Event_AllUnits.lua")

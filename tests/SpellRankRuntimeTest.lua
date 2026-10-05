@@ -123,6 +123,14 @@ loadAddonFile("core/classes/Spell.lua")
 loadAddonFile("core/internal/ruleset/Rules.lua")
 loadAddonFile("core/internal/ruleset/Ruleset.lua")
 loadAddonFile("client/spellcasting/Helpers.lua")
+Addon.Client.Spellcasting.ResolveSpellCooldownChannel = function(spell)
+    return spell and spell.cooldownChannel or 1, {
+        enabled = true,
+        name = "Test Channel",
+        triggersGCD = true,
+        canUseOffTurn = true,
+    }, "test", nil
+end
 
 local Spell = Addon.Internal.Database.Classes.Spell
 local Spellcasting = Addon.Client.Spellcasting

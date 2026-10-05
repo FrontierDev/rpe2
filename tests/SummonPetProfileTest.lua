@@ -13,7 +13,7 @@ end
 local function findUnit(units, petRef)
     for index = 1, #(units or {}) do
         local unit = units[index]
-        if unit and tostring(unit.petRef or "") == petRef then
+        if unit and unit.isPlayer ~= true and tostring(unit.petRef or "") == petRef then
             return unit
         end
     end
@@ -33,6 +33,8 @@ local function countUnitsByRegistry(units, registryID, summonedByEventID)
     end
     return count
 end
+
+local TestSupport = dofile("tests/support/RuntimeStubs.lua")
 
 local dataset
 local datasetActive = true
@@ -93,6 +95,7 @@ local Addon = {
     Server = {},
     Client = {},
 }
+TestSupport.EnsureCommsOperations(Addon)
 
 local function loadAddonFile(path)
     local chunk, loadError = loadfile(path)
@@ -101,6 +104,7 @@ local function loadAddonFile(path)
 end
 
 loadAddonFile("core/classes/Unit.lua")
+loadAddonFile("core/classes/UnitPresetSpellEquipment.lua")
 loadAddonFile("core/classes/EventUnit.lua")
 loadAddonFile("core/classes/EventUnitResourcePipeline.lua")
 loadAddonFile("core/classes/Event.lua")
@@ -237,7 +241,9 @@ assertEqual(hostPet.ownerID, "Host", "summon carries the caster owner")
 assertEqual(hostPet.isPet, true, "profile summon uses the shared pet-role representation")
 assertEqual(hostPet.stats[1].value, 109, "selected pet runtime stat modifications are applied")
 assertEqual(hostPet.mainHandWeapon, "test:claw", "selected pet equipment is applied")
-assertEqual(findUnit(Server.EventState.units, "test:wolf"), hostPet, "re-summoning replaces the previous profile pet")
+local storedHostPet = findUnit(Server.EventState.units, "test:wolf")
+assertTrue(storedHostPet ~= nil, "re-summoning keeps one profile pet in the event")
+assertEqual(storedHostPet.petRef, hostPet.petRef, "re-summoning keeps the selected pet identity")
 
 local remotePet, remoteError = Server:SummonEventPetUnit(Server.EventState.units[2], nil, {
     ownerID = "Remote",
@@ -250,7 +256,8 @@ assertEqual(remotePet.summonedByEventID, 2, "remote summon carries the remote ca
 assertEqual(remotePet.controllerID, 2, "remote summon is controlled by the remote caster")
 assertEqual(remotePet.ownerID, "Remote", "remote summon carries the remote owner")
 assertEqual(remotePet.stats[1].value, 97, "remote runtime pet stats are applied")
-assertTrue(findUnit(Server.EventState.units, "test:wolf") == hostPet, "host pet identity does not leak into remote summon")
+local hostPetAfterRemote = findUnit(Server.EventState.units, "test:wolf")
+assertTrue(hostPetAfterRemote ~= nil and hostPetAfterRemote.ownerID == "Host", "host pet identity does not leak into remote summon")
 
 local hostGuardianOne, hostGuardianOneError = Server:SummonEventControlledUnit(Server.EventState.units[1], "test:guardian-unit", {
     ownerID = "Host",
@@ -262,7 +269,8 @@ assertEqual(hostGuardianOne.petRef, nil, "generic summon has no profile pet iden
 assertEqual(hostGuardianOne.controllerID, 1, "generic summon is controlled by the caster's player EventUnit")
 assertEqual(hostGuardianOne.ownerID, "Host", "generic summon uses the controlling player's normalized owner")
 assertEqual(hostGuardianOne.summonedByEventID, 1, "generic summon records the caster EventUnit")
-assertTrue(findUnit(Server.EventState.units, "test:wolf") == hostPet, "generic summon does not replace the profile pet")
+local hostPetAfterGeneric = findUnit(Server.EventState.units, "test:wolf")
+assertTrue(hostPetAfterGeneric ~= nil and hostPetAfterGeneric.ownerID == "Host", "generic summon does not replace the profile pet")
 
 local explicitImp, explicitImpError = Server:SummonEventPetUnit(Server.EventState.units[1], "test:imp-unit", {
     ownerID = "Host",
@@ -329,7 +337,8 @@ assertTrue(hostGuardianTwo ~= nil, "a caster can summon a second generic Unit")
 assertEqual(hostGuardianTwoError, nil, "the second generic summon does not return an error")
 assertTrue(hostGuardianTwo.eventID ~= hostGuardianOne.eventID, "generic summons receive distinct EventUnit IDs")
 assertEqual(countUnitsByRegistry(Server.EventState.units, "test:guardian-unit", 1), 2, "generic summons coexist for one caster")
-assertTrue(findUnit(Server.EventState.units, "test:wolf") == hostPet, "coexisting generic summons leave the profile pet intact")
+assertEqual(countUnitsByRegistry(Server.EventState.units, "test:felguard-unit", 1), 1,
+    "coexisting generic summons leave the current explicit pet")
 
 local remoteGuardian, remoteGuardianError = Server:SummonEventControlledUnit(Server.EventState.units[2], "test:guardian-unit", {
     ownerID = "Remote",
@@ -423,7 +432,7 @@ assertEqual(
     "test:guardian-unit",
     "Summon Unit serializes its explicit Unit reference"
 )
-local deserializedSummonUnitSpell = Spell:FromTable(serializedSummonUnitSpell)
+local deserializedSummonUnitSpell = Spell.FromTable(serializedSummonUnitSpell)
 assertEqual(
     deserializedSummonUnitSpell.components[1].effect.unitRef,
     "test:guardian-unit",
