@@ -66,7 +66,7 @@ local dataAddon = {
 loadAddonFile("data/default/Datasets.lua", dataAddon)
 loadAddonFile("data/default/core.lua", dataAddon)
 local coreDefinition = dataAddon.Data.DefaultDatasets.Definitions["f82db71a"]
-assertEqual(coreDefinition.version, 58, "Core dataset version increments for Shield Block Value")
+assertEqual(coreDefinition.version, 64, "Core dataset version increments for Core racial data")
 local shieldStat
 for index = 1, #(coreDefinition.dataset.stats or {}) do
     local stat = coreDefinition.dataset.stats[index]
@@ -257,6 +257,77 @@ local function markBlock(entry, statRef)
 end
 
 local blockChanceRef = activeRuleset.rules.combat.block_chance_stat
+
+Combat.GetRuleValue = function(_, groupKey, ruleKey, fallback)
+    local group = activeRuleset.rules[groupKey]
+    local value = group and group[ruleKey]
+    if value == nil or value == "" then
+        return fallback
+    end
+    return value
+end
+
+local equippedOffhand
+Addon.Internal.Profile.GetEquippedItem = function(slotKey)
+    if slotKey == "offhand" then
+        return equippedOffhand
+    end
+    return nil
+end
+
+activeRuleset.rules.combat.allow_block_without_shield = false
+activeRuleset.rules.combat.limit_defensive_reactions_per_turn = false
+activeRuleset.rules.combat.percent_melee_resistance_stat = { blockChanceRef }
+activeRuleset.rules.combat.percent_ranged_resistance_stat = {}
+activeRuleset.rules.combat.percent_spell_resistance_stat = {}
+
+local function findBlockAction(entry)
+    for _, action in ipairs(Combat:BuildReactionActions(entry)) do
+        if action.statRef == blockChanceRef then
+            return action
+        end
+    end
+    return nil
+end
+
+equippedOffhand = {
+    itemRef = "test:worn-shield",
+    item = { armorWeight = "shield" },
+}
+local shieldEligibilityEntry = makeEntry(100, 30, 0, true)
+local shieldBlockAction = findBlockAction(shieldEligibilityEntry)
+assertTrue(shieldBlockAction ~= nil, "Block action exists for melee attacks")
+assertEqual(shieldBlockAction.enabled, true, "an equipped off-hand shield enables Block")
+assertEqual(shieldBlockAction.usesUnlimited, true, "unlimited reactions show unlimited uses")
+assertEqual(shieldBlockAction.tooltip.title, shieldBlockAction.label, "reaction tooltip uses the action label")
+assertEqual(shieldBlockAction.tooltip.lines[1], "Attempts to Block using 0% Block Chance.", "Block tooltip describes the reaction")
+
+equippedOffhand = {
+    itemRef = "test:offhand-weapon",
+    item = { armorWeight = "none" },
+}
+local offhandWeaponEntry = makeEntry(100, 30, 0, true)
+local offhandWeaponBlockAction = findBlockAction(offhandWeaponEntry)
+assertTrue(offhandWeaponBlockAction ~= nil, "Block action remains present with an off-hand weapon")
+assertEqual(offhandWeaponBlockAction.enabled, false, "an off-hand weapon does not qualify as a shield")
+
+equippedOffhand = {
+    itemRef = "test:worn-shield",
+    item = { armorWeight = "shield" },
+}
+activeRuleset.rules.combat.limit_defensive_reactions_per_turn = true
+activeRuleset.rules.combat.defensive_reaction_limit_bypass_stats = {}
+local limitedEntry = makeEntry(100, 30, 0, true)
+limitedEntry.turnNumber = 1
+limitedEntry.eventState.turnNumber = 1
+local limitedBlockAction = findBlockAction(limitedEntry)
+assertEqual(limitedBlockAction.usesRemaining, 1, "limited reactions show one remaining use")
+assertEqual(Combat:ConsumeDefensiveReactionUse(limitedEntry, limitedBlockAction), true, "limited reaction use is consumed")
+Combat:RefreshDefensiveReactionAvailability(limitedEntry, limitedEntry.reactionActionsCache)
+Combat:RefreshReactionActionPresentation(limitedEntry, limitedEntry.reactionActionsCache)
+assertEqual(limitedBlockAction.usesRemaining, 0, "consumed reactions show no remaining uses")
+activeRuleset.rules.combat.limit_defensive_reactions_per_turn = false
+
 activeRuleset.rules.combat.shield_block_value_stat = ""
 local disabledEntry = makeEntry(100, 30, 0, true)
 assertEqual(markBlock(disabledEntry, blockChanceRef), false, "empty Shield Block Value rule leaves Block unmarked")
@@ -279,6 +350,18 @@ assertEqual(blockedResult.blocked, true, "resolved damage records partial Block"
 assertEqual(blockedResult.shieldBlockValueStatRef, shieldStatRef, "resolved damage records Shield Block Value stat")
 assertEqual(blockedResult.shieldBlockValue, 30, "resolved damage records Shield Block Value")
 assertEqual(blockedResult.blockedAmount, 30, "resolved damage records prevented Block amount")
+
+local defenceLogCount = 0
+Addon.Client.EmitCombatLogEntry = function()
+    defenceLogCount = defenceLogCount + 1
+    return true
+end
+assertEqual(
+    Combat:ShowDefenceCombatText(blockedEntry, { defenceStatRef = blockChanceRef }),
+    false,
+    "partial Shield Blocks do not emit a separate defence combat-log entry"
+)
+assertEqual(defenceLogCount, 0, "partial Shield Blocks suppress the standalone Block combat-log entry")
 
 local defenceEventCount = 0
 Combat.Events = {
@@ -368,5 +451,36 @@ local previewResult = Combat:BuildDamagePreview(authoritativeEntry)
 local applied, authoritativeResult = Combat:ApplyResolvedDamage(authoritativeEntry, true)
 assertEqual(applied, true, "authoritative preview resolves")
 assertEqual(authoritativeResult.preAbsorbAmount, previewResult.preAbsorbAmount, "preview and application share blocked pre-absorb damage")
+
+loadAddonFile("client/combat/Helpers.lua", Addon)
+local emittedDamageLog
+Addon.Client.EmitCombatLogEntry = function(_, entry)
+    emittedDamageLog = entry
+    return true
+end
+local combatLogEntry = makeEntry(100, 30, 20, true)
+combatLogEntry.componentKey = "shield-block-log"
+combatLogEntry.context = {
+    castEntry = {},
+    componentKey = combatLogEntry.componentKey,
+    spell = {},
+}
+assertEqual(Combat:RegisterActionDamageCombatLog(combatLogEntry, {
+    amount = 50,
+    blocked = true,
+    blockedAmount = 30,
+    damageSchoolName = "Physical",
+}), true, "Shield Block damage is registered for the combat log")
+assertEqual(
+    Combat:FlushActionDamageCombatLog(Addon.Client, combatLogEntry.context, combatLogEntry.context.castEntry, combatLogEntry.context.spell, combatLogEntry.componentKey),
+    true,
+    "Shield Block damage combat log is emitted"
+)
+assertEqual(
+    emittedDamageLog.detailText,
+    "50 Physical (|cff59e673-30|r)",
+    "Shield Block mitigation is a green combat-log adjustment"
+)
+assertEqual(emittedDamageLog.spellIconTexture, "Interface\\Icons\\Ability_Defend", "Shield Block damage uses the defend icon")
 
 print("ShieldBlockValueTest passed")

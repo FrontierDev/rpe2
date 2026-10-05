@@ -384,6 +384,108 @@ function Combat:CanUseDefensiveReaction(entry, action)
     return true
 end
 
+function Combat:GetDefensiveReactionUsesRemaining(entry, action)
+    local resolvedAction = resolveDefensiveReactionAction(entry, action)
+    if not resolvedAction or isPassReactionAction(resolvedAction) then
+        return nil, true
+    end
+
+    local statRef = getDefensiveReactionStatRef(resolvedAction)
+    if getCombatRuleValue("limit_defensive_reactions_per_turn", false) ~= true
+        or not statRef
+        or isDefensiveReactionStatBypassed(statRef)
+    then
+        return nil, true
+    end
+
+    local identity, eventId, turnNumber = getDefensiveReactionLedgerIdentity(entry, resolvedAction)
+    if not identity then
+        return 0, false
+    end
+
+    local ledger = getDefensiveReactionLedger(eventId, turnNumber)
+    if not ledger then
+        return 0, false
+    end
+
+    return ledger.uses[identity] == true and 0 or 1, false
+end
+
+local function formatReactionValue(value)
+    local numericValue = tonumber(value) or 0
+    if numericValue == math.floor(numericValue) then
+        return tostring(math.floor(numericValue))
+    end
+    return ("%.2f"):format(numericValue):gsub("0+$", ""):gsub("%.$", "")
+end
+
+function Combat:BuildReactionActionTooltip(entry, action)
+    local resolvedAction = resolveDefensiveReactionAction(entry, action)
+    if not resolvedAction then
+        return nil
+    end
+
+    local title = tostring(resolvedAction.label or "Reaction")
+    local usesRemaining, usesUnlimited = self:GetDefensiveReactionUsesRemaining(entry, resolvedAction)
+    local usageText = usesUnlimited and "Uses this turn: Unlimited"
+        or ("Uses remaining this turn: %d"):format(math.max(0, tonumber(usesRemaining) or 0))
+    local lines = {}
+
+    if isPassReactionAction(resolvedAction) then
+        lines[#lines + 1] = "Take the incoming damage without attempting a defensive reaction."
+    else
+        local statRef = getDefensiveReactionStatRef(resolvedAction)
+        local statValue = statRef and self.GetCachedCombatStatValue
+            and self:GetCachedCombatStatValue(entry and entry.context, entry and entry.defenderUnit, statRef, 0)
+            or 0
+        local displayedValue = formatReactionValue(statValue)
+        local resolutionSystem = tostring(resolvedAction.resolutionSystem or "")
+        local blockChanceStatRef = normalizeToken(getCombatRuleValue("block_chance_stat", ""))
+
+        if resolutionSystem == "percent" and statRef == blockChanceStatRef then
+            local shieldBlockValueStatRef = normalizeToken(getCombatRuleValue("shield_block_value_stat", ""))
+            local shieldBlockValue = shieldBlockValueStatRef and self.GetCachedCombatStatValue
+                and self:GetCachedCombatStatValue(entry and entry.context, entry and entry.defenderUnit, shieldBlockValueStatRef, 0)
+                or 0
+            lines[#lines + 1] = ("Attempts to Block using %s%% Block Chance."):format(displayedValue)
+            lines[#lines + 1] = ("On a successful Block, reduces damage taken by a further %s."):format(formatReactionValue(shieldBlockValue))
+        elseif resolutionSystem == "percent" then
+            lines[#lines + 1] = ("Uses %s%% %s to defend against this attack. A successful defence prevents the hit."):format(displayedValue, title)
+        elseif resolutionSystem == "ac" then
+            lines[#lines + 1] = ("Uses %s %s to prevent the hit when it meets or exceeds the attack total."):format(displayedValue, title)
+        elseif resolutionSystem == "simple" or resolutionSystem == "complex" then
+            lines[#lines + 1] = ("Rolls your defence dice plus %s %s to prevent the hit."):format(displayedValue, title)
+        else
+            lines[#lines + 1] = "Attempts to prevent the incoming hit."
+        end
+    end
+
+    lines[#lines + 1] = usageText
+    if resolvedAction.enabled == false then
+        if resolvedAction.unavailableReason == "used-this-turn" then
+            lines[#lines + 1] = "Unavailable: this reaction has already been used this turn."
+        elseif resolvedAction.requiresShield == true then
+            lines[#lines + 1] = "Unavailable: requires an equipped shield."
+        end
+    end
+
+    return {
+        title = title,
+        lines = lines,
+    }
+end
+
+function Combat:RefreshReactionActionPresentation(entry, actions)
+    for index = 1, #(actions or {}) do
+        local action = actions[index]
+        if type(action) == "table" then
+            action.usesRemaining, action.usesUnlimited = self:GetDefensiveReactionUsesRemaining(entry, action)
+            action.tooltip = self:BuildReactionActionTooltip(entry, action)
+        end
+    end
+    return actions
+end
+
 function Combat:ConsumeDefensiveReactionUse(entry, action)
     local resolvedAction = resolveDefensiveReactionAction(entry, action)
     if not resolvedAction or resolvedAction.enabled == false then
@@ -463,8 +565,11 @@ local function unitHasShield(unit)
     end
 
     if unit.isPlayer == true then
-        local equipped = Profile.GetEquippedItem and Profile.GetEquippedItem("shield") or nil
-        if type(equipped) == "table" and normalizeToken(equipped.itemRef) then
+        -- Player equipment is stored in the Off Hand slot. A shield is an
+        -- item classification within that slot, not a separate "shield" slot.
+        local equipped = Profile.GetEquippedItem and Profile.GetEquippedItem("offhand") or nil
+        local item = type(equipped) == "table" and equipped.item or nil
+        if type(item) == "table" and normalizeToken(item.armorWeight) == "shield" then
             return true
         end
     end
@@ -1108,9 +1213,9 @@ function Combat:BuildReactionActions(entry)
         -- The turn ledger is a player-defender UI concern. NPC callers may
         -- reuse this action builder for automatic strength evaluation.
         if type(entry.defenderUnit) == "table" and entry.defenderUnit.isPlayer == true then
-            return self:RefreshDefensiveReactionAvailability(entry, entry.reactionActionsCache)
+            self:RefreshDefensiveReactionAvailability(entry, entry.reactionActionsCache)
         end
-        return entry.reactionActionsCache
+        return self:RefreshReactionActionPresentation(entry, entry.reactionActionsCache)
     end
     local actions = {}
 
@@ -1268,6 +1373,7 @@ function Combat:BuildReactionActions(entry)
     if type(entry.defenderUnit) == "table" and entry.defenderUnit.isPlayer == true then
         self:RefreshDefensiveReactionAvailability(entry, actions)
     end
+    self:RefreshReactionActionPresentation(entry, actions)
     entry.reactionActionsCache = actions
     return actions
 end
@@ -1732,6 +1838,13 @@ function Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, ac
     local successfullyDefended = defendedOverride == true
         or entry.successfullyDefended == true
         or isSuccessfulDefensiveResolution(entry, action, normalizedResult, resolution)
+    local resolvedDefenceStatRef = successfullyDefended
+        and normalizeDefenceStatRef(
+            type(resolution) == "table" and resolution.defenceStatRef
+                or type(entry.lastResolution) == "table" and entry.lastResolution.defenceStatRef
+                or type(action) == "table" and action.statRef
+        )
+        or nil
     return client:RecordCombatAttack(
         entry.eventState,
         entry.attackerUnit,
@@ -1739,7 +1852,8 @@ function Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, ac
         entry.attackType,
         landed,
         successfullyDefended,
-        entry.checkId
+        entry.checkId,
+        resolvedDefenceStatRef
     )
 end
 
@@ -1773,7 +1887,7 @@ function Combat:ShowMissCombatText(entry)
 end
 
 function Combat:ShowDefenceCombatText(entry, resolution)
-    if type(entry) ~= "table" then
+    if type(entry) ~= "table" or entry.blocked == true then
         return false
     end
 
@@ -1839,9 +1953,6 @@ function Client:ResolveCombatReactionAction(actionId)
             entry.lastDamageResult = damageResult
             Combat:FinalizeLocalDamageResult(entry, damageResult)
         elseif completed and resultToken == RESULT_FAIL then
-            Combat:ShowDefenceCombatText(entry, resolution)
-        end
-        if completed and resultToken == RESULT_FAIL and entry.blocked == true then
             Combat:ShowDefenceCombatText(entry, resolution)
         end
         self:ShowNextQueuedCombatReaction()
@@ -2041,7 +2152,7 @@ function Combat:HandleDamageHitCheckResponse(client, arguments, sender)
 
     local completed, result = Combat:CompleteHitCheck(entry, resultToken, "player-response")
     if completed then
-        Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, nil, nil, successfullyDefended)
+        Combat:RecordResolvedCombatAttackHistory(client, entry, resultToken, nil, entry.lastResolution, successfullyDefended)
     end
     if completed and resultToken == RESULT_PASS and type(Combat.ApplyResolvedDamage) == "function" then
         local _, damageResult = Combat:ApplyResolvedDamage(entry, true)

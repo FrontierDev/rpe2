@@ -9,16 +9,16 @@ local UI = Addon.UI or {}
 local Image = UI.Image
 
 local WINDOW_WIDTH = 284
-local WINDOW_BASE_HEIGHT = 152
+local WINDOW_BASE_HEIGHT = 164
 local WINDOW_TOP_OFFSET = -210
 local CONTENT_WIDTH = WINDOW_WIDTH - 20
 local PORTRAIT_SIZE = 44
 local ACTION_BUTTON_SIZE = 30
-local ACTION_LABEL_HEIGHT = 14
+local ACTION_LABEL_HEIGHT = 26
 local ACTION_COLUMNS = 4
-local ACTION_CELL_HEIGHT = 46
+local ACTION_CELL_HEIGHT = 58
 local ACTION_ROW_SPACING = 2
-local ACTIONS_BASE_HEIGHT = 46
+local ACTIONS_BASE_HEIGHT = 58
 local DEFAULT_ICON = "Interface\\Icons\\INV_Misc_QuestionMark"
 
 ClientUI.ReactionWidget = ClientUI.ReactionWidget or {}
@@ -209,11 +209,19 @@ function ReactionWidget:EnsureActionSlot(index)
         }),
         button = nil,
         label = nil,
+        usesText = nil,
         actionId = nil,
+        tooltip = nil,
     }
     self.actionsLayout:AddChild(slot.panel)
 
     local contentFrame = slot.panel:GetContentFrame()
+    local panelFrame = slot.panel:GetFrame()
+    if panelFrame and panelFrame.EnableMouse then
+        -- The label sits below the icon button, so the full option needs to
+        -- receive hover events for its tooltip to be discoverable.
+        panelFrame:EnableMouse(true)
+    end
     slot.button = UI.ImageButton:New({
         name = ("RPEClientReactionWidgetActionButton%d"):format(index),
         width = ACTION_BUTTON_SIZE,
@@ -245,6 +253,19 @@ function ReactionWidget:EnsureActionSlot(index)
     })
     local labelFrame = slot.label:GetFrame()
     labelFrame:SetPoint("TOP", buttonFrame, "BOTTOM", 0, -2)
+
+    slot.usesText = UI.CreateText(buttonFrame, ("RPEClientReactionWidgetActionUses%d"):format(index), "", {
+        width = 16,
+        height = 12,
+        justifyH = "RIGHT",
+        justifyV = "TOP",
+        fontSize = 9,
+        fontFlags = "OUTLINE",
+        textColor = UI.ResolveColor(nil, "text.primary"),
+    })
+    local usesFrame = slot.usesText:GetFrame()
+    usesFrame:SetPoint("TOPRIGHT", buttonFrame, "TOPRIGHT", -1, -1)
+    usesFrame:Hide()
 
     self.actionSlots[index] = slot
     return slot
@@ -344,9 +365,24 @@ function ReactionWidget:Refresh(reason)
             if slot.button.SetEnabled then
                 slot.button:SetEnabled(action and action.enabled ~= false and slot.actionId ~= nil)
             end
+            if slot.button.SetTooltip then
+                slot.tooltip = action and action.tooltip or nil
+                slot.button:SetTooltip(function()
+                    return slot.tooltip
+                end)
+            end
+            if frame and frame.SetMotionScriptsWhileDisabled then
+                frame:SetMotionScriptsWhileDisabled(true)
+            end
+        end
+        if slot.panel and slot.panel.SetTooltip then
+            slot.panel:SetTooltip(function()
+                return slot.tooltip
+            end)
         end
         if slot.label and slot.label.SetText then
-            slot.label:SetText(tostring(action and action.label or ""))
+            local labelText = tostring(action and action.label or "")
+            slot.label:SetText(labelText)
             if slot.label.SetWidth then
                 slot.label:SetWidth(cellWidth)
             end
@@ -356,6 +392,17 @@ function ReactionWidget:Refresh(reason)
                 (action and action.enabled ~= false) and (UI.ResolveColor(nil, "text.primary").b or 1) or (UI.ResolveColor(nil, "text.secondary").b or 0.7),
                 (action and action.enabled ~= false) and (UI.ResolveColor(nil, "text.primary").a or 1) or (UI.ResolveColor(nil, "text.secondary").a or 1)
             )
+        end
+        if slot.usesText and slot.usesText.SetText then
+            local usesFrame = slot.usesText.GetFrame and slot.usesText:GetFrame() or nil
+            if action and action.usesUnlimited ~= true then
+                slot.usesText:SetText(tostring(math.max(0, tonumber(action.usesRemaining) or 0)))
+                if usesFrame and usesFrame.Show then
+                    usesFrame:Show()
+                end
+            elseif usesFrame and usesFrame.Hide then
+                usesFrame:Hide()
+            end
         end
         local panelFrame = slot.panel and slot.panel.GetFrame and slot.panel:GetFrame() or nil
         if panelFrame and panelFrame.Show then

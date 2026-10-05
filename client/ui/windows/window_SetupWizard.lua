@@ -27,8 +27,13 @@ local PAGE_SPACING = 6
 local FOOTER_RESERVED_HEIGHT = 34
 local SECTION_HEIGHT = 232
 local CHOICE_COLUMNS = 4
-local CHOICE_SLOT_SIZE = 40
+local CHOICE_ROWS = 3
+local CHOICE_SLOT_SIZE = 36
 local CHOICE_LABEL_HEIGHT = 12
+local CHOICE_PAGE_SIZE = CHOICE_COLUMNS * CHOICE_ROWS
+local PASSIVE_SLOT_SIZE = 28
+local PASSIVE_SLOT_SPACING = 4
+local PASSIVE_SECTION_GAP = 10
 local ITEM_SEARCH_HEIGHT = 18
 local ITEM_SLOT_COLUMNS = 8
 local ITEM_SLOT_ROWS = 5
@@ -371,6 +376,10 @@ local function createInstance()
         startingItemFeedback = "",
         raceChoices = {},
         classChoices = {},
+        racePassiveChoices = {},
+        classPassiveChoices = {},
+        raceChoicePage = 1,
+        classChoicePage = 1,
         startingItemSlots = {},
         actionBarSlotDropdowns = {},
         actionBarSlotRows = {},
@@ -1410,6 +1419,61 @@ local function applyChoiceVisual(choice, isSelected, labelText, iconTexture, too
     end
 end
 
+function SetupWizard:EnsurePassiveChoice(collectionKey, index, parent)
+    local collection = self[collectionKey] or {}
+    self[collectionKey] = collection
+    if collection[index] then
+        return collection[index]
+    end
+
+    local slot = UI.ObjectSlot:New({
+        name = ("RPESetupWizard%s%d"):format(collectionKey, index),
+        width = PASSIVE_SLOT_SIZE,
+        height = PASSIVE_SLOT_SIZE,
+        size = PASSIVE_SLOT_SIZE,
+        iconTexture = DEFAULT_ICON,
+        border = false,
+    })
+    slot:SetParent(parent)
+    slot:Create()
+
+    collection[index] = slot
+    return slot
+end
+
+function SetupWizard:RefreshPassiveRow(collectionKey, parent, rows)
+    local collection = self[collectionKey] or {}
+    local totalWidth = (#rows * PASSIVE_SLOT_SIZE) + (math.max(0, #rows - 1) * PASSIVE_SLOT_SPACING)
+    local firstSlot = nil
+
+    for index = 1, #rows do
+        local traitRow = rows[index]
+        local slot = self:EnsurePassiveChoice(collectionKey, index, parent)
+        local frame = slot:GetFrame()
+        frame:ClearAllPoints()
+        if index == 1 then
+            frame:SetPoint("TOP", parent, "TOP", -totalWidth / 2 + PASSIVE_SLOT_SIZE / 2, 0)
+            firstSlot = frame
+        else
+            frame:SetPoint("LEFT", firstSlot, "RIGHT", PASSIVE_SLOT_SPACING, 0)
+            firstSlot = frame
+        end
+        slot:SetIcon(trimString(traitRow and traitRow.icon) ~= "" and traitRow.icon or DEFAULT_ICON)
+        slot:SetBorderColor(DEFAULT_SLOT_BORDER.r, DEFAULT_SLOT_BORDER.g, DEFAULT_SLOT_BORDER.b, DEFAULT_SLOT_BORDER.a)
+        slot:SetTooltip(function(owner)
+            if not traitRow or not TooltipBuilders.Trait or type(TooltipBuilders.Trait.Build) ~= "function" then
+                return nil
+            end
+            return TooltipBuilders.Trait:Build(traitRow, owner)
+        end)
+        frame:Show()
+    end
+
+    for index = #rows + 1, #collection do
+        setFrameShown(collection[index], false)
+    end
+end
+
 function SetupWizard:BuildIdentityPage(page)
     if self.IdentityPageBuilt then
         return
@@ -1451,12 +1515,34 @@ function SetupWizard:BuildIdentityPage(page)
     })
     self.ClassTitle:GetFrame():SetPoint("TOP", self.ClassPanel:GetContentFrame(), "TOP", 0, 0)
 
+    self.RacePagePrevious = UI.CreateButton(self.RacePanel:GetContentFrame(), "RPESetupWizardRacePagePrevious", "<", 16, function()
+        self.raceChoicePage = math.max(1, (self.raceChoicePage or 1) - 1)
+        self:RefreshIdentityPage(self.cachedState or self:CaptureSelectionState())
+    end, { height = 12, fontSize = 7 })
+    self.RacePagePrevious:GetFrame():SetPoint("LEFT", self.RaceTitle:GetFrame(), "LEFT", 0, 0)
+    self.RacePageNext = UI.CreateButton(self.RacePanel:GetContentFrame(), "RPESetupWizardRacePageNext", ">", 16, function()
+        self.raceChoicePage = (self.raceChoicePage or 1) + 1
+        self:RefreshIdentityPage(self.cachedState or self:CaptureSelectionState())
+    end, { height = 12, fontSize = 7 })
+    self.RacePageNext:GetFrame():SetPoint("RIGHT", self.RaceTitle:GetFrame(), "RIGHT", 0, 0)
+
+    self.ClassPagePrevious = UI.CreateButton(self.ClassPanel:GetContentFrame(), "RPESetupWizardClassPagePrevious", "<", 16, function()
+        self.classChoicePage = math.max(1, (self.classChoicePage or 1) - 1)
+        self:RefreshIdentityPage(self.cachedState or self:CaptureSelectionState())
+    end, { height = 12, fontSize = 7 })
+    self.ClassPagePrevious:GetFrame():SetPoint("LEFT", self.ClassTitle:GetFrame(), "LEFT", 0, 0)
+    self.ClassPageNext = UI.CreateButton(self.ClassPanel:GetContentFrame(), "RPESetupWizardClassPageNext", ">", 16, function()
+        self.classChoicePage = (self.classChoicePage or 1) + 1
+        self:RefreshIdentityPage(self.cachedState or self:CaptureSelectionState())
+    end, { height = 12, fontSize = 7 })
+    self.ClassPageNext:GetFrame():SetPoint("RIGHT", self.ClassTitle:GetFrame(), "RIGHT", 0, 0)
+
     local gridWidth = sectionWidth - 12
     local cellWidth = math.floor((gridWidth - ((CHOICE_COLUMNS - 1) * 4)) / CHOICE_COLUMNS)
 
     self.RaceGrid = UI.CreateLayout(UI.GridLayoutGroup, self.RacePanel:GetContentFrame(), "RPESetupWizardRaceGrid", {
         width = gridWidth,
-        height = SECTION_HEIGHT - 24,
+        height = CHOICE_ROWS * (CHOICE_SLOT_SIZE + CHOICE_LABEL_HEIGHT + 2),
         columns = CHOICE_COLUMNS,
         cellWidth = cellWidth,
         cellHeight = CHOICE_SLOT_SIZE + CHOICE_LABEL_HEIGHT + 2,
@@ -1468,7 +1554,7 @@ function SetupWizard:BuildIdentityPage(page)
 
     self.ClassGrid = UI.CreateLayout(UI.GridLayoutGroup, self.ClassPanel:GetContentFrame(), "RPESetupWizardClassGrid", {
         width = gridWidth,
-        height = SECTION_HEIGHT - 24,
+        height = CHOICE_ROWS * (CHOICE_SLOT_SIZE + CHOICE_LABEL_HEIGHT + 2),
         columns = CHOICE_COLUMNS,
         cellWidth = cellWidth,
         cellHeight = CHOICE_SLOT_SIZE + CHOICE_LABEL_HEIGHT + 2,
@@ -1477,6 +1563,24 @@ function SetupWizard:BuildIdentityPage(page)
         fitChildrenHeight = false,
     })
     self.ClassGrid:GetFrame():SetPoint("TOPLEFT", self.ClassTitle:GetFrame(), "BOTTOMLEFT", 0, -4)
+
+    self.RacePassivesTitle = UI.CreateText(self.RacePanel:GetContentFrame(), "RPESetupWizardRacePassivesTitle", "Race Passives", {
+        width = gridWidth, height = 10, justifyH = "CENTER", fontSize = 7, textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.RacePassivesTitle:GetFrame():SetPoint("TOPLEFT", self.RaceGrid:GetFrame(), "BOTTOMLEFT", 0, -PASSIVE_SECTION_GAP)
+    self.RacePassivesRow = UI.CreateLayout(UI.HorizontalLayoutGroup, self.RacePanel:GetContentFrame(), "RPESetupWizardRacePassivesRow", {
+        width = gridWidth, height = PASSIVE_SLOT_SIZE, spacing = PASSIVE_SLOT_SPACING, fitChildrenWidth = false, fitChildrenHeight = false,
+    })
+    self.RacePassivesRow:GetFrame():SetPoint("TOPLEFT", self.RacePassivesTitle:GetFrame(), "BOTTOMLEFT", 0, -2)
+
+    self.ClassPassivesTitle = UI.CreateText(self.ClassPanel:GetContentFrame(), "RPESetupWizardClassPassivesTitle", "Class Passives", {
+        width = gridWidth, height = 10, justifyH = "CENTER", fontSize = 7, textColor = UI.ResolveColor(nil, "text.secondary"),
+    })
+    self.ClassPassivesTitle:GetFrame():SetPoint("TOPLEFT", self.ClassGrid:GetFrame(), "BOTTOMLEFT", 0, -PASSIVE_SECTION_GAP)
+    self.ClassPassivesRow = UI.CreateLayout(UI.HorizontalLayoutGroup, self.ClassPanel:GetContentFrame(), "RPESetupWizardClassPassivesRow", {
+        width = gridWidth, height = PASSIVE_SLOT_SIZE, spacing = PASSIVE_SLOT_SPACING, fitChildrenWidth = false, fitChildrenHeight = false,
+    })
+    self.ClassPassivesRow:GetFrame():SetPoint("TOPLEFT", self.ClassPassivesTitle:GetFrame(), "BOTTOMLEFT", 0, -2)
 end
 
 function SetupWizard:BuildStartingItemsPage(page)
@@ -2650,12 +2754,42 @@ function SetupWizard:RefreshIdentityPage(state)
     setFrameShown(self.RacePanel, canChooseRace)
     setFrameShown(self.ClassPanel, canChooseClass)
 
-    self:RefreshChoiceGrid("raceChoices", self.RaceGrid, raceItems, self.selectedRaceRef, function(instance, value)
+    local function getPage(items, pageKey)
+        local pageCount = math.max(1, math.ceil(#items / CHOICE_PAGE_SIZE))
+        local page = math.min(math.max(1, math.floor(tonumber(self[pageKey]) or 1)), pageCount)
+        self[pageKey] = page
+        local firstIndex = ((page - 1) * CHOICE_PAGE_SIZE) + 1
+        local pageItems = {}
+        for index = firstIndex, math.min(#items, firstIndex + CHOICE_PAGE_SIZE - 1) do
+            pageItems[#pageItems + 1] = items[index]
+        end
+        return pageItems, page, pageCount
+    end
+
+    local racePageItems, racePage, racePageCount = getPage(raceItems, "raceChoicePage")
+    local classPageItems, classPage, classPageCount = getPage(classItems, "classChoicePage")
+
+    self.RaceTitle:SetText(racePageCount > 1 and ("Race (%d/%d)"):format(racePage, racePageCount) or "Race")
+    self.ClassTitle:SetText(classPageCount > 1 and ("Class (%d/%d)"):format(classPage, classPageCount) or "Class")
+    self.RacePagePrevious:SetEnabled(racePage > 1)
+    self.RacePageNext:SetEnabled(racePage < racePageCount)
+    self.ClassPagePrevious:SetEnabled(classPage > 1)
+    self.ClassPageNext:SetEnabled(classPage < classPageCount)
+    setFrameShown(self.RacePagePrevious, racePageCount > 1)
+    setFrameShown(self.RacePageNext, racePageCount > 1)
+    setFrameShown(self.ClassPagePrevious, classPageCount > 1)
+    setFrameShown(self.ClassPageNext, classPageCount > 1)
+
+    self:RefreshChoiceGrid("raceChoices", self.RaceGrid, racePageItems, self.selectedRaceRef, function(instance, value)
         instance.selectedRaceRef = value
     end)
-    self:RefreshChoiceGrid("classChoices", self.ClassGrid, classItems, self.selectedClassRef, function(instance, value)
+    self:RefreshChoiceGrid("classChoices", self.ClassGrid, classPageItems, self.selectedClassRef, function(instance, value)
         instance.selectedClassRef = value
     end)
+
+    local sections = self:GetDraftTraitSections()
+    self:RefreshPassiveRow("racePassiveChoices", self.RacePassivesRow:GetFrame(), sections.race or {})
+    self:RefreshPassiveRow("classPassiveChoices", self.ClassPassivesRow:GetFrame(), sections.classPassives or {})
 end
 
 function SetupWizard:BuildFilteredStartingItems()

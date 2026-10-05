@@ -277,6 +277,27 @@ local function buildAcrossDatasets(self, collectionKey, includeNone)
     return items
 end
 
+local function buildDefenceStatItems(self)
+    local items = {
+        { label = "Any Defence", value = "" },
+    }
+    local datasets = self:GetDatasets()
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        for index = 1, #((dataset and dataset.stats) or {}) do
+            local stat = dataset.stats[index]
+            local defenceLabel = tostring(stat and stat.defenceLabel or ""):gsub("^%s+", ""):gsub("%s+$", "")
+            if stat and stat.id and defenceLabel ~= "" then
+                items[#items + 1] = {
+                    label = ("%s / %s"):format(self:GetDatasetDisplayName(dataset), defenceLabel),
+                    value = ("%s:%s"):format(dataset.id, stat.id),
+                }
+            end
+        end
+    end
+    return items
+end
+
 local function getFirstSelectableValue(items)
     for index = 1, #(items or {}) do
         local value = ensureString(items[index] and items[index].value)
@@ -797,6 +818,22 @@ local function createEditorRoot(self, ownerKey, page)
         end)
     end)
 
+    ui.DefenceStatGroup = createGroup(ui, ui.EditorRoot, ("RPEDataEditor%sInspectorConditionDefenceStatGroup"):format(ownerKey), "Defensive Stat", 18)
+    ui.DefenceStatDropdown = createDropdown(ui.DefenceStatGroup, ("RPEDataEditor%sInspectorConditionDefenceStatDropdown"):format(ownerKey), buildDefenceStatItems(self), ui.FieldWidth, function(value)
+        if self._refreshingConditionInspector then
+            return
+        end
+
+        local _, index = self:GetSelectedInspectorCondition(ownerKey)
+        if not index then
+            return
+        end
+
+        self:CommitInspectorConditionOwner(ownerKey, function(owner)
+            owner.conditions[index].defenceStatRef = value ~= "" and value or nil
+        end)
+    end, false)
+
     ui.MinimumGroup = createGroup(ui, ui.EditorRoot, ("RPEDataEditor%sInspectorConditionMinimumGroup"):format(ownerKey), "Minimum", 18)
     ui.MinimumInput = createTextInput(ui.MinimumGroup, ("RPEDataEditor%sInspectorConditionMinimumInput"):format(ownerKey), "", ui.FieldWidth)
     bindTextInput(ui.MinimumInput, function()
@@ -1056,6 +1093,11 @@ function DataEditor:RefreshInspectorConditionsPage(ownerKey)
         ui.TooltipOverrideInput:SetText(condition and ensureString(condition.tooltipTextOverride) or "")
         setTextElementEnabled(ui.TooltipOverrideInput, condition ~= nil)
     end
+    if ui.DefenceStatDropdown then
+        ui.DefenceStatDropdown:SetItems(buildDefenceStatItems(self))
+        ui.DefenceStatDropdown:SetSelectedValue(condition and ensureString(condition.defenceStatRef) or "", true)
+        setDropdownEnabled(ui.DefenceStatDropdown, condition ~= nil)
+    end
     if ui.MinimumInput then
         ui.MinimumInput:SetText(condition and condition.minimumValue ~= nil and tostring(condition.minimumValue) or "")
         setTextElementEnabled(ui.MinimumInput, condition ~= nil)
@@ -1128,6 +1170,7 @@ function DataEditor:RefreshInspectorConditionsPage(ownerKey)
 
     setGroupVisible(ui.TypeGroup, condition ~= nil)
     setGroupVisible(ui.TooltipOverrideGroup, condition ~= nil)
+    setGroupVisible(ui.DefenceStatGroup, conditionType == "caster_defended_melee_this_turn")
     setGroupVisible(ui.MinimumGroup, conditionType == "level" or conditionType == "caster_health_percent" or conditionType == "target_health_percent" or conditionType == "skill_requirement" or conditionType == "aura_requirement")
     setGroupVisible(ui.MaximumGroup, conditionType == "level" or conditionType == "caster_health_percent" or conditionType == "target_health_percent" or conditionType == "skill_requirement")
     setGroupVisible(ui.ClassGroup, conditionType == "class")

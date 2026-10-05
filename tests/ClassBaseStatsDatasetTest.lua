@@ -127,7 +127,7 @@ assertClass("monkdata", 9, "monk0001", "Monk", {
     ["f82db71a:4c8mfm99"] = { 17, 20.8 },
 }, 0, 5)
 
-assertClass("dhunter1", 2, "dhclass1", "Demon Hunter", {
+assertClass("dhunter1", 4, "dhclass1", "Demon Hunter", {
     ["f82db71a:zfqm8dxp"] = { 1, 1 },
     ["f82db71a:xqz0daz2"] = { 3, 1.81 },
     ["f82db71a:ygjno50i"] = { 1, 0.92 },
@@ -135,9 +135,9 @@ assertClass("dhunter1", 2, "dhclass1", "Demon Hunter", {
     ["f82db71a:kec9rhli"] = { 0, 0.51 },
 }, {
     ["f82db71a:q2ktkztt"] = { 25, 25.39 },
-}, 0, 0)
+}, 0, 10)
 
-assertClass("evokdata", 2, "evoker01", "Evoker", {
+assertClass("evokdata", 4, "evoker01", "Evoker", {
     ["f82db71a:zfqm8dxp"] = { 0, 0.17 },
     ["f82db71a:xqz0daz2"] = { 0, 0.25 },
     ["f82db71a:ygjno50i"] = { 0, 0.42 },
@@ -146,12 +146,14 @@ assertClass("evokdata", 2, "evoker01", "Evoker", {
 }, {
     ["f82db71a:q2ktkztt"] = { 31, 22.53 },
     ["f82db71a:4c8mfm99"] = { 100, 19.88 },
-}, 0, 0)
+}, 0, 10)
 
 local shamanDataset = definitions["c4a91e7d"].dataset
 local warlockDataset = definitions["e8f3b2c6"].dataset
 local deathKnightDataset = definitions["dknight1"].dataset
 local monkDataset = definitions["monkdata"].dataset
+local demonHunterDataset = definitions["dhunter1"].dataset
+local evokerDataset = definitions["evokdata"].dataset
 local coreDataset = definitions["f82db71a"].dataset
 assertEqual(definitions["c4a91e7d"].version, 10, "Shaman dataset version")
 assertEqual(#shamanDataset.auras, 28, "Shaman aura count")
@@ -159,7 +161,7 @@ assertEqual(#shamanDataset.spells, 32, "Shaman spell count")
 assertEqual(#shamanDataset.traits, 14, "Shaman trait count")
 assertEqual(#shamanDataset.items, 64, "Shaman item count")
 assertEqual(definitions["e8f3b2c6"].version, 22, "Warlock dataset version")
-assertEqual(definitions["f82db71a"].version, 58, "Core dataset version")
+assertEqual(definitions["f82db71a"].version, 64, "Core dataset version")
 assertEqual(definitions["dknight1"].version, 8, "Death Knight dataset version")
 assertEqual(#deathKnightDataset.auras, 18, "Death Knight aura count")
 assertEqual(#deathKnightDataset.spells, 31, "Death Knight spell count")
@@ -175,6 +177,38 @@ assertEqual(#warlockDataset.spells, 40, "Warlock spell count")
 assertEqual(#warlockDataset.items, 32, "Warlock item count")
 assertEqual(#warlockDataset.pets, 5, "Warlock pet count")
 assertEqual(#warlockDataset.traits, 6, "Warlock trait count")
+assertEqual(definitions["dhunter1"].version, 4, "Demon Hunter dataset version")
+assertEqual(#demonHunterDataset.auras, 11, "Demon Hunter aura count")
+assertEqual(#demonHunterDataset.spells, 22, "Demon Hunter spell count")
+assertEqual(#demonHunterDataset.traits, 10, "Demon Hunter trait count")
+assertEqual(#demonHunterDataset.items, 48, "Demon Hunter item count")
+assertEqual(definitions["evokdata"].version, 4, "Evoker dataset version")
+assertEqual(#evokerDataset.auras, 12, "Evoker aura count")
+assertEqual(#evokerDataset.spells, 23, "Evoker spell count")
+assertEqual(#evokerDataset.traits, 10, "Evoker trait count")
+assertEqual(#evokerDataset.items, 32, "Evoker item count")
+
+local function assertClassDatasetReferences(dataset, datasetId, classRef, label)
+    local expectedTraitPrefix = datasetId .. ":"
+    for _, traitRef in ipairs(dataset.classes[1].talentTraitRefs or {}) do
+        assertTrue(traitRef:sub(1, #expectedTraitPrefix) == expectedTraitPrefix, label .. " talent ref stays in its dataset")
+    end
+
+    for _, item in ipairs(dataset.items or {}) do
+        local classCondition
+        for _, condition in ipairs(item.conditions or {}) do
+            if condition.type == "class" then
+                classCondition = condition
+                break
+            end
+        end
+        assertTrue(type(classCondition) == "table", item.name .. " has a class condition")
+        assertEqual(classCondition.classRefs[1], classRef, item.name .. " class condition ref")
+    end
+end
+
+assertClassDatasetReferences(demonHunterDataset, "dhunter1", "dhunter1:dhclass1", "Demon Hunter")
+assertClassDatasetReferences(evokerDataset, "evokdata", "evokdata:evoker01", "Evoker")
 
 local function findByName(collection, name)
     for index = 1, #collection do

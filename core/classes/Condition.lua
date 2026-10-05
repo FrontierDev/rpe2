@@ -39,6 +39,11 @@ local function normalizeRef(value)
     return ref
 end
 
+local function normalizeDefenceStatRef(value)
+    local ref = ensureString(value):gsub("^%s+", ""):gsub("%s+$", "")
+    return ref ~= "" and ref or nil
+end
+
 local function normalizeRefList(values)
     local normalized = {}
     local seen = {}
@@ -115,7 +120,9 @@ local TYPE_DEFAULTS = {
         traitRef = nil,
     },
     caster_dead = {},
-    caster_defended_melee_this_turn = {},
+    caster_defended_melee_this_turn = {
+        defenceStatRef = nil,
+    },
     caster_failed_attack_this_turn = {},
     caster_killed_this_turn = {},
     target_killed_this_turn = {},
@@ -257,6 +264,9 @@ function Condition.Normalize(value)
         or conditionType == "caster_killed_this_turn"
         or conditionType == "target_killed_this_turn"
     then
+        if conditionType == "caster_defended_melee_this_turn" then
+            normalized.defenceStatRef = normalizeDefenceStatRef(data.defenceStatRef)
+        end
         return normalized
     end
 

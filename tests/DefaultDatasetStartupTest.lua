@@ -116,7 +116,7 @@ local function endsWithAny(value, suffixes)
 end
 
 local function expectedGuildShopArmourCost(itemId)
-    if endsWithAny(itemId, { "belt", "brac", "bind", "cord", "wais", "wrst", "wrap" }) then
+    if endsWithAny(itemId, { "belt", "brac", "bind", "cord", "wais", "wris", "wrst", "wrap" }) then
         return 1250
     end
     if endsWithAny(itemId, { "boot", "feet", "glov", "hand", "hnds", "grsp", "sand", "trds" }) then
@@ -125,16 +125,28 @@ local function expectedGuildShopArmourCost(itemId)
     return 2250
 end
 
-for _, datasetId in ipairs({ "c4a91e7d", "e8f3b2c6" }) do
+local excludedGuildShopArmourPrefixes = {
+    c4a91e7d = "s2",
+    e8f3b2c6 = "wl2",
+    dhunter1 = "dh2",
+    evokdata = "ev2",
+}
+
+for _, datasetId in ipairs({ "c4a91e7d", "e8f3b2c6", "dhunter1", "evokdata" }) do
     local classDataset = definitions[datasetId].dataset
     for index = 1, #(classDataset.items or {}) do
         local item = classDataset.items[index]
         local itemRef = datasetId .. ":" .. item.id
         local requisition = guildShopArmourByItemRef[itemRef]
-        assertTrue(type(requisition) == "table", "Guild Shop includes " .. itemRef)
-        assertEqual(requisition.quantity, 1, "Guild Shop quantity for " .. itemRef)
-        assertEqual(requisition.costs[1].currencyRef, "justice", "Guild Shop currency for " .. itemRef)
-        assertEqual(requisition.costs[1].amount, expectedGuildShopArmourCost(item.id), "Guild Shop price for " .. itemRef)
+        local excludedPrefix = excludedGuildShopArmourPrefixes[datasetId]
+        if excludedPrefix and item.id:sub(1, #excludedPrefix) == excludedPrefix then
+            assertTrue(requisition == nil, "Guild Shop excludes " .. itemRef)
+        else
+            assertTrue(type(requisition) == "table", "Guild Shop includes " .. itemRef)
+            assertEqual(requisition.quantity, 1, "Guild Shop quantity for " .. itemRef)
+            assertEqual(requisition.costs[1].currencyRef, "justice", "Guild Shop currency for " .. itemRef)
+            assertEqual(requisition.costs[1].amount, expectedGuildShopArmourCost(item.id), "Guild Shop price for " .. itemRef)
+        end
     end
 end
 
@@ -148,6 +160,8 @@ local function assertCoreGuildDependency(datasetId)
 end
 assertCoreGuildDependency("c4a91e7d")
 assertCoreGuildDependency("e8f3b2c6")
+assertCoreGuildDependency("dhunter1")
+assertCoreGuildDependency("evokdata")
 
 local function findCoreSpell(spellId)
     for index = 1, #(coreDefinition.dataset.spells or {}) do
@@ -209,6 +223,21 @@ for datasetId, definition in pairs(definitions) do
     assertTrue(type(root.datasets[datasetId]) == "table", "clean startup installs " .. datasetId)
     assertEqual(root.defaultDatasetVersions[datasetId], definition.version, "clean startup records version for " .. datasetId)
     assertEqual(Database.IsDatasetActivated(datasetId), true, "clean startup activates " .. datasetId)
+end
+
+local installedCoreSetting = root.datasets["f82db71a"].guildSettings[1]
+installedCoreSetting.requisitions[#installedCoreSetting.requisitions + 1] = {
+    id = "stale_dh_t2",
+    itemRef = "dhunter1:dh2vchst",
+}
+installedCoreSetting.requisitions[#installedCoreSetting.requisitions + 1] = {
+    id = "stale_evoker_t2",
+    itemRef = "evokdata:ev2cchst",
+}
+Addon.Data.SyncDefaultDatasets()
+for index = 1, #installedCoreSetting.requisitions do
+    local itemRef = installedCoreSetting.requisitions[index].itemRef or ""
+    assertTrue(not itemRef:match("^dhunter1:dh2") and not itemRef:match("^evokdata:ev2"), "stale Core Tier 2 shop rows are migrated")
 end
 
 local installedCount = 0

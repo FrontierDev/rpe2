@@ -622,7 +622,9 @@ end
 -- Revision 3 also refreshes packaged defaults after the Core NPC spell and
 -- Human-unit additions, including clients whose Core version metadata was
 -- recorded during an intermediate package build.
-local PACKAGED_DEFAULT_SYNC_REVISION = 3
+-- Revision 4 removes stale Tier 2 Demon Hunter/Evoker shop rows from Core
+-- records that were already written by an earlier package build.
+local PACKAGED_DEFAULT_SYNC_REVISION = 4
 
 local function logInstallDiagnostic(message)
     local debug = Addon.Debug or nil
@@ -645,6 +647,34 @@ local function applyPackagedVersionCorrections(definitions)
     then
         leatherworking.version = 2
     end
+end
+
+local function removeStaleCoreTierTwoShopRows(root)
+    local coreDataset = type(root) == "table"
+        and type(root.datasets) == "table"
+        and root.datasets["f82db71a"]
+        or nil
+    local guildSettings = type(coreDataset) == "table" and coreDataset.guildSettings or nil
+    if type(guildSettings) ~= "table" then
+        return false
+    end
+
+    local changed = false
+    for settingIndex = 1, #guildSettings do
+        local setting = guildSettings[settingIndex]
+        local requisitions = type(setting) == "table" and setting.requisitions or nil
+        if type(requisitions) == "table" then
+            for requisitionIndex = #requisitions, 1, -1 do
+                local itemRef = tostring(requisitions[requisitionIndex] and requisitions[requisitionIndex].itemRef or ""):match("^%s*(.-)%s*$")
+                if itemRef:match("^dhunter1:dh2") or itemRef:match("^evokdata:ev2") then
+                    table.remove(requisitions, requisitionIndex)
+                    changed = true
+                end
+            end
+        end
+    end
+
+    return changed
 end
 
 local function syncDefaultDatasets()
@@ -702,6 +732,11 @@ local function syncDefaultDatasets()
         logInstallDiagnostic(("%d packaged default dataset definition(s) failed validation."):format(skippedDefinitions))
         return false
     end
+
+    -- Package-version checks rewrite normal defaults, but an old Core record
+    -- can still carry these rows when its metadata was already advanced by an
+    -- intermediate build. Clean the persisted record as part of installation.
+    removeStaleCoreTierTwoShopRows(savedRoot)
 
     savedRoot.defaultDatasetSyncRevision = PACKAGED_DEFAULT_SYNC_REVISION
     return true

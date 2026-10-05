@@ -23,6 +23,8 @@ local function scheduleNextFrame(callback)
     callback()
 end
 
+local DATASET_ENTRY_IMPORT_NONE = "__rpe_dataset_entry_import_none__"
+
 DataEditor.__index = DataEditor
 DataEditor.Database = Addon.Internal and Addon.Internal.Database or {}
 DataEditor.Registry = Addon.Internal and Addon.Internal.Registry or {}
@@ -1359,6 +1361,91 @@ function DataEditor:ExportSelectedDatasetEntryToClipboard(collectionKey)
     return exportText
 end
 
+function DataEditor:BuildDatasetEntryImportSourceItems(collectionKey)
+    self.DatasetEntryImportSources = {}
+
+    local definition = self:GetEntryDefinition(collectionKey) or {}
+    local items = {
+        {
+            label = ("Select an existing %s"):format(string.lower(definition.singular or "entry")),
+            value = DATASET_ENTRY_IMPORT_NONE,
+        },
+    }
+
+    for _, dataset in ipairs(self:GetDatasets() or {}) do
+        local datasetId = tostring(dataset and dataset.id or "")
+        local entries = dataset and dataset[collectionKey] or nil
+        if datasetId ~= "" and type(entries) == "table" then
+            local children = {}
+            for entryIndex = 1, #entries do
+                local entry = entries[entryIndex]
+                if type(entry) == "table" then
+                    local entryId = tostring(entry.id or "")
+                    local entryName = self:GetEntryDisplayName(collectionKey, entry)
+                    local entryLabel = entryName
+                    if entryId ~= "" then
+                        entryLabel = ("%s [%s]"):format(entryName, entryId)
+                    end
+
+                    local sourceValue = ("%s:%d"):format(datasetId, entryIndex)
+                    self.DatasetEntryImportSources[sourceValue] = {
+                        collectionKey = collectionKey,
+                        datasetId = datasetId,
+                        entryIndex = entryIndex,
+                        datasetName = self:GetDatasetDisplayName(dataset),
+                        entryName = entryLabel,
+                    }
+                    children[#children + 1] = {
+                        label = entryLabel,
+                        value = sourceValue,
+                        tooltip = entryId ~= "" and ("ID: " .. entryId) or nil,
+                    }
+                end
+            end
+
+            if #children > 0 then
+                items[#items + 1] = {
+                    label = self:GetDatasetDisplayName(dataset),
+                    value = "dataset:" .. datasetId,
+                    children = children,
+                    tooltip = "Dataset ID: " .. datasetId,
+                }
+            end
+        end
+    end
+
+    return items
+end
+
+function DataEditor:CopyDatasetEntryImportSource(sourceValue)
+    if sourceValue == DATASET_ENTRY_IMPORT_NONE then
+        return nil
+    end
+
+    local source = self.DatasetEntryImportSources and self.DatasetEntryImportSources[sourceValue]
+    local collectionKey = self.CurrentDatasetEntryImportCollectionKey
+    if not source or source.collectionKey ~= collectionKey then
+        return nil, "Select an existing dataset entry first."
+    end
+    if not (self.Database and self.Database.ExportDatasetEntry) then
+        return nil, "Dataset entry export is unavailable."
+    end
+
+    local exportText = self.Database.ExportDatasetEntry(source.datasetId, collectionKey, source.entryIndex)
+    if not exportText then
+        return nil, "The selected dataset entry could not be exported."
+    end
+
+    if self.DatasetEntryImportTextArea and self.DatasetEntryImportTextArea.SetText then
+        self.DatasetEntryImportTextArea:SetText(exportText)
+    end
+    if self.DatasetEntryImportStatusText and self.DatasetEntryImportStatusText.SetText then
+        self.DatasetEntryImportStatusText:SetText(("Loaded %s from %s."):format(source.entryName, source.datasetName))
+    end
+
+    return exportText
+end
+
 function DataEditor:ImportDatasetFromText(text)
     if not (self.Database and self.Database.ImportDataset) then
         return nil, "Dataset import is unavailable."
@@ -1947,6 +2034,39 @@ function DataEditor:BuildDatasetEntryImportWindow()
     )
     root:AddChild(self.DatasetEntryImportInstructionText)
 
+    local sourceRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorDatasetEntryImportSourceRow", {
+        spacing = 4,
+        height = 20,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    sourceRow:AddChild(UI.CreateText(sourceRow:GetFrame(), "RPEDataEditorDatasetEntryImportSourceLabel", "Copy from", {
+        width = 70,
+        height = 20,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    }))
+    self.DatasetEntryImportSourceDropdown = UI.CreateDropdown(sourceRow:GetFrame(), "RPEDataEditorDatasetEntryImportSourceDropdown", {
+        width = 0,
+        height = 20,
+        expandWidth = true,
+        weight = 1,
+        popupWidth = 320,
+        visibleRows = 10,
+        placeholder = "Select an existing entry",
+        items = {
+            { label = "Select an existing entry", value = DATASET_ENTRY_IMPORT_NONE },
+        },
+        onValueChanged = function(value)
+            local _, copyError = self:CopyDatasetEntryImportSource(value)
+            if copyError and self.DatasetEntryImportStatusText and self.DatasetEntryImportStatusText.SetText then
+                self.DatasetEntryImportStatusText:SetText(copyError)
+            end
+        end,
+    })
+    sourceRow:AddChild(self.DatasetEntryImportSourceDropdown)
+    root:AddChild(sourceRow)
+
     self.DatasetEntryImportTextArea = UI.CreateTextArea(root:GetFrame(), "RPEDataEditorDatasetEntryImportTextArea", {
         width = 500,
         height = 260,
@@ -2021,6 +2141,13 @@ function DataEditor:ShowDatasetEntryImportWindow(collectionKey)
 
     local window = self:BuildDatasetEntryImportWindow()
     self.CurrentDatasetEntryImportCollectionKey = collectionKey
+
+    local sourceItems = self:BuildDatasetEntryImportSourceItems(collectionKey)
+    if self.DatasetEntryImportSourceDropdown then
+        self.DatasetEntryImportSourceDropdown:SetItems(sourceItems)
+        self.DatasetEntryImportSourceDropdown:SetSelectedValue(DATASET_ENTRY_IMPORT_NONE, true)
+        self.DatasetEntryImportSourceDropdown:SetEnabled(next(self.DatasetEntryImportSources) ~= nil)
+    end
 
     local singular = definition.singular or "Entry"
     if window and window.SetTitle then

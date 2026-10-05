@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 56,
+    version = 57,
     dataset = {
         achievements = {},
         auras = {
@@ -161,9 +161,9 @@ Addon.Data.DefaultDatasets:Register({
                         type = "stat"
                     },
                     {
-                        baseAmount = 5,
+                        baseAmount = 3,
                         operation = "flat",
-                        statRef = "f82db71a:jslmczbi",
+                        statRef = "f82db71a:wbj4zuf3",
                         statScaling = {},
                         type = "stat"
                     }
@@ -177,7 +177,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Increases Melee Attack Power by 10%. Reduces Damage Done by 10%. Increases Melee Crit. Chance by 5%.",
+                    bodyText = "Increases Melee Attack Power by 10%. Reduces Damage Done by 10%. Increases Melee Hit Chance by 3%.",
                     bodyTokens = {},
                     stackingText = "",
                     stackingTokens = {},
@@ -955,7 +955,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Increases Block Chance by {AURA_STAT_1}. When you successfully block an attack, deal {AURA_EVENT_DAMAGE_1} Holy damage to the attacker.",
+                    bodyText = "Increases Block Chance by {AURA_STAT_1}%. When you successfully block an attack, the attacker takes {AURA_EVENT_DAMAGE_1} Holy damage.",
                     bodyTokens = {
                         {
                             applyMode = "stat_amount",
@@ -6429,7 +6429,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:sotc9a2f",
                             datasetId = "b0211ab3",
-                            descriptionText = "Increases Melee Attack Power by 10%. Reduces Damage Done by 10%. Increases Melee Crit. Chance by 5%.",
+                            descriptionText = "Increases Melee Attack Power by 10%. Reduces Damage Done by 10%. Increases Melee Hit Chance by 3%.",
                             duration = 3,
                             icon = "interface/icons/spell_holy_holysmite.blp",
                             nameText = "Seal of the Crusader",
@@ -9332,7 +9332,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:hlyshlda",
                             datasetId = "b0211ab3",
-                            descriptionText = "Increases Block Chance by {AURA_STAT_1}. When you successfully block an attack, deal {AURA_EVENT_DAMAGE_1} Holy damage to the attacker.",
+                            descriptionText = "Increases Block Chance by {AURA_STAT_1}%. When you successfully block an attack, the attacker takes {AURA_EVENT_DAMAGE_1} Holy damage.",
                             duration = 3,
                             icon = "interface/icons/spell_holy_blessingofprotection.blp",
                             nameText = "Holy Shield",
