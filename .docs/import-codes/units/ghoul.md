@@ -1,5 +1,78 @@
 # Ghoul Unit and Ability Import Codes
 
+Standalone `RPE_DATASET_ENTRY_V1` import code for the base Ghoul unit and its three Normal-challenge variants in the Core dataset (`f82db71a`).
+
+Import the supporting Ghoul Auras and Spells from `.docs/import-codes/spells/ghoul-abilities.md` before importing this Unit.
+
+## Base Ghoul calibration
+
+| Stat | Initial | Per level | Level 60 |
+|---|---:|---:|---:|
+| Health | 130 | 28.305085 | 1,800 |
+| Armor | 20 | 14.915254 | 900 |
+| Melee Attack Power | 45 | 5.169492 | 350 |
+| Ranged Attack Power | 0 | 0 | 0 |
+| Spell Power | 0 | 0 | 0 |
+| Healing Power | 0 | 0 | 0 |
+| Melee Hit Chance | 0 | 0 | 0 |
+| Ranged Hit Chance | 0 | 0 | 0 |
+| Spell Hit Chance | 0 | 0 | 0 |
+| Melee Crit Chance | 5 | 0 | 5 |
+| Ranged Crit Chance | 0 | 0 | 0 |
+| Spell Crit Chance | 0 | 0 | 0 |
+| Parry Chance | 0 | 0 | 0 |
+| Dodge Chance | 3 | 0 | 3 |
+| Block Chance | 0 | 0 | 0 |
+| Magic Resistance | 0 | 0 | 0 |
+| Fire Resistance | 0 | 0 | 0 |
+| Frost Resistance | 0 | 0 | 0 |
+| Nature Resistance | 0 | 0 | 0 |
+| Arcane Resistance | 0 | 0 | 0 |
+| Shadow Resistance | 0 | 0 | 0 |
+| Holy Resistance | 0 | 0 | 0 |
+| Resource Regeneration | 0 | 0 | 0 |
+| Movement Speed | 35 | 0 | 35 |
+
+The base Ghoul is a `minor`, `medium` Undead with Health only and the Core Natural Attack (`f82db71a:natatk01`).
+
+## Normal variants
+
+All three variants override the challenge level to `normal` and use the same baseline Normal-tier stat adjustment:
+
+- Health: +50% -> 2,700 at level 60
+- Armor: +66.666667% -> 1,500 at level 60
+- Melee Attack Power: +28.571429% -> 450 at level 60
+- Dodge Chance remains 3%
+- Movement Speed remains 35
+
+Each variant retains Natural Attack as its Free Action and gains one Main Action ability.
+
+### Plaguebearer
+
+- **Diseased Bite** — Main Action, Shadow melee ability.
+- Direct damage budget: `85 + 0.2975 × MAP`.
+- Applies **Diseased Bite** for 20 turns.
+- The debuff reduces Strength and Agility by 40%.
+- No spell cooldown; re-use refreshes the non-stacking debuff.
+
+### Leaper
+
+- **Leap** — Main Action, Shadow melee ability.
+- Four-turn cooldown.
+- Direct damage budget: `123.25 + 0.431375 × MAP`.
+- Applies a 1-turn stun using the same control contract as Hammer of Justice: no casting, no movement, and attacks against the target automatically hit.
+- The 4-turn cooldown prevents repeated turn-by-turn stun locking.
+
+### Ravager
+
+- **Thrash** — Main Action, Physical melee ability.
+- Direct damage budget: `85 + 0.2975 × MAP`.
+- Applies a 3-turn heavy bleed.
+- Bleed per turn: `28.1667 + 0.15 × MAP` Physical damage.
+- The bleed refreshes rather than stacking.
+
+# Ghoul Unit and Ability Import Codes
+
 Standalone `RPE_DATASET_ENTRY_V1` import codes for the base Ghoul unit, its three Normal-challenge variants, and their supporting NPC abilities in the Core dataset (`f82db71a`).
 
 Import the three **Auras** first, then the three **Spells**, then the **Ghoul Unit**.
