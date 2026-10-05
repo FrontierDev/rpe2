@@ -44,7 +44,7 @@ The base Zombie is authored as a `minor`, `medium` Undead. It is intended to fun
 - Movement Speed is reduced to 20 to preserve the slow Zombie identity.
 - No innate school resistances or Holy vulnerability are seeded on the base unit.
 - Damage Done and Damage Reduction are not seeded on the base unit.
-- The Zombie uses the Core Pet Attack spell (`f82db71a:6uix049h`) as its natural melee attack because Core Main Hand Attack requires an equipped main-hand weapon.
+- The Zombie uses the Core Natural Attack spell (`f82db71a:natatk01`) as its basic melee attack. Natural Attack is an unlearnable NPC auto attack that scales from Melee Attack Power and does not require a weapon.
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -71,7 +71,7 @@ RPE_DATASET_ENTRY_V1
             },
         },
         spells = {
-            "f82db71a:6uix049h",
+            "f82db71a:natatk01",
         },
         stats = {
             {
