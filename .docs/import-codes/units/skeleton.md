@@ -117,9 +117,6 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Warrior",
                 challengeLevel = "normal",
-                resourceModifiers = {
-                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = -100, flatBonus = 0 },
-                },
                 statModifiers = {
                     { statRef = "f82db71a:v42albuv", percentBonus = 80, flatBonus = 0 },
                     { statRef = "f82db71a:u7b49vs9", percentBonus = 53.846154, flatBonus = 0 },
