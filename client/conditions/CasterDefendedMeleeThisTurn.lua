@@ -21,13 +21,21 @@ local function resolveDefenceStat(condition)
     end
 
     local _, stat = Registry:ResolveStatReference(reference)
-    local defenceLabel = type(stat) == "table" and tostring(stat.defenceLabel or "") or ""
-    defenceLabel = defenceLabel:gsub("^%s+", ""):gsub("%s+$", "")
-    if defenceLabel == "" then
+    if type(stat) ~= "table" then
         return nil, false
     end
 
-    return defenceLabel, true
+    local displayLabel = tostring(stat.defenceLabel or "")
+    displayLabel = displayLabel:gsub("^%s+", ""):gsub("%s+$", "")
+    if displayLabel == "" then
+        for _, candidate in ipairs({ stat.name, stat.label, stat.id, reference }) do
+            displayLabel = tostring(candidate or ""):gsub("^%s+", ""):gsub("%s+$", "")
+            if displayLabel ~= "" then
+                break
+            end
+        end
+    end
+    return displayLabel ~= "" and displayLabel or reference, true
 end
 
 Conditions:RegisterCondition("caster_defended_melee_this_turn", {

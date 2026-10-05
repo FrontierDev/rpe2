@@ -16,9 +16,36 @@ local function assertEqual(actual, expected, message)
     end
 end
 
+local function normalizeToken(value)
+    local token = tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    return token ~= "" and token or nil
+end
+
 local Addon = {
     Client = {
         Spellcasting = {},
+        Combat = {
+            Normalization = {
+                TrimText = function(value)
+                    return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                end,
+                NormalizeToken = normalizeToken,
+                NormalizeResultToken = function(value)
+                    local token = normalizeToken(value)
+                    if token == "pass" or token == "fail" then
+                        return token
+                    end
+                    return nil
+                end,
+                SplitList = function(value)
+                    local values = {}
+                    for item in tostring(value or ""):gmatch("[^,]+") do
+                        values[#values + 1] = item
+                    end
+                    return values
+                end,
+            },
+        },
         CombatHistoryByEventId = {
             history = {
                 turns = {
@@ -45,10 +72,20 @@ local Addon = {
                 if statRef == "core:dodge" then
                     return {}, { name = "Dodge", defenceLabel = "Dodge" }
                 end
+                if statRef == "core:custom" then
+                    return {}, { name = "Custom Defence" }
+                end
                 return nil, nil
             end,
         },
         Database = {},
+        Comms = {
+            Operations = {
+                GetOpcode = function(_, _)
+                    return "test-opcode"
+                end,
+            },
+        },
     },
     Utils = {},
 }
@@ -66,6 +103,9 @@ conditionsCoreChunk("RPEngine2", Addon)
 local defendedConditionChunk, defendedConditionLoadError = loadfile("client/conditions/CasterDefendedMeleeThisTurn.lua")
 assert(defendedConditionChunk, defendedConditionLoadError)
 defendedConditionChunk("RPEngine2", Addon)
+local reactionChunk, reactionLoadError = loadfile("client/combat/Reaction.lua")
+assert(reactionChunk, reactionLoadError)
+reactionChunk("RPEngine2", Addon)
 
 local eventState = { active = true, id = "history", turnNumber = 2 }
 assertTrue(
@@ -114,6 +154,64 @@ assertEqual(
     Addon.Client.CombatHistoryByEventId.defended.turns[3].attacks[1].defenceStatRef,
     "core:parry",
     "combat history preserves the canonical defence stat reference"
+)
+
+local customState = record("custom", 3, "melee", true, "core:custom", "custom-1")
+assertEqual(
+    Addon.Client.CombatHistoryByEventId.custom.turns[3].attacks[1].defenceStatRef,
+    "core:custom",
+    "a resolvable defence stat without a defenceLabel is retained in combat history"
+)
+assertTrue(
+    Addon.Client:HasSuccessfullyDefendedMeleeThisTurn(customState, caster.eventID, "core:custom"),
+    "a resolvable defence stat without a defenceLabel satisfies the filtered query"
+)
+local customCondition = Addon.Internal.Database.Classes.Condition.Normalize({
+    type = "caster_defended_melee_this_turn",
+    defenceStatRef = "core:custom",
+})
+local customEvaluation = Addon.Client.Conditions:Evaluate(customCondition, {
+    eventState = customState,
+    casterUnit = caster,
+})
+assertTrue(customEvaluation.passed, "a resolvable defence stat without a defenceLabel satisfies the condition")
+assertEqual(
+    Addon.Client.Conditions:ResolveConditionText(customCondition, {}),
+    "Requires the caster to have successfully defended using Custom Defence this turn",
+    "parameterised condition tooltip falls back to the resolved stat name"
+)
+
+local reactionEntry = {
+    eventState = { active = true, id = "reaction-history", turnNumber = 4 },
+    attackerUnit = attacker,
+    defenderUnit = caster,
+    attackType = "melee",
+    defenceSystem = "percent",
+    checkId = "reaction-check-1",
+    lastResolution = {
+        defenceSystem = "percent",
+        defenceStatRef = "core:custom",
+    },
+}
+local reactionAction = {
+    id = "percent:core:custom",
+    enabled = true,
+    statRef = "core:custom",
+}
+assertTrue(
+    Addon.Client.Combat:RecordResolvedCombatAttackHistory(
+        Addon.Client,
+        reactionEntry,
+        "fail",
+        reactionAction,
+        reactionEntry.lastResolution
+    ),
+    "reaction resolution records the resolved combat attack"
+)
+assertEqual(
+    Addon.Client.CombatHistoryByEventId["reaction-history"].turns[4].attacks[1].defenceStatRef,
+    "core:custom",
+    "reaction resolution preserves the canonical defence stat reference"
 )
 
 local previousTurnState = record("previous-turn", 1, "melee", true, "core:parry", "previous-parry")

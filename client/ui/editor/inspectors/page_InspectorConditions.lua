@@ -287,9 +287,18 @@ local function buildDefenceStatItems(self)
         for index = 1, #((dataset and dataset.stats) or {}) do
             local stat = dataset.stats[index]
             local defenceLabel = tostring(stat and stat.defenceLabel or ""):gsub("^%s+", ""):gsub("%s+$", "")
-            if stat and stat.id and defenceLabel ~= "" then
+            local statLabel = defenceLabel
+            if statLabel == "" then
+                for _, candidate in ipairs({ stat and stat.name, stat and stat.label, stat and stat.id }) do
+                    statLabel = tostring(candidate or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                    if statLabel ~= "" then
+                        break
+                    end
+                end
+            end
+            if stat and stat.id and statLabel ~= "" then
                 items[#items + 1] = {
-                    label = ("%s / %s"):format(self:GetDatasetDisplayName(dataset), defenceLabel),
+                    label = ("%s / %s"):format(self:GetDatasetDisplayName(dataset), statLabel),
                     value = ("%s:%s"):format(dataset.id, stat.id),
                 }
             end

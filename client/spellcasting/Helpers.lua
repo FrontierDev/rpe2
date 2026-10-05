@@ -57,8 +57,7 @@ local function isKnownDefenceStatRef(reference)
     end
 
     local _, stat = Registry:ResolveStatReference(reference)
-    local defenceLabel = type(stat) == "table" and tostring(stat.defenceLabel or "") or ""
-    return defenceLabel:gsub("^%s+", ""):gsub("%s+$", "") ~= ""
+    return type(stat) == "table"
 end
 
 local function getTimings()

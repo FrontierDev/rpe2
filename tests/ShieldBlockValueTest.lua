@@ -125,6 +125,11 @@ local function getStatValue(unit, statRef, fallback)
 end
 
 local Addon = {
+    UI = {
+        ResolveColor = function(_, colorKey)
+            return colorKey
+        end,
+    },
     Client = {
         Combat = {
             Normalization = {
@@ -154,8 +159,11 @@ local Addon = {
             end,
             GetRulesetRuleValue = function(ruleset, categoryKey, ruleDefinition)
                 local category = ruleset and ruleset.rules and ruleset.rules[categoryKey] or nil
-                local value = category and category[ruleDefinition.key] or nil
-                return value ~= nil and value or ruleDefinition.default
+                local value = category and category[ruleDefinition.key]
+                if value ~= nil then
+                    return value
+                end
+                return ruleDefinition.default
             end,
         },
     },
@@ -242,6 +250,7 @@ local function makeEntry(rawDamage, shieldValue, mitigationFlat, isPlayer)
         effect = effect,
         component = {},
         attackType = "melee",
+        defenceSystem = "percent",
         resultType = "hit",
         hitResolutionContext = hitContext,
     }
@@ -381,7 +390,7 @@ assertEqual(defenceEventCount, 1, "partial Block emits one successful-defence ev
 
 local absorbedInput
 Addon.Client.Spellcasting.AuraManager = {
-    PreviewAbsorption = function(_, _, _, amount)
+    PreviewAbsorption = function(_, _, _, _, amount)
         absorbedInput = amount
         return { absorbedAmount = 10, remainingDamage = amount - 10, changes = {} }
     end,
