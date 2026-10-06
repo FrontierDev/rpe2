@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 46,
+    version = 47,
     dataset = {
         achievements = {},
         auras = {
@@ -6374,6 +6374,69 @@ Addon.Data.DefaultDatasets:Register({
                             tokenType = "spell_damage_range"
                         }
                     },
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            targetEvents = {},
+                            type = "interrupt"
+                        },
+                        key = "pummelc1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 10,
+                cooldownGroup = "interrupt",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/inv_gauntlets_04.blp",
+                id = "pummel01",
+                cooldownChannel = 5,
+                learnMode = "always_learned",
+                learnLevel = 38,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Pummel",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 10,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Fury",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Interrupt an enemy's spellcasting.",
+                    tokens = {},
                     version = 1
                 },
                 totalTicks = 0,
