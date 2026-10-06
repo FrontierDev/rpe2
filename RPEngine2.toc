@@ -240,6 +240,7 @@ client/combat/effects/Revert.lua
 client/combat/effects/SummonPet.lua
 client/combat/effects/SummonUnit.lua
 client/combat/effects/Hide.lua
+client/combat/effects/RemoveHidden.lua
 client/combat/effects/Taunt.lua
 client/client_EventMeters.lua
 client/combat/ReactionPerformance.lua
