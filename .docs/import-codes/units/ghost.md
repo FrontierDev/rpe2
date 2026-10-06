@@ -1,6 +1,6 @@
 # Ghost Unit Import Code
 
-Standalone `RPE_DATASET_ENTRY_V1` import code for the base Ghost unit in the Core dataset (`f82db71a`).
+Standalone `RPE_DATASET_ENTRY_V1` import code for the base Ghost unit and its Wraith, Spectre and Shade presets in the Core dataset (`f82db71a`).\n\nImport the Ghost-specific abilities from `.docs/import-codes/spells/ghost-abilities.md` before importing this Unit.
 
 ## Level-60 calibration
 
@@ -41,8 +41,31 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for the base Ghost unit in the Cor
 - No equipment
 - Natural Attack — `f82db71a:natatk01`
 - Shadow Bolt — `e8f3b2c6:wlsbolt1`
-- No variants are included yet.
 - The Ghost's low Armor represents its poor physical durability, while modest Magic and Shadow Resistance provide its spectral defensive identity.
+
+## Variants
+
+### Wraith — Normal
+
+- Natural Attack
+- Frostbolt — `d7c874c4:lywroiqu`
+- Freezing Touch — `f82db71a:ghostft01`
+- Freezing Touch is a Main Action melee attack dealing Frost damage.
+
+### Spectre — Normal
+
+- Natural Attack
+- Shadow Bolt — `e8f3b2c6:wlsbolt1`
+- Shadow Claws — `f82db71a:ghostsc01`
+- Shadow Claws is a Main Action melee attack dealing Shadow damage.
+
+### Shade — Normal
+
+- Natural Attack
+- Stealth — `23d5dce2:stealth01`
+- Detect Invisibility — required, but not yet representable by the current hidden-unit targeting schema.
+
+The current hidden system provides per-spell `canTargetHiddenUnits` / per-target `allowHiddenTargets`, but no persistent unit or aura capability that makes all of a unit's abilities able to target hidden units. Do not replace Detect Invisibility with a no-op or unrelated fallback.
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -59,7 +82,43 @@ RPE_DATASET_ENTRY_V1
         creatureType = "undead",
         id = "ghost001",
         name = "Ghost",
-        presets = {  },
+        presets = {
+            {
+                name = "Wraith",
+                challengeLevel = "normal",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "f82db71a:natatk01",
+                    "d7c874c4:lywroiqu",
+                    "f82db71a:ghostft01",
+                },
+                equipment = {  },
+            },
+            {
+                name = "Spectre",
+                challengeLevel = "normal",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "f82db71a:natatk01",
+                    "e8f3b2c6:wlsbolt1",
+                    "f82db71a:ghostsc01",
+                },
+                equipment = {  },
+            },
+            {
+                name = "Shade",
+                challengeLevel = "normal",
+                resourceModifiers = {  },
+                statModifiers = {  },
+                spells = {
+                    "f82db71a:natatk01",
+                    "23d5dce2:stealth01",
+                },
+                equipment = {  },
+            },
+        },
         resistances = {  },
         resources = {
             {
