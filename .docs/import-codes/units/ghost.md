@@ -1,6 +1,8 @@
 # Ghost Unit Import Code
 
-Standalone `RPE_DATASET_ENTRY_V1` import code for the base Ghost unit and its Wraith, Spectre and Shade presets in the Core dataset (`f82db71a`).\n\nImport the Ghost-specific abilities from `.docs/import-codes/spells/ghost-abilities.md` before importing this Unit.
+Standalone `RPE_DATASET_ENTRY_V1` import code for the base Ghost unit and its Wraith, Spectre and Shade presets in the Core dataset (`f82db71a`).
+
+Import the Ghost-specific abilities from `.docs/import-codes/spells/ghost-abilities.md` before importing this Unit.
 
 ## Level-60 calibration
 
@@ -63,9 +65,8 @@ Standalone `RPE_DATASET_ENTRY_V1` import code for the base Ghost unit and its Wr
 
 - Natural Attack
 - Stealth — `23d5dce2:stealth01`
-- Detect Invisibility — required, but not yet representable by the current hidden-unit targeting schema.
-
-The current hidden system provides per-spell `canTargetHiddenUnits` / per-target `allowHiddenTargets`, but no persistent unit or aura capability that makes all of a unit's abilities able to target hidden units. Do not replace Detect Invisibility with a no-op or unrelated fallback.
+- Reveal — `f82db71a:ghreveal`
+- Reveal can target hidden enemies and removes their hidden status.
 
 ```text
 RPE_DATASET_ENTRY_V1
@@ -115,6 +116,7 @@ RPE_DATASET_ENTRY_V1
                 spells = {
                     "f82db71a:natatk01",
                     "23d5dce2:stealth01",
+                    "f82db71a:ghreveal",
                 },
                 equipment = {  },
             },
