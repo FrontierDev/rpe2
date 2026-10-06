@@ -215,3 +215,86 @@ RPE_DATASET_ENTRY_V1
     },
 }
 ```
+
+## Reveal
+
+Main Action utility spell that targets a hidden enemy and removes its hidden status. The spell is explicitly allowed to target hidden units.
+
+```text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "f82db71a",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = true,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    targetEvents = {  },
+                    type = "remove_hidden",
+                },
+                key = "ghrevl01",
+                target = {
+                    allowDeadTargets = false,
+                    allowHiddenTargets = true,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {
+            {
+                invert = false,
+                showOnTooltip = true,
+                tooltipTextOverride = "Requires Hidden Target",
+                type = "hidden",
+                unit = "target",
+            },
+        },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        icon = "interface/icons/spell_holy_dispelmagic.blp",
+        id = "ghreveal",
+        cooldownChannel = 1,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Reveal",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = true,
+        spellbookCategory = "",
+        tags = {
+            "npc",
+            "ghost",
+        },
+        tooltipTemplate = true,
+        tooltipTemplateData = {
+            auraSections = {  },
+            mainText = "Reveal a hidden enemy.",
+            tokens = {  },
+            version = 1,
+        },
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+```
+
