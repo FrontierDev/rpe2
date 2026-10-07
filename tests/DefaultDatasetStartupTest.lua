@@ -10,19 +10,11 @@ local function assertTrue(value, message)
     end
 end
 
-local function loadAddonFile(path, addon)
-    local chunk, loadError = loadfile(path)
-    assert(chunk, loadError)
-    chunk("RPEngine2", addon)
-end
-
 local savedDatasetRoot = rawget(_G, "RPEngineDatasetDB")
 local savedManagerRoot = rawget(_G, "RPEngineManagerDB")
 local diagnostics = {}
-local Addon = {
-    Name = "RPEngine2",
-    Data = {},
-    Internal = {},
+local TestSupport = dofile("tests/support/RuntimeStubs.lua")
+local Addon = TestSupport.CreateAddon({
     Debug = {
         Internal = function(message, ...)
             diagnostics[#diagnostics + 1] = select("#", ...) > 0
@@ -30,59 +22,18 @@ local Addon = {
                 or tostring(message)
         end,
     },
-}
+})
 
-loadAddonFile("core/internal/database/Dependecies.lua", Addon)
-loadAddonFile("core/internal/database/Database.lua", Addon)
-loadAddonFile("data/default/Datasets.lua", Addon)
+-- The helper reads the packaged TOC, so this smoke test automatically covers
+-- a newly added default-data file without maintaining a parallel file list.
+local definitions = TestSupport.LoadPackagedDefaultData(Addon)
 
--- This mirrors the packaged-data section of the current TOC, including every
--- post-definition patch file that contributes to the final packaged payload.
-local packagedDataFiles = {
-    "data/default/core.lua",
-    "data/default/core_guild_settings.lua",
-    "data/default/classes/druid.lua",
-    "data/default/classes/hunter.lua",
-    "data/default/classes/mage.lua",
-    "data/default/classes/paladin.lua",
-    "data/default/classes/priest.lua",
-    "data/default/classes/rogue.lua",
-    "data/default/classes/shaman.lua",
-    "data/default/classes/warlock.lua",
-    "data/default/classes/warrior.lua",
-    "data/default/classes/death_knight.lua",
-    "data/default/classes/monk.lua",
-    "data/default/classes/demon_hunter.lua",
-    "data/default/classes/evoker.lua",
-    "data/default/professions/fishing.lua",
-    "data/default/professions/alchemy.lua",
-    "data/default/professions/alchemy_daily_rewards.lua",
-    "data/default/professions/blacksmithing.lua",
-    "data/default/professions/blacksmithing_daily_rewards.lua",
-    "data/default/professions/enchanting.lua",
-    "data/default/professions/enchanting_daily_rewards.lua",
-    "data/default/professions/inscription.lua",
-    "data/default/professions/inscription_daily_rewards.lua",
-    "data/default/professions/jewelcrafting.lua",
-    "data/default/professions/jewelcrafting_daily_rewards.lua",
-    "data/default/professions/leatherworking.lua",
-    "data/default/professions/leatherworking_daily_rewards.lua",
-    "data/default/professions/misc.lua",
-    "data/default/professions/tailoring.lua",
-    "data/default/professions/tailoring_daily_rewards_cleanup.lua",
-    "data/default/professions/engineering.lua",
-}
-for index = 1, #packagedDataFiles do
-    loadAddonFile(packagedDataFiles[index], Addon)
-end
-
-loadAddonFile("data/default/Install.lua", Addon)
-loadAddonFile("core/internal/manager/ExternalManager.lua", Addon)
-loadAddonFile("core/internal/Runtime.lua", Addon)
+TestSupport.LoadAddonFile("data/default/Install.lua", Addon)
+TestSupport.LoadAddonFile("core/internal/manager/ExternalManager.lua", Addon)
+TestSupport.LoadAddonFile("core/internal/Runtime.lua", Addon)
 
 local Database = Addon.Internal.Database
 local Dependecies = Database.Dependecies
-local definitions = Addon.Data.DefaultDatasets.Definitions
 assertTrue(type(Addon.Data.SyncDefaultDatasets) == "function", "installer exposes the runtime dataset synchronizer")
 
 local expectedDefinitionCount = 0

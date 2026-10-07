@@ -58,26 +58,7 @@ jobs:
       - name: Run every Lua regression test
         shell: bash
         run: |
-          set -uo pipefail
-          mapfile -t tests < <(find tests -maxdepth 1 -type f -name '*Test.lua' -print | sort)
-          failures=()
-
-          for test in "${tests[@]}"; do
-            name="${test#tests/}"
-            if lua5.1 "$test"; then
-              echo "PASS $name"
-            else
-              echo "FAIL $name"
-              failures+=("$name")
-            fi
-          done
-
-          echo
-          echo "${#failures[@]} / ${#tests[@]} tests failed"
-          if ((${#failures[@]} > 0)); then
-            printf -- '- %s\n' "${failures[@]}"
-            exit 1
-          fi
+          bash .github/scripts/run_lua_tests.sh
 
   release-package:
     name: Validate release package
