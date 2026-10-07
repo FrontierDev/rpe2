@@ -212,6 +212,13 @@ assertEqual(root.defaultDatasetVersions[updatedDatasetId], originalVersion + 1, 
 assertEqual(Database.IsDatasetActivated(updatedDatasetId), false, "package update preserves user deactivation")
 updatedDefinition.version = originalVersion
 
+local forceReinstallDataset = root.datasets[updatedDatasetId]
+local packagedName = updatedDefinition.dataset.name
+forceReinstallDataset.name = "Locally modified default dataset"
+assertEqual(Addon.Data.SyncDefaultDatasets({ force = true }), true, "explicit force sync succeeds")
+assertEqual(root.datasets[updatedDatasetId].name, packagedName, "explicit force sync rewrites unchanged packaged datasets")
+assertEqual(Database.IsDatasetActivated(updatedDatasetId), false, "explicit force sync preserves user deactivation")
+
 definitions["malformed-default-regression"] = {
     version = 0,
     dataset = { id = "malformed-default-regression", name = "Malformed" },

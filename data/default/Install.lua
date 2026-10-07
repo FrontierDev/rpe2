@@ -677,7 +677,7 @@ local function removeStaleCoreTierTwoShopRows(root)
     return changed
 end
 
-local function syncDefaultDatasets()
+local function syncDefaultDatasets(options)
     local Database = Addon.Internal and Addon.Internal.Database or nil
     local DefaultDatasets = Addon.Data and Addon.Data.DefaultDatasets or nil
 
@@ -724,7 +724,8 @@ local function syncDefaultDatasets()
     end
 
     local installedRevision = math.max(0, math.floor(tonumber(savedRoot.defaultDatasetSyncRevision) or 0))
-    local forceSync = installedRevision < PACKAGED_DEFAULT_SYNC_REVISION
+    local requestedForceSync = type(options) == "table" and options.force == true
+    local forceSync = requestedForceSync or installedRevision < PACKAGED_DEFAULT_SYNC_REVISION
     local _, skippedDefinitions = Database.SyncDefaultDatasets(DefaultDatasets.Definitions, {
         force = forceSync,
     })

@@ -118,6 +118,22 @@ function ClientCommands:RegisterSlashCommands()
         return true
     end, "Show the data editor window.")
 
+    register({ "data", "reinstall" }, function(context)
+        local data = Addon.Data or nil
+        if type(data) ~= "table" or type(data.SyncDefaultDatasets) ~= "function" then
+            context.router:Print("Default dataset installation is not available.", "warn")
+            return false
+        end
+
+        if data.SyncDefaultDatasets({ force = true }) ~= true then
+            context.router:Print("Default dataset reinstall failed; see RPE INTERNAL messages for details.", "error")
+            return false
+        end
+
+        context.router:Print("Reinstalled all packaged default datasets. Existing edits to those datasets were overwritten; activation choices were preserved.")
+        return true
+    end, "Reinstall every packaged default dataset, overwriting edits while preserving activation choices.")
+
     register({ "rulesets" }, function(context)
         if not Client.OpenRulesetLauncherDestination then
             context.router:Print("Ruleset UI is not available.", "warn")
