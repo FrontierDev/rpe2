@@ -90,15 +90,13 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Tunneler",
                 challengeLevel = "normal",
-                resourceModifiers = {  },
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = 100, flatBonus = 0 },
+                },
                 statModifiers = {
-                    { statRef = "f82db71a:q2ktkztt", percentBonus = 0, flatBonus = 0 },
                     { statRef = "f82db71a:v42albuv", percentBonus = 157.142857, flatBonus = 0 },
                     { statRef = "f82db71a:u7b49vs9", percentBonus = 50, flatBonus = 0 },
                     { statRef = "f82db71a:wbj4zuf3", percentBonus = 0, flatBonus = 5 },
-                },
-                resourceModifiers = {
-                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = 100, flatBonus = 0 },
                 },
                 spells = {
                     "f82db71a:z36xzk0w",
