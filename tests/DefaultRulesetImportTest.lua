@@ -52,12 +52,33 @@ local imported, importError = Database.ImportRuleset(DefaultRuleset.export)
 assert(imported, importError)
 assertEqual(imported.id, CORE_RULESET_ID, "packaged Core import ID")
 assertEqual(imported.name, "Core", "packaged Core import name")
-assertEqual(DefaultRuleset.packageVersion, 11, "packaged Core ruleset version")
+assertEqual(DefaultRuleset.packageVersion, 14, "packaged Core ruleset version")
 assertEqual(imported.rules.event.event_end_justice_currency, "125", "packaged Core end-of-event Justice reward")
-assertTrue(contains(imported.rules.setup.allowed_class_refs, "c4a91e7d:shaman01"), "packaged Core allows Shaman setup")
-assertTrue(contains(imported.rules.setup.allowed_class_refs, "e8f3b2c6:warlock1"), "packaged Core allows Warlock setup")
-assertTrue(contains(imported.rules.setup.forced_dataset_ids, "c4a91e7d"), "packaged Core forces the Shaman dataset")
-assertTrue(contains(imported.rules.setup.forced_dataset_ids, "e8f3b2c6"), "packaged Core forces the Warlock dataset")
+assertEqual(imported.rules.combat.shield_block_value_stat, "f82db71a:sblkval1", "packaged Core enables Shield Block Value")
+
+local expectedDefaultClasses = {
+    ["b0211ab3:wvirv9um"] = "Paladin",
+    ["1c1038a7:nxlle3j6"] = "Priest",
+    ["23d5dce2:ta9uh9xw"] = "Rogue",
+    ["7bbb4cb9:wvirv9um"] = "Warrior",
+    ["d7c874c4:02p0r8a2"] = "Mage",
+    ["6e4d2a91:drdruid1"] = "Druid",
+    ["a8j9d1rx:h7n4t2er"] = "Hunter",
+    ["c4a91e7d:shaman01"] = "Shaman",
+    ["e8f3b2c6:warlock1"] = "Warlock",
+    ["dknight1:dkclass1"] = "Death Knight",
+    ["monkdata:monk0001"] = "Monk",
+    ["dhunter1:dhclass1"] = "Demon Hunter",
+    ["evokdata:evoker01"] = "Evoker",
+}
+
+for classRef, className in pairs(expectedDefaultClasses) do
+    assertTrue(contains(imported.rules.setup.allowed_class_refs, classRef), ("packaged Core allows %s setup"):format(className))
+    local datasetId = classRef:match("^([^:]+):")
+    assertTrue(contains(imported.rules.setup.forced_dataset_ids, datasetId), ("packaged Core forces the %s dataset"):format(className))
+end
+assertEqual(#imported.rules.setup.allowed_class_refs, 13, "packaged Core exposes every default class")
+assertEqual(#imported.rules.setup.allowed_race_refs, 0, "packaged Core leaves all races available by default")
 
 -- ADDON_LOADED synchronization installs Core without touching character-scoped
 -- activation. The stable-character path owns that activation decision.

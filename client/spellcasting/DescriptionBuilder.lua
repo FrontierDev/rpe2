@@ -1058,8 +1058,214 @@ local function buildHideSentence(component)
     return ("Cause %s to become hidden."):format(targetPhrase)
 end
 
-local function buildSummonPetSentence()
-    return "Summon the selected unit under your control."
+local function humanizeUnitReference(unitRef)
+    local value = trimText(unitRef)
+    value = value:match("^[^:]+:(.+)$") or value
+    value = value:gsub("[-_]+", " ")
+    value = value:gsub("(%w)([%w']*)", function(first, rest)
+        return string.upper(first) .. string.lower(rest)
+    end)
+    return value
+end
+
+local function resolveSummonUnitDefinition(unitRef)
+    local normalizedRef = trimText(unitRef)
+    if normalizedRef == "" or type(Registry.ResolveUnitDefinition) ~= "function" then
+        return nil
+    end
+
+    local ok, _, unit = pcall(Registry.ResolveUnitDefinition, Registry, normalizedRef, {
+        includeInactive = true,
+    })
+    if not ok or type(unit) ~= "table" then
+        return nil
+    end
+
+    return unit
+end
+
+local function listSummonDatasets()
+    if type(Database.ListDatasets) == "function" then
+        return Database.ListDatasets() or {}
+    end
+    if type(Registry.GetActivatedDatasets) == "function" then
+        return Registry:GetActivatedDatasets() or {}
+    end
+    return {}
+end
+
+local function findPetByReference(petRef)
+    local normalizedRef = trimText(petRef)
+    local datasetId, petId = normalizedRef:match("^([^:]+):(.+)$")
+    if not datasetId or not petId then
+        return nil
+    end
+
+    local datasets = listSummonDatasets()
+    for index = 1, #datasets do
+        local dataset = datasets[index]
+        if tostring(dataset and dataset.id or "") == datasetId then
+            for petIndex = 1, #(dataset.pets or {}) do
+                local pet = dataset.pets[petIndex]
+                if tostring(pet and pet.id or "") == petId then
+                    return pet
+                end
+            end
+        end
+    end
+
+    return nil
+end
+
+local function findPetByUnitReference(unitRef)
+    local normalizedRef = trimText(unitRef)
+    if normalizedRef == "" then
+        return nil
+    end
+
+    local datasets = listSummonDatasets()
+    for index = 1, #datasets do
+        local dataset = datasets[index]
+        for petIndex = 1, #(dataset and dataset.pets or {}) do
+            local pet = dataset.pets[petIndex]
+            if tostring(pet and pet.unitRef or "") == normalizedRef then
+                return pet
+            end
+        end
+    end
+
+    return nil
+end
+
+local function resolveSelectedPetForTooltip(detail)
+    local casterUnit = type(detail) == "table" and detail.casterUnit or nil
+    local petRef = type(casterUnit) == "table" and trimText(casterUnit.petRef) or ""
+    if petRef ~= "" then
+        local pet = findPetByReference(petRef)
+        if pet then
+            return pet, resolveSummonUnitDefinition(pet.unitRef)
+        end
+    end
+
+    if type(Profile.GetSelectedPet) == "function" then
+        local selectedPet = Profile.GetSelectedPet()
+        if type(selectedPet) == "table" then
+            return selectedPet.pet or selectedPet, selectedPet.unit
+        end
+    end
+
+    return nil
+end
+
+local function appendUniqueValues(target, values)
+    local seen = {}
+    for index = 1, #target do
+        seen[target[index]] = true
+    end
+    for index = 1, #(values or {}) do
+        local value = trimText(values[index])
+        if value ~= "" and not seen[value] then
+            seen[value] = true
+            target[#target + 1] = value
+        end
+    end
+end
+
+local function resolveSummonSpellRefs(unit, pet, preferPetSpells)
+    local spellRefs = {}
+    local petSpells = type(pet) == "table" and pet.spells or nil
+    local unitSpells = type(unit) == "table" and unit.spells or nil
+    if preferPetSpells == true and type(petSpells) == "table" and #petSpells > 0 then
+        appendUniqueValues(spellRefs, petSpells)
+    elseif type(unitSpells) == "table" and #unitSpells > 0 then
+        appendUniqueValues(spellRefs, unitSpells)
+    elseif type(petSpells) == "table" then
+        appendUniqueValues(spellRefs, petSpells)
+    end
+    return spellRefs
+end
+
+local function resolveSummonSpellName(spellRef)
+    if type(Registry.ResolveSpellName) == "function" then
+        local ok, name = pcall(Registry.ResolveSpellName, Registry, spellRef)
+        if ok and trimText(name) ~= "" then
+            return trimText(name)
+        end
+    end
+
+    return humanizeUnitReference(spellRef)
+end
+
+local function buildSummonAbilityClause(unit, pet, preferPetSpells)
+    local spellRefs = resolveSummonSpellRefs(unit, pet, preferPetSpells)
+    local spellNames = {}
+    for index = 1, #spellRefs do
+        local spellName = resolveSummonSpellName(spellRefs[index])
+        if spellName ~= "" then
+            spellNames[#spellNames + 1] = spellName
+        end
+    end
+    if #spellNames == 0 then
+        return ""
+    end
+
+    return (" Available abilities: %s."):format(table.concat(spellNames, ", "))
+end
+
+local function buildSummonPetSentence(detail, component)
+    local effect = type(component) == "table" and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    local unitRef = trimText(effect.unitRef)
+    local unit = unitRef ~= "" and resolveSummonUnitDefinition(unitRef) or nil
+    local pet
+    local selectedUnit
+    if unitRef ~= "" then
+        pet = findPetByUnitReference(unitRef)
+    else
+        pet, selectedUnit = resolveSelectedPetForTooltip(detail)
+    end
+    unit = unit or selectedUnit
+    local unitName = trimText(unit and unit.name)
+    if unitName == "" and type(pet) == "table" then
+        unitName = trimText(pet.name)
+    end
+
+    local sentence
+    if unitName ~= "" then
+        sentence = ("Summon %s as your pet."):format(unitName)
+    elseif unitRef ~= "" then
+        sentence = "Summon the specified unit as your pet."
+    else
+        sentence = "Summon your selected pet."
+    end
+
+    sentence = sentence .. " This replaces your current pet."
+    sentence = sentence .. buildSummonAbilityClause(unit, pet, true)
+    return sentence
+end
+
+local function buildSummonUnitSentence(detail, component)
+    local effect = type(component) == "table" and component.effect or nil
+    if type(effect) ~= "table" then
+        return nil
+    end
+
+    local unitRef = trimText(effect.unitRef)
+    local unit = unitRef ~= "" and resolveSummonUnitDefinition(unitRef) or nil
+    local unitName = trimText(unit and unit.name)
+    local sentence
+    if unitName ~= "" then
+        sentence = ("Summon %s as a controlled unit."):format(unitName)
+    else
+        sentence = "Summon the specified unit as a controlled unit."
+    end
+
+    sentence = sentence .. " This is separate from your pet."
+    sentence = sentence .. buildSummonAbilityClause(unit, nil, false)
+    return sentence
 end
 
 local function buildInterruptSentence(component)
@@ -1226,7 +1432,10 @@ local function buildSentence(detail, casterUnit, component, rankMultiplier)
         return buildHideSentence(component)
     end
     if effectType == "summon_pet" then
-        return buildSummonPetSentence()
+        return buildSummonPetSentence(detail, component)
+    end
+    if effectType == "summon_unit" then
+        return buildSummonUnitSentence(detail, component)
     end
     if effectType == "interrupt" then
         return buildInterruptSentence(component)
@@ -1401,7 +1610,10 @@ local function buildTemplateSentence(detail, componentIndex, component, state)
         return buildHideSentence(component)
     end
     if effectType == "summon_pet" then
-        return buildSummonPetSentence()
+        return buildSummonPetSentence(detail, component)
+    end
+    if effectType == "summon_unit" then
+        return buildSummonUnitSentence(detail, component)
     end
     if effectType == "interrupt" then
         return buildInterruptSentence(component)
@@ -2008,6 +2220,11 @@ function DescriptionBuilder:BuildTooltipData(detail, options)
             return cachedTooltipData
         end
         local payload = type(spell) == "table" and spell.tooltipTemplateData or nil
+        if type(TooltipTemplate.NormalizeSpellPayload) == "function"
+            and type(TooltipTemplate.NormalizeSpellPayload(payload)) ~= "table"
+        then
+            payload = self:BuildTooltipTemplatePayload(detail)
+        end
         local tooltipData, resolveError = self:ResolveTooltipTemplatePayload(detail, payload, casterUnit)
         if type(tooltipData) ~= "table" then
             local errorText = trimText(resolveError or buildSpellTemplateError(detail, "template payload is missing."))

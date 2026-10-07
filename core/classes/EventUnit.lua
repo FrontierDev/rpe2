@@ -671,7 +671,9 @@ function EventUnit:New(data)
         hidden = false,
         boss = false,
         showInNpcMode = false,
+        isPet = false,
         petRef = nil,
+        petStats = {},
         summonedByEventID = nil,
         mainHandWeapon = nil,
         offHandWeapon = nil,
@@ -717,7 +719,9 @@ function EventUnit:Merge(data)
     self.hidden = normalizeHidden(self.hidden)
     self.boss = normalizeBoss(self.boss)
     self.showInNpcMode = normalizeShowInNpcMode(self.showInNpcMode)
+    self.isPet = coerceBoolean(self.isPet, false)
     self.petRef = normalizeRef(self.petRef)
+    self.petStats = normalizeStats(self.petStats)
     self.summonedByEventID = tonumber(self.summonedByEventID) or nil
     self.mainHandWeapon = normalizeRef(self.mainHandWeapon)
     self.offHandWeapon = normalizeRef(self.offHandWeapon)
@@ -819,7 +823,9 @@ function EventUnit:ToTable()
         hidden = normalizeHidden(self.hidden),
         boss = normalizeBoss(self.boss),
         showInNpcMode = normalizeShowInNpcMode(self.showInNpcMode),
+        isPet = self.isPet == true,
         petRef = self.petRef,
+        petStats = normalizeStats(self.petStats),
         summonedByEventID = tonumber(self.summonedByEventID) or nil,
         mainHandWeapon = self.mainHandWeapon,
         offHandWeapon = self.offHandWeapon,

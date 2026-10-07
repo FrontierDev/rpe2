@@ -4,9 +4,9 @@ Standalone `RPE_DATASET_ENTRY_V1` import codes for the Warlock class dataset `e8
 
 ## Authoring notes
 
-- The current packaged Warlock dataset exists but has no spells or auras yet.
+- Pet abilities in this sheet use `learnMode = "unavailable"`; they are dataset-owned abilities intended to be granted through Warlock Pet definitions rather than learned by the player.
 - These entries follow the current RPE2 spell-authoring specification and current shipped spell schemas.
-- All spell and aura `description` fields are intentionally empty and `tooltipTemplate = true`; the runtime description generators should derive descriptions from the actual components and aura effects rather than relying on hand-authored descriptions.
+ All spell and aura `description` fields are intentionally empty and `tooltipTemplate = false`; the runtime tooltip template generator derives descriptions from the actual components and aura effects.
 - **Shadow Bolt** uses the standard 1-turn single-target Main Action DPS budget: **135 + 1.40 Spell Power** Shadow damage, costing **6.8% base Mana**.
 - **Immolate** is a pure 5-turn active DoT using the current pure-active-DoT reference budget: **20.8 + 0.42 Spell Power per turn**. Its requested 1-turn cast remains on Main Action; the DoT uses the standard periodic **6.3% base Mana** cost convention.
 - **Searing Pain** uses the standard instant single-target damage budget, but `threatCoefficient = 2` so the generated tooltip identifies it as high threat.
@@ -22,9 +22,9 @@ Standalone `RPE_DATASET_ENTRY_V1` import codes for the Warlock class dataset `e8
 - **Drain Life** independently budgets its damage and self-heal as secondary outputs: **114.75 + 1.19 Spell Power** Shadow damage and **61.625 + 0.34 Spell Power** self-healing. The calculated 1-turn hybrid cost is **3.4% base Mana**.
 - **Drain Mana** has no current same-mechanic Warlock analogue and the transfer magnitude was not specified. This code uses **15% base Mana drained** and **15% base Mana restored**, reusing Life Tap's explicit 15% resource-conversion magnitude. It also deals the secondary-output Shadow damage budget (**114.75 + 1.19 Spell Power**) and costs **6.8% base Mana**, matching the standard 1-turn nuke cost rather than treating Mana generation as free.
 
-- **Curse of Tongues** is authored as an instant Main Action, 1-turn silence, costing **5% base Mana**. Silence uses the existing control effect with `preventCasting = true` and does not add movement control or auto-hit behavior.
+- **Curse of Tongues** is an instant Main Action, 5-turn curse costing **5% base Mana**. It reduces **Spell Hit Chance by 10 percentage points**, giving it a sustained anti-caster role distinct from Spell Lock rather than preventing casting outright.
 - **Curse of Elements** lasts 5 turns and reduces the percentage-point **Magic Resistance** stat by **5 + 0.01 × Spell Power**. This means its magnitude increases by 20% of the base reduction per 100 Spell Power.
-- **Curse of Shadows** had no duration specified, so it uses the same **5-turn curse duration**. It reduces both Arcane and Shadow Resistance by **25 + 0.05 × Spell Power**, preserving the same 20%-of-base-per-100-SP scaling convention as Curse of Elements.
+- **Curse of Shadows** uses ranks and the same **5-turn curse duration**. It reduces both Arcane and Shadow Resistance by **25 + 0.05 × Spell Power**, preserving the same 20%-of-base-per-100-SP scaling convention as Curse of Elements.
 - **Death Coil** is a Bonus Action that applies the existing Warlock Fear aura for **1 turn** and heals the caster for **27.625 + 0.16575 × Spell Power**. Its heal uses the current DPS secondary-healing budget and costs **15% base Mana**.
 - **Howl of Terror** copies current Warrior **Intimidating Shout** mechanically: instant Bonus Action, up to 3 targets, 1-turn break-on-damage casting prevention, 10-turn cooldown and `fear` cooldown group. Rage is replaced with the current multi-target-control Mana analogue: **18.1% base Mana**.
 - **Demon Skin** is a 10-turn Buff Action self-buff granting **+100% Armor** and **+20% Healing Received**, costing **5% base Mana**.
@@ -128,7 +128,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -172,7 +172,7 @@ RPE_DATASET_ENTRY_V1
         name = "Immolate",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -248,7 +248,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -347,7 +347,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -446,7 +446,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -545,7 +545,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -644,7 +644,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -741,12 +741,380 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Destruction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
 }
 ```
+
+
+## Fel Fireball
+
+Copies the current Mage **Fireball** implementation exactly apart from name, icon, IDs, dataset ownership and category.
+
+### Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseDamage = 17.68,
+                damageSchoolRefs = {
+                    "f82db71a:esjguw6d",
+                },
+                statScaling = {
+                    {
+                        coefficient = 0.22,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                },
+                type = "damage",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_fel_firebolt.blp",
+        id = "wlfelfba",
+        maxStacks = 1,
+        name = "Fel Fireball",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = false,
+    },
+}
+\`\`\`
+
+### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {
+            "on_spell_hit",
+            "on_critical_hit",
+        },
+        charges = 2,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = true,
+                    auraRef = "e8f3b2c6:wlfelfba",
+                    auraStacks = 1,
+                    baseDamage = 120.488,
+                    damageSchoolRefs = {
+                        "f82db71a:esjguw6d",
+                    },
+                    damageType = "spell",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 1.2496,
+                            statRef = "f82db71a:7t7xgzcx",
+                        },
+                    },
+                    targetEvents = {
+                        "on_spell_taken",
+                        "on_critical_heal_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 0,
+                    weaponDamageMode = "none",
+                },
+                key = "wlfelfbc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 1,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_fel_firebolt.blp",
+        id = "wlfelfb1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Fel Fireball",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 6.8,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Destruction",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Rain of Felfire
+
+Copies the current Warlock **Rain of Fire** implementation exactly apart from name, icon and ID.
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {
+            "on_spell_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseDamage = 60.75,
+                    damageSchoolRefs = {
+                        "f82db71a:esjguw6d",
+                    },
+                    damageType = "spell",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.63,
+                            statRef = "f82db71a:7t7xgzcx",
+                        },
+                    },
+                    targetEvents = {
+                        "on_spell_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 0,
+                    weaponDamageMode = "none",
+                },
+                key = "wlrnfed1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 5,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "raid_marker",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_fire_felrainoffire.blp",
+        id = "wlrnfel1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Rain of Felfire",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 12.3,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Destruction",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Fel Immolate
+
+Copies the current Warlock **Immolate** implementation exactly apart from name, icon and IDs.
+
+### Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseDamage = 20.8,
+                damageSchoolRefs = {
+                    "f82db71a:esjguw6d",
+                },
+                statScaling = {
+                    {
+                        coefficient = 0.42,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                },
+                type = "damage",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_fire_felfire.blp",
+        id = "wlfimmoa",
+        maxStacks = 1,
+        name = "Fel Immolate",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = false,
+    },
+}
+\`\`\`
+
+### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {
+            "on_spell_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlfimmoa",
+                    basePower = 0,
+                    duration = 5,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "wlfimmoc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_fire_felfire.blp",
+        id = "wlfimmo1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Fel Immolate",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 6.3,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Destruction",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
 
 # Affliction
 
@@ -787,7 +1155,7 @@ RPE_DATASET_ENTRY_V1
         name = "Corruption",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -863,7 +1231,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -940,7 +1308,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -984,7 +1352,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Agony",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -1060,7 +1428,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1102,7 +1470,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Weakness",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -1178,7 +1546,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1216,7 +1584,7 @@ RPE_DATASET_ENTRY_V1
         name = "Fear",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -1292,7 +1660,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1397,7 +1765,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1530,7 +1898,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1671,7 +2039,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1692,14 +2060,15 @@ RPE_DATASET_ENTRY_V1
     datasetId = "e8f3b2c6",
     entry = {
         description = "",
-        duration = 1,
+        duration = 5,
         effects = {
             {
-                            cancelOnDamage = false,
-                            forceAutoHitAgainstTarget = false,
-                            preventCasting = true,
+                            baseAmount = -10,
+                            operation = "flat",
+                            scaleWithRank = false,
+                            statRef = "f82db71a:v2g0tw0o",
                             statScaling = {  },
-                            type = "control",
+                            type = "stat",
                         }
         },
         events = {  },
@@ -1709,7 +2078,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Tongues",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -1737,7 +2106,7 @@ RPE_DATASET_ENTRY_V1
                             effect = {
                                 auraRef = "e8f3b2c6:wlctnga1",
                                 basePower = 0,
-                                duration = 1,
+                                duration = 5,
                                 stacks = 1,
                                 targetEvents = {  },
                                 type = "apply_aura",
@@ -1784,7 +2153,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1827,7 +2196,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Elements",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -1902,7 +2271,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -1927,7 +2296,7 @@ RPE_DATASET_ENTRY_V1
             {
                             baseAmount = -25,
                             operation = "flat",
-                            scaleWithRank = false,
+                            scaleWithRank = true,
                             statRef = "f82db71a:954yunb9",
                             statScaling = {
                                 {
@@ -1940,7 +2309,7 @@ RPE_DATASET_ENTRY_V1
             {
                             baseAmount = -25,
                             operation = "flat",
-                            scaleWithRank = false,
+                            scaleWithRank = true,
                             statRef = "f82db71a:itpo751d",
                             statScaling = {
                                 {
@@ -1958,7 +2327,7 @@ RPE_DATASET_ENTRY_V1
         name = "Curse of Shadows",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2016,7 +2385,7 @@ RPE_DATASET_ENTRY_V1
         cooldownChannel = 1,
         learnMode = "always_learned",
         learnLevel = 1,
-        usesRanks = false,
+        usesRanks = true,
         rankInterval = 8,
         mountedCombatOnly = false,
         name = "Curse of Shadows",
@@ -2033,7 +2402,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2144,7 +2513,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2181,7 +2550,7 @@ RPE_DATASET_ENTRY_V1
         name = "Howl of Terror",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2256,12 +2625,191 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Affliction",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
 }
 ```
+
+
+## Siphon Life
+
+Copies the current Priest **Vampiric Touch** implementation. The current source implementation already applies an independent-duration stacking **Health-healing aura** to the caster rather than restoring Mana, so Siphon Life preserves that behavior directly.
+
+### Damage Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseDamage = 17.68,
+                damageSchoolRefs = {
+                    "f82db71a:1ggt4t3v",
+                },
+                statScaling = {
+                    {
+                        coefficient = 0.32,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                },
+                type = "damage",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_shadow_requiem.blp",
+        id = "wlsiphla",
+        maxStacks = 1,
+        name = "Siphon Life",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = false,
+    },
+}
+\`\`\`
+
+### Healing Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 5,
+        effects = {
+            {
+                amountMode = "flat",
+                baseHealing = 8.84,
+                statScaling = {
+                    {
+                        coefficient = 0.221,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                },
+                type = "heal",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_shadow_requiem.blp",
+        id = "wlsiphhr",
+        maxStacks = 3,
+        name = "Siphoned Life",
+        stackBehavior = "independent_duration",
+        tags = {  },
+        tooltipTemplate = false,
+    },
+}
+\`\`\`
+
+### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlsiphla",
+                    basePower = 0,
+                    duration = 5,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "wlsiphdm",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlsiphhr",
+                    basePower = 0,
+                    duration = 5,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "wlsiphhl",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_shadow_requiem.blp",
+        id = "wlsiphl1",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Siphon Life",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 3.4,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Affliction",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
 
 # Demonology
 
@@ -2304,7 +2852,7 @@ RPE_DATASET_ENTRY_V1
         name = "Demon Skin",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2379,7 +2927,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Demonology",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2417,7 +2965,7 @@ RPE_DATASET_ENTRY_V1
         name = "Banish",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2502,7 +3050,7 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Demonology",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
@@ -2546,7 +3094,7 @@ RPE_DATASET_ENTRY_V1
         name = "Shadow Ward",
         stackBehavior = "refresh_duration",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
     },
 }
 ```
@@ -2621,12 +3169,1049 @@ RPE_DATASET_ENTRY_V1
         seedNPCSpell = false,
         spellbookCategory = "Demonology",
         tags = {  },
-        tooltipTemplate = true,
+        tooltipTemplate = false,
         totalTicks = 0,
         useCooldownCharges = false,
     },
 }
 ```
+
+
+
+## Summon Sayaad
+
+Uses the Core Sayaad Unit \`f82db71a:sayaad01\` through the current explicit-Unit \`summon_pet\` path.
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    targetEvents = {  },
+                    type = "summon_pet",
+                    unitRef = "f82db71a:sayaad01",
+                },
+                key = "wlsmsyac",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_shadow_summonsuccubus.blp",
+        id = "wlsmsyaa",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Summon Sayaad",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = false,
+        spellbookCategory = "Demonology",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Summon Felhunter
+
+Uses the Core Felhunter Unit \`f82db71a:felhnt01\` through the current explicit-Unit \`summon_pet\` path.
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    targetEvents = {  },
+                    type = "summon_pet",
+                    unitRef = "f82db71a:felhnt01",
+                },
+                key = "wlsmfelhc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 0,
+                    requiresTarget = false,
+                    targetDisposition = "ally",
+                    type = "caster",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_shadow_summonfelhunter.blp",
+        id = "wlsmfelh",
+        cooldownChannel = 1,
+        learnMode = "always_learned",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Summon Felhunter",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = false,
+        spellbookCategory = "Demonology",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+# Pet Abilities
+
+All spells in this section use \`learnMode = "unavailable"\`. They are intended to be assigned through Warlock Pet definitions and must not appear as normally learnable Warlock spells.
+
+Authoring choices derived from the requested copies/current implementations:
+
+- **Blood Pact** copies Priest **Prayer of Fortitude** mechanically: instant Buff Action, all allies, 10-turn aura, +5% Stamina, 10-turn cooldown, 10% base Mana.
+- **Flame Ward** copies Mage **Fire Ward** exactly for absorption, duration, cooldown, rank behavior, and Mana cost, but targets one ally and sets \`disableSelfCast = true\`.
+- **Torment** is an instant Bonus Action taunt lasting 1 turn. No cooldown or resource cost was requested, so none is authored.
+- **Legion Strike** copies Warrior **Mortal Strike** damage, Rage cost, cooldown, weapon requirement, and rank behavior, but its aura reduces Healing Received by 10 instead of 50.
+- **Whiplash** copies Core **Pet Attack** and is intended to replace Pet Attack in the Sayaad Pet spell list.
+- **Charm** uses the current **Repentance** mechanical shape because the requested 2-turn incapacitate / 6-turn cooldown matches it exactly: 1-turn cast, break-on-damage incapacitate, 5% base Mana.
+- **Devour Mana** reuses the current **Drain Mana** damage and target Mana-loss components: **114.75 + 1.19 Spell Power** Shadow damage and **-15% base Mana**. It deliberately omits Drain Mana's caster Mana restoration.
+- **Spell Lock** is an instant Reaction with the current interrupt cooldown group. It interrupts first, then applies a 1-turn aura that only prevents casting; it does not immobilize, force auto-hit, or break on damage.
+
+## Imp
+
+### Blood Pact
+
+#### Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 10,
+        effects = {
+            {
+                baseAmount = 5,
+                operation = "percent",
+                statRef = "f82db71a:ygjno50i",
+                statScaling = {  },
+                type = "stat",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/ability_ironmaidens_corruptedblood.blp",
+        id = "wlbldpau",
+        maxStacks = 1,
+        name = "Blood Pact",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = false,
+    },
+}
+\`\`\`
+
+#### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlbldpau",
+                    basePower = 0,
+                    duration = 10,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "wlbldpcc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 0,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "all_allies",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 10,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/ability_ironmaidens_corruptedblood.blp",
+        id = "wlbldp01",
+        cooldownChannel = 3,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Blood Pact",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 10,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Pet - Imp",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+### Flame Ward
+
+#### Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 2,
+        effects = {
+            {
+                amountMode = "flat",
+                baseAbsorption = 104,
+                damageSchoolRefs = {
+                    "f82db71a:esjguw6d",
+                },
+                statScaling = {
+                    {
+                        coefficient = 0.52,
+                        statRef = "f82db71a:7t7xgzcx",
+                    },
+                },
+                type = "absorb",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_fire_firearmor.blp",
+        id = "wlflmwau",
+        maxStacks = 1,
+        name = "Flame Ward",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = false,
+    },
+}
+\`\`\`
+
+#### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlflmwau",
+                    basePower = 0,
+                    duration = 2,
+                    stacks = 1,
+                    targetEvents = {  },
+                    threatCoefficient = 0.375,
+                    type = "apply_aura",
+                },
+                key = "wlflmwac",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = true,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "ally",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 5,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_fire_firearmor.blp",
+        id = "wlflmwr1",
+        cooldownChannel = 3,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Flame Ward",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 15,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Pet - Imp",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Voidwalker
+
+### Torment
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    duration = 1,
+                    targetEvents = {  },
+                    type = "taunt",
+                },
+                key = "wltormc1",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_shadow_gathershadows.blp",
+        id = "wltorm01",
+        cooldownChannel = 2,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Torment",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = false,
+        spellbookCategory = "Pet - Voidwalker",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Felguard
+
+### Legion Strike
+
+#### Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 2,
+        effects = {
+            {
+                baseAmount = -10,
+                operation = "flat",
+                statRef = "f82db71a:ok80ohz3",
+                statScaling = {  },
+                type = "stat",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/inv_axe_09.blp",
+        id = "wllgstra",
+        maxStacks = 1,
+        name = "Legion Strike",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = false,
+    },
+}
+\`\`\`
+
+#### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 0,
+        casterEvents = {
+            "on_melee_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = true,
+                    auraRef = "e8f3b2c6:wllgstra",
+                    auraStacks = 1,
+                    baseDamage = 92.438,
+                    damageSchoolRefs = {
+                        "f82db71a:v1azo4j6",
+                    },
+                    damageType = "melee",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 0.4314,
+                            statRef = "f82db71a:u7b49vs9",
+                        },
+                    },
+                    targetEvents = {
+                        "on_melee_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 1.2325,
+                    weaponDamageMode = "main_hand",
+                },
+                key = "wllgstrc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {
+            {
+                invert = false,
+                showOnTooltip = true,
+                slotKey = "mainhand",
+                tooltipTextOverride = "Requires Main Hand",
+                type = "item_equipped",
+                weaponTypeRefs = {  },
+            },
+        },
+        cooldown = 4,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/inv_axe_09.blp",
+        id = "wllgstr1",
+        cooldownChannel = 1,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Legion Strike",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 30,
+                amountMode = "flat",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:e2tfklq7",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Pet - Felguard",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Sayaad
+
+### Whiplash
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 0,
+        casterEvents = {
+            "on_melee_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseDamage = 0,
+                    damageSchoolRefs = {
+                        "f82db71a:v1azo4j6",
+                    },
+                    damageType = "melee",
+                    hitType = "pet",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 1,
+                            statRef = "f82db71a:u7b49vs9",
+                        },
+                    },
+                    targetEvents = {
+                        "on_melee_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 1,
+                    weaponDamageMode = "none",
+                },
+                key = "wlwhiplc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/ability_warlock_whiplash.blp",
+        id = "wlwhipl1",
+        cooldownChannel = 1,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Whiplash",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = false,
+        spellbookCategory = "Pet - Sayaad",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+### Charm
+
+#### Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 2,
+        effects = {
+            {
+                cancelOnDamage = true,
+                forceAutoHitAgainstTarget = true,
+                movementRangeOverride = 0,
+                preventCasting = true,
+                statScaling = {  },
+                type = "control",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_shadow_soothingkiss.blp",
+        id = "wlcharma",
+        maxStacks = 1,
+        name = "Charm",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = false,
+    },
+}
+\`\`\`
+
+#### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlcharma",
+                    basePower = 0,
+                    duration = 2,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "wlcharmc",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 6,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_shadow_soothingkiss.blp",
+        id = "wlcharm1",
+        cooldownChannel = 1,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Charm",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 5,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Pet - Sayaad",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+## Felhunter
+
+### Devour Mana
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 1,
+        casterEvents = {
+            "on_spell_hit",
+            "on_critical_hit",
+        },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    alwaysHits = false,
+                    amountMode = "flat",
+                    applyAura = false,
+                    auraStacks = 1,
+                    baseDamage = 114.75,
+                    damageSchoolRefs = {
+                        "f82db71a:1ggt4t3v",
+                    },
+                    damageType = "spell",
+                    hitType = "ability",
+                    projectilePath = "",
+                    projectileSpeed = 0,
+                    statScaling = {
+                        {
+                            coefficient = 1.19,
+                            statRef = "f82db71a:7t7xgzcx",
+                        },
+                    },
+                    targetEvents = {
+                        "on_spell_taken",
+                        "on_critical_hit_taken",
+                    },
+                    threatCoefficient = 1,
+                    type = "damage",
+                    usesProjectile = false,
+                    weaponDamageCoefficient = 0,
+                    weaponDamageMode = "none",
+                },
+                key = "wldevmdg",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    amount = -15,
+                    amountMode = "base_percent",
+                    resourceRef = "f82db71a:4c8mfm99",
+                    targetEvents = {  },
+                    type = "resource",
+                },
+                key = "wldevmna",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 0,
+        cooldownGroup = "",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_frost_manaburn.blp",
+        id = "wldevmn1",
+        cooldownChannel = 1,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = true,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Devour Mana",
+        range = 0,
+        resourceCosts = {
+            {
+                amount = 6.8,
+                amountMode = "base_percent",
+                castPhase = "on_cast_end",
+                refundOnInterrupt = 0,
+                resourceRef = "f82db71a:4c8mfm99",
+            },
+        },
+        seedNPCSpell = false,
+        spellbookCategory = "Pet - Felhunter",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
+
+### Spell Lock
+
+#### Aura
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "auras",
+    datasetId = "e8f3b2c6",
+    entry = {
+        description = "",
+        duration = 1,
+        effects = {
+            {
+                cancelOnDamage = false,
+                forceAutoHitAgainstTarget = false,
+                preventCasting = true,
+                statScaling = {  },
+                type = "control",
+            },
+        },
+        events = {  },
+        icon = "interface/icons/spell_shadow_mindrot.blp",
+        id = "wlspklka",
+        maxStacks = 1,
+        name = "Spell Lock",
+        stackBehavior = "refresh_duration",
+        tags = {  },
+        tooltipTemplate = false,
+    },
+}
+\`\`\`
+
+#### Spell
+
+\`\`\`text
+RPE_DATASET_ENTRY_V1
+{
+    format = "rpe-dataset-entry",
+    version = 1,
+    collectionKey = "spells",
+    datasetId = "e8f3b2c6",
+    entry = {
+        allowDeadTargets = false,
+        canMoveWhileCasting = false,
+        canTargetHiddenUnits = false,
+        castTime = 0,
+        casterEvents = {  },
+        charges = 0,
+        components = {
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    targetEvents = {  },
+                    type = "interrupt",
+                },
+                key = "wlspkint",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+            {
+                castPhase = "on_cast_end",
+                castingGroup = "default",
+                effect = {
+                    auraRef = "e8f3b2c6:wlspklka",
+                    basePower = 0,
+                    duration = 1,
+                    stacks = 1,
+                    targetEvents = {  },
+                    type = "apply_aura",
+                },
+                key = "wlspkaur",
+                target = {
+                    allowDeadTargets = false,
+                    disableSelfCast = false,
+                    maxTargets = 1,
+                    minTargets = 1,
+                    requiresTarget = true,
+                    targetDisposition = "enemy",
+                    type = "single",
+                },
+            },
+        },
+        conditions = {  },
+        cooldown = 5,
+        cooldownGroup = "interrupt",
+        cooldownScalesWithHaste = false,
+        description = "",
+        doesNotRevealCaster = false,
+        icon = "interface/icons/spell_shadow_mindrot.blp",
+        id = "wlspklk1",
+        cooldownChannel = 5,
+        learnMode = "unavailable",
+        learnLevel = 1,
+        usesRanks = false,
+        rankInterval = 8,
+        mountedCombatOnly = false,
+        name = "Spell Lock",
+        range = 0,
+        resourceCosts = {  },
+        seedNPCSpell = false,
+        spellbookCategory = "Pet - Felhunter",
+        tags = {  },
+        tooltipTemplate = false,
+        totalTicks = 0,
+        useCooldownCharges = false,
+    },
+}
+\`\`\`
 
 ## Detect Invisibility
 

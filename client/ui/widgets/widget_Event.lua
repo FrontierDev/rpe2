@@ -809,6 +809,9 @@ local function isLocalPlayerPet(eventUnit, localEventUnit)
     if type(eventUnit) ~= "table" or type(localEventUnit) ~= "table" or eventUnit.isPlayer == true then
         return false
     end
+    if eventUnit.isPet ~= true and tostring(eventUnit.petRef or "") == "" then
+        return false
+    end
 
     local localEventId = tonumber(localEventUnit.eventID) or 0
     if localEventId > 0 and tonumber(eventUnit.summonedByEventID) == localEventId then
@@ -816,13 +819,13 @@ local function isLocalPlayerPet(eventUnit, localEventUnit)
     end
 
     local controllerId = tonumber(eventUnit.controllerID) or 0
-    if controllerId > 0 and controllerId == localEventId and tostring(eventUnit.petRef or "") ~= "" then
+    if controllerId > 0 and controllerId == localEventId then
         return true
     end
 
     local localOwnerName = normalizeName(localEventUnit.ownerID or localEventUnit.controllerID or localEventUnit.name)
     local eventOwnerName = normalizeName(eventUnit.ownerID)
-    return tostring(eventUnit.petRef or "") ~= "" and localOwnerName ~= "" and eventOwnerName == localOwnerName
+    return localOwnerName ~= "" and eventOwnerName == localOwnerName
 end
 
 local function buildMaskedWidgetUnit(eventUnit)

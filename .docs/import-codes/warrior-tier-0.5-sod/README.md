@@ -19,7 +19,7 @@ The codes target the Warrior dataset `sb4b9ef3`, use the current `RPE_DATASET_EN
   - Critical strike maps to **Melee Crit. Chance**.
   - Spell Hit, Spell Crit, Spell Power, and Healing Power are not added.
 - Tank Defense bonuses map directly to RPE **Defense Rating**.
-- RPE has **Block Chance** but no **Shield Block Value** stat. Chestguard of Heroism and Legguards of Heroism therefore receive **+1% Block Chance** as the established approximation for their source Shield Block Value bonuses.
+- Chestguard of Heroism and Legguards of Heroism map their source bonuses directly to RPE's **Shield Block Value** stat. **Block Chance** remains separate.
 - Handguards of Heroism already grants **+3% Block Chance** in SoD and retains that value directly.
 - The original Heroism slot icon family is used for both specialization variants of each slot.
 

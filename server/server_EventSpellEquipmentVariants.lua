@@ -140,9 +140,9 @@ function Server:SummonEventPetUnit(casterUnit, registryId, options)
         shield = callOptions.shield,
     }
 
-    local unit = baseSummonEventPetUnit(self, casterUnit, registryId, callOptions)
+    local unit, summonError = baseSummonEventPetUnit(self, casterUnit, registryId, callOptions)
     self.PendingNpcSummonSpellEquipmentOverride = previousOverride
-    return unit
+    return unit, summonError
 end
 
 Server._spellEquipmentVariantIntegrationInstalled = true

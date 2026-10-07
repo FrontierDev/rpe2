@@ -106,6 +106,15 @@ local function normalizeStackBehavior(value)
         or "refresh_duration"
 end
 
+local function normalizeRankMultiplier(value)
+    local multiplier = tonumber(value)
+    if multiplier == nil or multiplier ~= multiplier or math.abs(multiplier) == math.huge or multiplier < 0 then
+        return 1
+    end
+    return multiplier
+end
+Evaluator.NormalizeRankMultiplier = normalizeRankMultiplier
+
 local function resolveApplicationProfile(application, profile)
     if type(profile) == "table" then
         return profile
@@ -166,15 +175,6 @@ local function getAuraManager()
         and Addon.Client.Spellcasting.AuraManager
         or nil
 end
-
-local function normalizeRankMultiplier(value)
-    local multiplier = tonumber(value)
-    if multiplier == nil or multiplier ~= multiplier or math.abs(multiplier) == math.huge or multiplier < 0 then
-        return 1
-    end
-    return multiplier
-end
-Evaluator.NormalizeRankMultiplier = normalizeRankMultiplier
 
 local function applyRankMultiplier(multiplier, amount)
     local spellcasting = Addon.Client and Addon.Client.Spellcasting or nil

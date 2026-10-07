@@ -503,6 +503,9 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                 self:CommitSelectedSpell(function()
                     local nextEffect = shallowCloneTable(component.effect)
                     nextEffect.type = value
+                    -- Summon references are never carried across effect-type
+                    -- changes; both summon effects may author a Unit ref.
+                    nextEffect.unitRef = nil
                     if value == "apply_aura" then
                         nextEffect.stacks = tonumber(nextEffect.stacks or nextEffect.auraStacks) or 1
                         nextEffect.statScaling = nil
@@ -609,7 +612,7 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                         nextEffect.resourceRef = nil
                         nextEffect.amount = nil
                         nextEffect.unitRef = nil
-                    elseif value == "summon_pet" then
+                    elseif value == "summon_pet" or value == "summon_unit" then
                         nextEffect.baseDamage = nil
                         nextEffect.baseHealing = nil
                         nextEffect.basePower = nil
@@ -631,10 +634,9 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
                         nextEffect.duration = nil
                         nextEffect.resourceRef = nil
                         nextEffect.amount = nil
-                        nextEffect.unitRef = nextEffect.unitRef or nil
                     end
                     component.effect = nextEffect
-                    if value == "summon_pet" then
+                    if value == "summon_pet" or value == "summon_unit" then
                         component.target = {
                             type = "caster",
                             requiresTarget = false,
@@ -1096,8 +1098,8 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
     root:AddChild(self.SpellInspectorResourceScaleWithRankCheckbox)
     attachMouseWheel(self.SpellInspectorResourceScaleWithRankCheckbox)
 
-    self.SpellInspectorSummonPetUnitGroup = createGroup("RPEDataEditorSpellInspectorSummonPetUnitGroup", "Summoned Unit", 18)
-    self.SpellInspectorSummonPetUnitDropdown = UI.CreateDropdown(self.SpellInspectorSummonPetUnitGroup:GetFrame(), "RPEDataEditorSpellInspectorSummonPetUnitDropdown", {
+    self.SpellInspectorSummonUnitGroup = createGroup("RPEDataEditorSpellInspectorSummonUnitGroup", "Summoned Unit", 18)
+    self.SpellInspectorSummonUnitDropdown = UI.CreateDropdown(self.SpellInspectorSummonUnitGroup:GetFrame(), "RPEDataEditorSpellInspectorSummonUnitDropdown", {
         width = self.SpellInspectorFieldWidth,
         height = 18,
         items = self:BuildSpellInspectorUnitsAcrossDatasets(),
@@ -1107,15 +1109,16 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
             end
 
             local component = self:GetSelectedSpellInspectorComponent()
-            if component then
+            local effectType = tostring(component and component.effect and component.effect.type or "")
+            if component and (effectType == "summon_pet" or effectType == "summon_unit") then
                 self:CommitSelectedSpell(function()
                     component.effect.unitRef = value ~= "" and value or nil
                 end)
             end
         end,
     })
-    self.SpellInspectorSummonPetUnitGroup:AddChild(self.SpellInspectorSummonPetUnitDropdown)
-    attachMouseWheel(self.SpellInspectorSummonPetUnitDropdown)
+    self.SpellInspectorSummonUnitGroup:AddChild(self.SpellInspectorSummonUnitDropdown)
+    attachMouseWheel(self.SpellInspectorSummonUnitDropdown)
 
     self.SpellInspectorCasterEventsGroup = createGroup("RPEDataEditorSpellInspectorCasterEventsGroup", "Caster Events (Spell)", 18)
     self.SpellInspectorCasterEventsDropdown = UI.CreateDropdown(self.SpellInspectorCasterEventsGroup:GetFrame(), "RPEDataEditorSpellInspectorCasterEventsDropdown", {

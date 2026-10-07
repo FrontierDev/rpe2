@@ -207,6 +207,10 @@ RPE_DATASET_ENTRY_V1
                 value = 2,
             },
             {
+                sourceStatRef = "f82db71a:sblkval1",
+                value = 14,
+            },
+            {
                 sourceStatRef = "f82db71a:0wyp78x9",
                 value = 10,
             },
@@ -304,10 +308,6 @@ RPE_DATASET_ENTRY_V1
             {
                 sourceStatRef = "f82db71a:pg0ytacb",
                 value = 10,
-            },
-            {
-                sourceStatRef = "f82db71a:p8syz5ba",
-                value = 1,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",
@@ -428,8 +428,8 @@ RPE_DATASET_ENTRY_V1
                 value = 1,
             },
             {
-                sourceStatRef = "f82db71a:p8syz5ba",
-                value = 1,
+                sourceStatRef = "f82db71a:sblkval1",
+                value = 12,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",
@@ -542,8 +542,8 @@ RPE_DATASET_ENTRY_V1
                 value = 10,
             },
             {
-                sourceStatRef = "f82db71a:p8syz5ba",
-                value = 1,
+                sourceStatRef = "f82db71a:sblkval1",
+                value = 21,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",
@@ -645,8 +645,8 @@ RPE_DATASET_ENTRY_V1
                 value = 10,
             },
             {
-                sourceStatRef = "f82db71a:p8syz5ba",
-                value = 1,
+                sourceStatRef = "f82db71a:sblkval1",
+                value = 14,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",
@@ -752,8 +752,8 @@ RPE_DATASET_ENTRY_V1
                 value = 10,
             },
             {
-                sourceStatRef = "f82db71a:p8syz5ba",
-                value = 1,
+                sourceStatRef = "f82db71a:sblkval1",
+                value = 17,
             },
             {
                 sourceStatRef = "f82db71a:0wyp78x9",

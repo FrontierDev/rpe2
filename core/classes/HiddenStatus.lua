@@ -107,9 +107,10 @@ local function collectHiddenSpellEffects(components)
     for index = 1, #(components or {}) do
         local component = components[index]
         local effect = type(component) == "table" and component.effect or nil
-        if type(effect) == "table" and string.lower(tostring(effect.type or "")) == "hide" then
+        local effectType = type(effect) == "table" and string.lower(tostring(effect.type or "")) or ""
+        if effectType == "hide" or effectType == "remove_hidden" then
             hidden[index] = {
-                type = "hide",
+                type = effectType,
                 targetEvents = normalizeEventList(effect.targetEvents),
             }
         end

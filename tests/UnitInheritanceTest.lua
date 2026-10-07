@@ -45,6 +45,26 @@ end
 
 loadAddonFile("core/classes/Unit.lua")
 loadAddonFile("core/classes/UnitPresetSpellEquipment.lua")
+loadAddonFile("core/classes/Stat.lua")
+loadAddonFile("core/classes/Mount.lua")
+loadAddonFile("core/classes/Pet.lua")
+loadAddonFile("core/classes/Item.lua")
+loadAddonFile("core/classes/Spell.lua")
+loadAddonFile("core/classes/Trait.lua")
+loadAddonFile("core/classes/Skill.lua")
+loadAddonFile("core/classes/Resource.lua")
+loadAddonFile("core/classes/Race.lua")
+loadAddonFile("core/classes/Class.lua")
+loadAddonFile("core/classes/ItemSlot.lua")
+loadAddonFile("core/classes/WeaponType.lua")
+loadAddonFile("core/classes/DamageSchool.lua")
+loadAddonFile("core/classes/Loot.lua")
+loadAddonFile("core/classes/Recipe.lua")
+loadAddonFile("core/classes/Aura.lua")
+loadAddonFile("core/classes/Interaction.lua")
+loadAddonFile("core/classes/Achievement.lua")
+loadAddonFile("core/classes/GuildSetting.lua")
+loadAddonFile("core/classes/Currency.lua")
 loadAddonFile("core/internal/database/Dependecies.lua")
 loadAddonFile("core/internal/database/Database.lua")
 loadAddonFile("core/internal/Registry.lua")
@@ -66,7 +86,7 @@ root.datasets = {
                 creatureSize = "medium",
                 challengeLevel = "normal",
                 mainHandWeapon = "base:sword",
-                spells = { "base:racial", "base:racial" },
+                spells = { "base:racial" },
                 stats = {
                     { statRef = "common:power", initialValue = 5, perLevelValue = 2 },
                     { statRef = "common:armor", initialValue = 3, perLevelValue = 1 },

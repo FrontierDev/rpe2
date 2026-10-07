@@ -10,7 +10,6 @@ local Common = Addon.Utils.Common or {}
 local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 local Registry = Addon.Internal.Registry or {}
-local Profile = Addon.Internal.Profile or {}
 local function getEventClass()
     return Addon.Internal
         and Addon.Internal.Database
@@ -63,28 +62,6 @@ local function resolveOutboundSessionChannelId(sessionState)
     end
 
     return channelId
-end
-
-local function buildSelectedPetSummonOptions(unitRef, sender)
-    local selectedPet = type(Profile.GetSelectedPet) == "function" and Profile.GetSelectedPet() or nil
-    if type(selectedPet) ~= "table" or selectedPet.isActive ~= true or selectedPet.hasUnit ~= true then
-        return {
-            ownerID = sender,
-        }
-    end
-
-    local selectedUnitRef = tostring(selectedPet.unitRef or "")
-    if selectedUnitRef == "" or selectedUnitRef ~= tostring(unitRef or "") then
-        return {
-            ownerID = sender,
-        }
-    end
-
-    return {
-        ownerID = sender,
-        petRef = selectedPet.ref,
-        stats = type(Profile.BuildSelectedPetRuntimeStats) == "function" and Profile.BuildSelectedPetRuntimeStats() or nil,
-    }
 end
 
 local function getEventCastBucket(self, eventId, createIfMissing)
@@ -394,8 +371,8 @@ local function shouldSuppressLoopbackLog(self, eventId, casterEventId, spellRef,
     return false
 end
 
-local function executeSummonPetComponents(self, payload)
-    if type(self.SummonEventPetUnit) ~= "function" or type(payload) ~= "table" or type(payload.spell) ~= "table" then
+local function executeSummonComponents(self, payload)
+    if type(payload) ~= "table" or type(payload.spell) ~= "table" then
         return false
     end
 
@@ -405,12 +382,21 @@ local function executeSummonPetComponents(self, payload)
         local castPhase = tostring(type(component) == "table" and component.castPhase or "on_cast_end")
         local effect = type(component) == "table" and component.effect or nil
         local effectType = tostring(type(effect) == "table" and effect.type or "")
-        local unitRef = tostring(type(effect) == "table" and effect.unitRef or "")
-        if castPhase == "on_cast_end" and effectType == "summon_pet" and unitRef ~= "" then
+        if castPhase == "on_cast_end" and effectType == "summon_pet"
+            and type(self.SummonEventPetUnit) == "function"
+        then
             summoned = self:SummonEventPetUnit(
                 payload.casterUnit,
-                unitRef,
-                buildSelectedPetSummonOptions(unitRef, payload.sender)
+                effect and effect.unitRef or nil,
+                { ownerID = payload.sender }
+            ) ~= nil or summoned
+        elseif castPhase == "on_cast_end" and effectType == "summon_unit"
+            and type(self.SummonEventControlledUnit) == "function"
+        then
+            summoned = self:SummonEventControlledUnit(
+                payload.casterUnit,
+                effect and effect.unitRef or nil,
+                { ownerID = payload.sender }
             ) ~= nil or summoned
         end
     end
@@ -471,7 +457,7 @@ function Server:HandleSpellcastComplete(arguments, sender)
         logLifecycle("complete", payload.authorityType, payload.casterUnit.name, (previous and previous.spellName) or resolveSpellName(payload.spellRef))
     end
 
-    executeSummonPetComponents(self, payload)
+    executeSummonComponents(self, payload)
 
     return true
 end

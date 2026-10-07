@@ -5,27 +5,11 @@ if not Combat then
     return
 end
 
-local function ensureString(value)
-    if value == nil then
-        return ""
-    end
-
-    return tostring(value)
-end
-
 function Combat:ExecuteSummonPetEffect(context, effect, component)
     local eventState = type(context) == "table" and context.eventState or nil
     local casterUnit = type(context) == "table" and (context.casterUnit or context.caster) or nil
-    local unitRef = ensureString(type(effect) == "table" and effect.unitRef or "")
 
     if type(eventState) ~= "table" or eventState.active ~= true or type(casterUnit) ~= "table" then
-        return false, {
-            effectType = "summon_pet",
-            resultType = "invalid",
-        }
-    end
-
-    if unitRef == "" then
         return false, {
             effectType = "summon_pet",
             resultType = "invalid",
@@ -36,15 +20,15 @@ function Combat:ExecuteSummonPetEffect(context, effect, component)
         effectType = "summon_pet",
         resultType = "applied",
         applied = true,
+        unitRef = type(effect) == "table" and effect.unitRef or nil,
         component = component,
-        registryID = unitRef,
     }
 end
 
 local SummonPetEffect = Combat:CreateEffectContract({
     type = "summon_pet",
     label = "Summon Pet",
-    description = "Summons the configured unit into the active event under the caster's control.",
+    description = "Summons the Pet selected in the caster's profile, or an authored Unit, under the caster's control.",
     defaults = {
         type = "summon_pet",
         unitRef = nil,

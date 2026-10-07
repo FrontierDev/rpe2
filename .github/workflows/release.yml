@@ -14,8 +14,8 @@ permissions:
   contents: write
 
 jobs:
-  first-run-bootstrap:
-    name: Validate first-run bootstrap
+  bootstrap-smoke:
+    name: Validate bootstrap smoke tests
     runs-on: ubuntu-latest
 
     steps:
@@ -30,7 +30,7 @@ jobs:
           sudo apt-get install --yes lua5.1
           lua5.1 -v
 
-      - name: Run first-run bootstrap regression suite
+      - name: Run bootstrap smoke tests
         shell: bash
         run: |
           set -euo pipefail
@@ -38,26 +38,33 @@ jobs:
           lua5.1 tests/DefaultRulesetImportTest.lua
           lua5.1 tests/SetupStartupOrderingTest.lua
           lua5.1 tests/DefaultDatasetStartupTest.lua
-          lua5.1 tests/DruidDatasetTest.lua
-          lua5.1 tests/ClassBaseStatsDatasetTest.lua
-          lua5.1 tests/TooltipBuilderRegressionTest.lua
-          lua5.1 tests/PeriodicAuraAuthoringTest.lua
-          lua5.1 tests/ClassSetRestrictionTest.lua
-          lua5.1 tests/RuntimeExternalManagerStartupTest.lua
-          lua5.1 tests/CompatibilityHashCanonicalizationTest.lua
-          lua5.1 tests/AutoAttackCooldownTest.lua
-          lua5.1 tests/NpcEquipmentConditionTest.lua
-          lua5.1 tests/MovementAllowanceFallbackTest.lua
-          lua5.1 tests/EventCompletionAchievementDistributionTest.lua
-          lua5.1 tests/EventUnitNetworkBaselineTest.lua
-          lua5.1 tests/DeferredThreatResourceFlushTest.lua
-          lua5.1 tests/EventUtilityWindowModeTest.lua
-          lua5.1 tests/GuildSettingLootTableTest.lua
+
+  lua-regression:
+    name: Run complete Lua regression suite
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out source commit
+        uses: actions/checkout@v4
+
+      - name: Install Lua 5.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          sudo apt-get update
+          sudo apt-get install --yes lua5.1
+          lua5.1 -v
+
+      - name: Run every Lua regression test
+        shell: bash
+        run: |
+          bash .github/scripts/run_lua_tests.sh
 
   release-package:
     name: Validate release package
     needs:
-      - first-run-bootstrap
+      - bootstrap-smoke
+      - lua-regression
     runs-on: ubuntu-latest
 
     steps:

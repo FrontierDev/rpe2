@@ -10,19 +10,11 @@ local function assertTrue(value, message)
     end
 end
 
-local function loadAddonFile(path, addon)
-    local chunk, loadError = loadfile(path)
-    assert(chunk, loadError)
-    chunk("RPEngine2", addon)
-end
-
 local savedDatasetRoot = rawget(_G, "RPEngineDatasetDB")
 local savedManagerRoot = rawget(_G, "RPEngineManagerDB")
 local diagnostics = {}
-local Addon = {
-    Name = "RPEngine2",
-    Data = {},
-    Internal = {},
+local TestSupport = dofile("tests/support/RuntimeStubs.lua")
+local Addon = TestSupport.CreateAddon({
     Debug = {
         Internal = function(message, ...)
             diagnostics[#diagnostics + 1] = select("#", ...) > 0
@@ -30,55 +22,18 @@ local Addon = {
                 or tostring(message)
         end,
     },
-}
+})
 
-loadAddonFile("core/internal/database/Dependecies.lua", Addon)
-loadAddonFile("core/internal/database/Database.lua", Addon)
-loadAddonFile("data/default/Datasets.lua", Addon)
+-- The helper reads the packaged TOC, so this smoke test automatically covers
+-- a newly added default-data file without maintaining a parallel file list.
+local definitions = TestSupport.LoadPackagedDefaultData(Addon)
 
--- This mirrors the packaged-data section of the current TOC, including every
--- post-definition patch file that contributes to the final packaged payload.
-local packagedDataFiles = {
-    "data/default/core.lua",
-    "data/default/core_guild_settings.lua",
-    "data/default/classes/druid.lua",
-    "data/default/classes/hunter.lua",
-    "data/default/classes/mage.lua",
-    "data/default/classes/paladin.lua",
-    "data/default/classes/priest.lua",
-    "data/default/classes/rogue.lua",
-    "data/default/classes/shaman.lua",
-    "data/default/classes/warlock.lua",
-    "data/default/classes/warrior.lua",
-    "data/default/professions/fishing.lua",
-    "data/default/professions/alchemy.lua",
-    "data/default/professions/alchemy_daily_rewards.lua",
-    "data/default/professions/blacksmithing.lua",
-    "data/default/professions/blacksmithing_daily_rewards.lua",
-    "data/default/professions/enchanting.lua",
-    "data/default/professions/enchanting_daily_rewards.lua",
-    "data/default/professions/inscription.lua",
-    "data/default/professions/inscription_daily_rewards.lua",
-    "data/default/professions/jewelcrafting.lua",
-    "data/default/professions/jewelcrafting_daily_rewards.lua",
-    "data/default/professions/leatherworking.lua",
-    "data/default/professions/leatherworking_daily_rewards.lua",
-    "data/default/professions/misc.lua",
-    "data/default/professions/tailoring.lua",
-    "data/default/professions/tailoring_daily_rewards_cleanup.lua",
-    "data/default/professions/engineering.lua",
-}
-for index = 1, #packagedDataFiles do
-    loadAddonFile(packagedDataFiles[index], Addon)
-end
-
-loadAddonFile("data/default/Install.lua", Addon)
-loadAddonFile("core/internal/manager/ExternalManager.lua", Addon)
-loadAddonFile("core/internal/Runtime.lua", Addon)
+TestSupport.LoadAddonFile("data/default/Install.lua", Addon)
+TestSupport.LoadAddonFile("core/internal/manager/ExternalManager.lua", Addon)
+TestSupport.LoadAddonFile("core/internal/Runtime.lua", Addon)
 
 local Database = Addon.Internal.Database
 local Dependecies = Database.Dependecies
-local definitions = Addon.Data.DefaultDatasets.Definitions
 assertTrue(type(Addon.Data.SyncDefaultDatasets) == "function", "installer exposes the runtime dataset synchronizer")
 
 local expectedDefinitionCount = 0
@@ -89,6 +44,75 @@ end
 
 local coreDefinition = definitions["f82db71a"]
 assertTrue(type(coreDefinition) == "table" and type(coreDefinition.dataset) == "table", "Core packaged definition exists")
+
+local coreGuildSetting = coreDefinition.dataset.guildSettings and coreDefinition.dataset.guildSettings[1]
+assertTrue(type(coreGuildSetting) == "table", "Core packaged Guild Shop setting exists")
+
+local guildShopArmourByItemRef = {}
+for index = 1, #(coreGuildSetting.requisitions or {}) do
+    local requisition = coreGuildSetting.requisitions[index]
+    if requisition.shopCategoryId == "a6r4m2ur" then
+        guildShopArmourByItemRef[requisition.itemRef] = requisition
+    end
+end
+
+local function endsWithAny(value, suffixes)
+    for index = 1, #suffixes do
+        local suffix = suffixes[index]
+        if value:sub(-#suffix) == suffix then
+            return true
+        end
+    end
+    return false
+end
+
+local function expectedGuildShopArmourCost(itemId)
+    if endsWithAny(itemId, { "belt", "brac", "bind", "cord", "wais", "wris", "wrst", "wrap" }) then
+        return 1250
+    end
+    if endsWithAny(itemId, { "boot", "feet", "glov", "hand", "hnds", "grsp", "sand", "trds" }) then
+        return 1750
+    end
+    return 2250
+end
+
+local excludedGuildShopArmourPrefixes = {
+    c4a91e7d = "s2",
+    e8f3b2c6 = "wl2",
+    dhunter1 = "dh2",
+    evokdata = "ev2",
+}
+
+for _, datasetId in ipairs({ "c4a91e7d", "e8f3b2c6", "dhunter1", "evokdata" }) do
+    local classDataset = definitions[datasetId].dataset
+    for index = 1, #(classDataset.items or {}) do
+        local item = classDataset.items[index]
+        local itemRef = datasetId .. ":" .. item.id
+        local requisition = guildShopArmourByItemRef[itemRef]
+        local excludedPrefix = excludedGuildShopArmourPrefixes[datasetId]
+        if excludedPrefix and item.id:sub(1, #excludedPrefix) == excludedPrefix then
+            assertTrue(requisition == nil, "Guild Shop excludes " .. itemRef)
+        else
+            assertTrue(type(requisition) == "table", "Guild Shop includes " .. itemRef)
+            assertEqual(requisition.quantity, 1, "Guild Shop quantity for " .. itemRef)
+            assertEqual(requisition.costs[1].currencyRef, "justice", "Guild Shop currency for " .. itemRef)
+            assertEqual(requisition.costs[1].amount, expectedGuildShopArmourCost(item.id), "Guild Shop price for " .. itemRef)
+        end
+    end
+end
+
+local function assertCoreGuildDependency(datasetId)
+    for index = 1, #(coreDefinition.dataset.dependencies or {}) do
+        if coreDefinition.dataset.dependencies[index] == datasetId then
+            return
+        end
+    end
+    error("Core Guild Shop dependency is missing: " .. datasetId, 2)
+end
+assertCoreGuildDependency("c4a91e7d")
+assertCoreGuildDependency("e8f3b2c6")
+assertCoreGuildDependency("dhunter1")
+assertCoreGuildDependency("evokdata")
 
 local function findCoreSpell(spellId)
     for index = 1, #(coreDefinition.dataset.spells or {}) do
@@ -150,6 +174,21 @@ for datasetId, definition in pairs(definitions) do
     assertTrue(type(root.datasets[datasetId]) == "table", "clean startup installs " .. datasetId)
     assertEqual(root.defaultDatasetVersions[datasetId], definition.version, "clean startup records version for " .. datasetId)
     assertEqual(Database.IsDatasetActivated(datasetId), true, "clean startup activates " .. datasetId)
+end
+
+local installedCoreSetting = root.datasets["f82db71a"].guildSettings[1]
+installedCoreSetting.requisitions[#installedCoreSetting.requisitions + 1] = {
+    id = "stale_dh_t2",
+    itemRef = "dhunter1:dh2vchst",
+}
+installedCoreSetting.requisitions[#installedCoreSetting.requisitions + 1] = {
+    id = "stale_evoker_t2",
+    itemRef = "evokdata:ev2cchst",
+}
+Addon.Data.SyncDefaultDatasets()
+for index = 1, #installedCoreSetting.requisitions do
+    local itemRef = installedCoreSetting.requisitions[index].itemRef or ""
+    assertTrue(not itemRef:match("^dhunter1:dh2") and not itemRef:match("^evokdata:ev2"), "stale Core Tier 2 shop rows are migrated")
 end
 
 local installedCount = 0

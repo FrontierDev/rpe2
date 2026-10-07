@@ -241,12 +241,15 @@ function DataEditor:BuildReferenceItemsAcrossDatasets(collectionKey, options)
     self.ReferenceItemsCache = self.ReferenceItemsCache or {}
     local includeNone = type(options) ~= "table" or options.includeNone ~= false
     local noneLabel = type(options) == "table" and options.noneLabel or "None"
+    local datasetFilter = type(options) == "table" and options.datasetFilter or nil
+    local cacheSuffix = type(options) == "table" and options.cacheSuffix or ""
     local cacheKey = table.concat({
         tostring(collectionKey or ""),
         includeNone and "1" or "0",
         tostring(noneLabel or ""),
+        tostring(cacheSuffix or ""),
     }, "::")
-    local cachedItems = self.ReferenceItemsCache[cacheKey]
+    local cachedItems = type(datasetFilter) == "function" and nil or self.ReferenceItemsCache[cacheKey]
     if cachedItems then
         return cachedItems
     end
@@ -262,64 +265,71 @@ function DataEditor:BuildReferenceItemsAcrossDatasets(collectionKey, options)
     local datasets = self:GetDatasets()
     for datasetIndex = 1, #datasets do
         local dataset = datasets[datasetIndex]
-        local subgroupMap = {}
-        local subgroupOrder = {}
+        if type(datasetFilter) == "function" and datasetFilter(self, dataset) ~= true then
+            dataset = nil
+        end
+        if dataset then
+            local subgroupMap = {}
+            local subgroupOrder = {}
 
-        for entryIndex = 1, #(dataset[collectionKey] or {}) do
-            local entry = dataset[collectionKey][entryIndex]
-            if entry and entry.id then
-                local subgroup = self:GetReferenceEntrySubgroupInfo(collectionKey, entry)
-                local subgroupKey = subgroup and subgroup.key or "other"
-                local subgroupLabel = subgroup and subgroup.label or "Other"
+            for entryIndex = 1, #(dataset[collectionKey] or {}) do
+                local entry = dataset[collectionKey][entryIndex]
+                if entry and entry.id then
+                    local subgroup = self:GetReferenceEntrySubgroupInfo(collectionKey, entry)
+                    local subgroupKey = subgroup and subgroup.key or "other"
+                    local subgroupLabel = subgroup and subgroup.label or "Other"
 
-                if not subgroupMap[subgroupKey] then
-                    subgroupMap[subgroupKey] = {
-                        label = subgroupLabel,
-                        children = {},
+                    if not subgroupMap[subgroupKey] then
+                        subgroupMap[subgroupKey] = {
+                            label = subgroupLabel,
+                            children = {},
+                        }
+                        subgroupOrder[#subgroupOrder + 1] = subgroupKey
+                    end
+
+                    subgroupMap[subgroupKey].children[#subgroupMap[subgroupKey].children + 1] = {
+                        label = self:GetEntryDisplayName(collectionKey, entry),
+                        value = ("%s:%s"):format(dataset.id, entry.id),
                     }
-                    subgroupOrder[#subgroupOrder + 1] = subgroupKey
+                end
+            end
+
+            if #subgroupOrder > 0 then
+                table.sort(subgroupOrder, function(leftKey, rightKey)
+                    local leftGroup = subgroupMap[leftKey]
+                    local rightGroup = subgroupMap[rightKey]
+                    return compareSubgroupLabels(leftGroup and leftGroup.label or "", rightGroup and rightGroup.label or "")
+                end)
+
+                local children = {}
+                for subgroupIndex = 1, #subgroupOrder do
+                    local subgroupKey = subgroupOrder[subgroupIndex]
+                    local subgroupGroup = subgroupMap[subgroupKey]
+                    children[#children + 1] = {
+                        label = subgroupGroup.label,
+                        value = ("subgroup:%s:%s:%s"):format(collectionKey, dataset.id or datasetIndex, subgroupKey),
+                        enabled = true,
+                        keepShownOnClick = true,
+                        notCheckable = true,
+                        children = subgroupGroup.children,
+                    }
                 end
 
-                subgroupMap[subgroupKey].children[#subgroupMap[subgroupKey].children + 1] = {
-                    label = self:GetEntryDisplayName(collectionKey, entry),
-                    value = ("%s:%s"):format(dataset.id, entry.id),
-                }
-            end
-        end
-
-        if #subgroupOrder > 0 then
-            table.sort(subgroupOrder, function(leftKey, rightKey)
-                local leftGroup = subgroupMap[leftKey]
-                local rightGroup = subgroupMap[rightKey]
-                return compareSubgroupLabels(leftGroup and leftGroup.label or "", rightGroup and rightGroup.label or "")
-            end)
-
-            local children = {}
-            for subgroupIndex = 1, #subgroupOrder do
-                local subgroupKey = subgroupOrder[subgroupIndex]
-                local subgroupGroup = subgroupMap[subgroupKey]
-                children[#children + 1] = {
-                    label = subgroupGroup.label,
-                    value = ("subgroup:%s:%s:%s"):format(collectionKey, dataset.id or datasetIndex, subgroupKey),
+                items[#items + 1] = {
+                    label = self:GetDatasetDisplayName(dataset),
+                    value = ("dataset:%s:%s"):format(collectionKey, dataset.id or datasetIndex),
                     enabled = true,
                     keepShownOnClick = true,
                     notCheckable = true,
-                    children = subgroupGroup.children,
+                    children = children,
                 }
             end
-
-            items[#items + 1] = {
-                label = self:GetDatasetDisplayName(dataset),
-                value = ("dataset:%s:%s"):format(collectionKey, dataset.id or datasetIndex),
-                enabled = true,
-                keepShownOnClick = true,
-                notCheckable = true,
-                children = children,
-            }
         end
     end
 
-    self.ReferenceItemsCache[cacheKey] = items
+    if type(datasetFilter) ~= "function" then
+        self.ReferenceItemsCache[cacheKey] = items
+    end
     return items
 end
 

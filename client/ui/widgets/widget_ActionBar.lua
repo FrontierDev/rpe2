@@ -929,7 +929,7 @@ local function getPetButtonTooltipText(widget, petUnit)
         return "Select an active pet first."
     end
 
-    return "No controllable pet found."
+    return "Selected pet is not currently summoned."
 end
 
 function ActionBarWidget:Get()

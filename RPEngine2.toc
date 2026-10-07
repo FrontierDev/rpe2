@@ -26,6 +26,10 @@ data/default/classes/rogue.lua
 data/default/classes/shaman.lua
 data/default/classes/warlock.lua
 data/default/classes/warrior.lua
+data/default/classes/death_knight.lua
+data/default/classes/monk.lua
+data/default/classes/demon_hunter.lua
+data/default/classes/evoker.lua
 data/default/professions/fishing.lua
 data/default/professions/alchemy.lua
 data/default/professions/alchemy_daily_rewards.lua
@@ -234,7 +238,9 @@ client/combat/effects/Resource.lua
 client/combat/effects/Interrupt.lua
 client/combat/effects/Revert.lua
 client/combat/effects/SummonPet.lua
+client/combat/effects/SummonUnit.lua
 client/combat/effects/Hide.lua
+client/combat/effects/RemoveHidden.lua
 client/combat/effects/Taunt.lua
 client/client_EventMeters.lua
 client/combat/ReactionPerformance.lua
@@ -266,6 +272,7 @@ client/client_PendingChanges.lua
 server/server_Spellcasting.lua
 server/server_EventRejoinState.lua
 core/internal/comms/PrimaryResourceSync.lua
+core/internal/comms/SelectedPetSync.lua
 
 core/Sound.lua
 api/UI.lua

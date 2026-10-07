@@ -65,6 +65,9 @@ local combat = {
     ResolveWeaponItemRef = function(_, unit, slotKey, fallbackField)
         return unit and unit[fallbackField] or nil
     end,
+    ResolvePrimaryWeaponSlotForEffect = function()
+        return "main_hand", "mainHandWeapon"
+    end,
     ResolveItemDefinition = function(_, itemRef)
         return weaponDefinitions[itemRef]
     end,
@@ -349,7 +352,17 @@ Addon.Client.Spellcasting.AuraManager.ResolveAuraDefinition = function(_, auraRe
 end
 loadAddonFile("client/autopilot/AuraEvaluator.lua")
 loadAddonFile("client/autopilot/AuraEvaluatorPerformance.lua")
+loadAddonFile("client/combat/Normalization.lua")
 loadAddonFile("client/combat/Helpers.lua")
+combat.ResolveWeaponItemRef = function(_, unit, slotKey, fallbackField)
+    return unit and unit[fallbackField] or nil
+end
+combat.ResolvePrimaryWeaponSlotForEffect = function()
+    return "main_hand", "mainHandWeapon"
+end
+combat.ResolveItemDefinition = function(_, itemRef)
+    return weaponDefinitions[itemRef]
+end
 loadAddonFile("client/autopilot/SpellEvaluator.lua")
 loadAddonFile("client/autopilot/ActionEconomy.lua")
 local AutoAura = Addon.Client.AutopilotAuraEvaluator

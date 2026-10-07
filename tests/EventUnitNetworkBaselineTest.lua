@@ -85,6 +85,7 @@ loadAddonFile("core/classes/Event.lua")
 loadAddonFile("core/classes/EventVariantNetwork.lua")
 loadAddonFile("core/classes/EventVariantSpellEquipmentNetwork.lua")
 loadAddonFile("core/internal/comms/PrimaryResourceSync.lua")
+loadAddonFile("core/internal/comms/SelectedPetSync.lua")
 
 local Classes = Addon.Internal.Database.Classes
 local Unit = Classes.Unit
@@ -269,6 +270,128 @@ local snapshotReceiver = Event.DeserializeUnitsFromNetwork(startEvent:SerializeU
     playerCount = 2,
 })
 assertStatsEqual(snapshotReceiver[3].stats, startEvent.units[3].stats, "rejoin snapshot hydration uses the active Event level")
+
+local selectedPetStats = {
+    { statRef = "test:pet-power", value = 42, currentValue = 42 },
+}
+local selectedPetEvent = Event:New({
+    id = "selected-pet-event",
+    active = true,
+    level = 1,
+    units = {
+        EventUnit:New({
+            eventID = 1,
+            isPlayer = true,
+            name = "Pet Owner",
+            ownerID = "Pet Owner",
+            petRef = "test:pet-wolf",
+            petStats = selectedPetStats,
+        }),
+    },
+})
+local selectedPetFields = splitPreservingEmpty(
+    splitPreservingEmpty(selectedPetEvent:SerializeUnitsForNetwork(), string.char(30))[1],
+    string.char(29)
+)
+assertEqual(selectedPetFields[16], "test:pet-wolf", "event snapshot carries the selected pet identity")
+assertEqual(selectedPetFields[33] ~= "", true, "event snapshot carries selected pet runtime stats")
+assertEqual(selectedPetFields[34], "0", "event snapshot carries the pet-role marker extension")
+local selectedPetSnapshot = Event.DeserializeUnitsFromNetwork(selectedPetEvent:SerializeUnitsForNetwork(), {
+    level = 1,
+    difficulty = "normal",
+    playerCount = 1,
+})
+assertEqual(selectedPetSnapshot[1].petRef, "test:pet-wolf", "rejoin snapshot preserves selected pet identity")
+assertStatsEqual(selectedPetSnapshot[1].petStats, selectedPetStats, "rejoin snapshot preserves selected pet runtime stats")
+local selectedPetDelta = Event.SerializeUnitDeltaBatchForNetwork({
+    { operation = "upsert", eventID = 1, unit = selectedPetEvent.units[1] },
+})
+local selectedPetDeltaFields = splitPreservingEmpty(
+    splitPreservingEmpty(selectedPetDelta, string.char(23))[1],
+    string.char(22)
+)
+local selectedPetDeltaUnitFields = splitPreservingEmpty(selectedPetDeltaFields[3], string.char(29))
+assertEqual(selectedPetDeltaUnitFields[16], "test:pet-wolf", "event delta carries the selected pet identity")
+local selectedPetDeltaEntries = Event.DeserializeUnitDeltaBatchFromNetwork(selectedPetDelta)
+assertEqual(selectedPetDeltaEntries[1].unit.petRef, "test:pet-wolf", "event delta preserves selected pet identity")
+assertStatsEqual(selectedPetDeltaEntries[1].unit.petStats, selectedPetStats, "event delta preserves selected pet runtime stats")
+
+local genericSummon = EventUnit:New({
+    eventID = 2,
+    name = "Spell Guardian",
+    registryID = "test:npc",
+    ownerID = "Pet Owner",
+    controllerID = 1,
+    summonedByEventID = 1,
+    team = 1,
+})
+local genericSummonEvent = Event:New({
+    id = "generic-summon-event",
+    active = true,
+    level = 1,
+    difficulty = "normal",
+    units = {
+        EventUnit:New({ eventID = 1, isPlayer = true, name = "Pet Owner" }),
+        genericSummon,
+    },
+})
+local genericSummonSnapshot = Event.DeserializeUnitsFromNetwork(genericSummonEvent:SerializeUnitsForNetwork(), {
+    level = 1,
+    difficulty = "normal",
+    playerCount = 1,
+})
+assertEqual(genericSummonSnapshot[2].petRef, nil, "generic summon snapshots omit profile pet identity")
+assertEqual(tonumber(genericSummonSnapshot[2].controllerID), 1, "generic summon snapshots preserve controller identity")
+assertEqual(genericSummonSnapshot[2].summonedByEventID, 1, "generic summon snapshots preserve caster identity")
+
+local authoredPet = EventUnit:New({
+    eventID = 4,
+    name = "Authored Pet",
+    registryID = "test:npc",
+    ownerID = "Pet Owner",
+    controllerID = 1,
+    summonedByEventID = 1,
+    isPet = true,
+})
+local authoredPetEvent = Event:New({
+    id = "authored-pet-network-event",
+    active = true,
+    level = 1,
+    difficulty = "normal",
+    units = {
+        EventUnit:New({ eventID = 1, isPlayer = true, name = "Pet Owner" }),
+        authoredPet,
+    },
+})
+local authoredPetSnapshot = Event.DeserializeUnitsFromNetwork(authoredPetEvent:SerializeUnitsForNetwork(), {
+    level = 1,
+    difficulty = "normal",
+    playerCount = 1,
+})
+assertEqual(authoredPetSnapshot[2].isPet, true, "authored pet snapshots preserve the pet-role marker")
+local authoredPetFields = splitPreservingEmpty(
+    splitPreservingEmpty(authoredPetEvent:SerializeUnitsForNetwork(), string.char(30))[2],
+    string.char(29)
+)
+assertEqual(authoredPetFields[34], "1", "authored pet snapshots serialize the pet-role marker extension")
+local authoredPetDelta = Event.SerializeUnitDeltaBatchForNetwork({
+    { operation = "upsert", eventID = 4, unit = authoredPet },
+}, { level = 1, difficulty = "normal", playerCount = 1 })
+local authoredPetDeltaEntries = Event.DeserializeUnitDeltaBatchFromNetwork(authoredPetDelta)
+assertEqual(authoredPetDeltaEntries[1].unit.isPet, true, "authored pet deltas preserve the pet-role marker")
+local genericSummonDelta = Event.SerializeUnitDeltaBatchForNetwork({
+    { operation = "upsert", eventID = 2, unit = genericSummon },
+}, { level = 1, difficulty = "normal", playerCount = 1 })
+local genericSummonDeltaFields = splitPreservingEmpty(
+    splitPreservingEmpty(genericSummonDelta, string.char(23))[1],
+    string.char(22)
+)
+local genericSummonDeltaUnitFields = splitPreservingEmpty(genericSummonDeltaFields[3], string.char(29))
+assertEqual(genericSummonDeltaUnitFields[16], "", "generic summon deltas omit profile pet identity")
+local genericSummonDeltaEntries = Event.DeserializeUnitDeltaBatchFromNetwork(genericSummonDelta)
+assertEqual(genericSummonDeltaEntries[1].unit.petRef, nil, "generic summon deltas preserve the absence of pet identity")
+assertEqual(tonumber(genericSummonDeltaEntries[1].unit.controllerID), 1, "generic summon deltas preserve controller identity")
+assertEqual(genericSummonDeltaEntries[1].unit.summonedByEventID, 1, "generic summon deltas preserve caster identity")
 
 local nativeHydrate = EventUnit.HydrateNetworkUnit
 local receivedOptions

@@ -287,10 +287,44 @@ function Server:AddEventNpcUnitFromDefinition(registryId, options)
     return self:AddEventNpcUnit(unitData)
 end
 
+local baseSummonEventControlledUnit = Server.SummonEventControlledUnit
+if type(baseSummonEventControlledUnit) == "function" then
+    function Server:SummonEventControlledUnit(casterUnit, registryId, options)
+        local resolvedOptions = type(options) == "table" and options or {}
+        local previousRequest = self.PendingNpcSummonPresetRequest
+        local previousPending = self.PendingNpcVariantMaterialization
+        local summonRequest = {
+            registryID = tostring(registryId or ""),
+            presetIndex = normalizeVariantIndex(resolvedOptions.presetIndex),
+            appearanceIndex = normalizeVariantIndex(resolvedOptions.appearanceIndex),
+        }
+        self.PendingNpcSummonPresetRequest = summonRequest
+
+        local unit, summonError = baseSummonEventControlledUnit(self, casterUnit, registryId, options)
+
+        self.PendingNpcSummonPresetRequest = previousRequest
+        self.PendingNpcVariantMaterialization = previousPending
+
+        if unit then
+            applyRuntimeVariantIdentity(unit, summonRequest.presetIndex, summonRequest.appearanceIndex)
+            applyIdentityToDraftCopy(self, unit.eventID, summonRequest.presetIndex, summonRequest.appearanceIndex)
+        end
+
+        return unit, summonError
+    end
+end
+
 local baseSummonEventPetUnit = Server.SummonEventPetUnit
 function Server:SummonEventPetUnit(casterUnit, registryId, options)
     if type(baseSummonEventPetUnit) ~= "function" then
         return nil
+    end
+
+    -- The shared controlled-unit wrapper owns variant materialization when it
+    -- exists. Keep the legacy request path for lightweight test/server hosts
+    -- that only expose the older profile-pet method.
+    if type(baseSummonEventControlledUnit) == "function" then
+        return baseSummonEventPetUnit(self, casterUnit, registryId, options)
     end
 
     local resolvedOptions = type(options) == "table" and options or {}
@@ -303,7 +337,7 @@ function Server:SummonEventPetUnit(casterUnit, registryId, options)
     }
     self.PendingNpcSummonPresetRequest = summonRequest
 
-    local unit = baseSummonEventPetUnit(self, casterUnit, registryId, options)
+    local unit, summonError = baseSummonEventPetUnit(self, casterUnit, registryId, options)
 
     self.PendingNpcSummonPresetRequest = previousRequest
     self.PendingNpcVariantMaterialization = previousPending
@@ -313,5 +347,5 @@ function Server:SummonEventPetUnit(casterUnit, registryId, options)
         applyIdentityToDraftCopy(self, unit.eventID, summonRequest.presetIndex, summonRequest.appearanceIndex)
     end
 
-    return unit
+    return unit, summonError
 end

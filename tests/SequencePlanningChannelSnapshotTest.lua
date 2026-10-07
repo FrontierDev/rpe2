@@ -42,7 +42,7 @@ local Addon = {
             ResolveSpellCooldownChannel = function(spell)
                 resolverCalls = resolverCalls + 1
                 if spell.invalidChannel == true then
-                    return nil, nil, nil, "unknown-channel"
+                    return nil, nil, nil, "invalid-cooldown-channel"
                 end
                 local channel = channels[spell.cooldownChannel]
                 return spell.cooldownChannel, channel
@@ -193,7 +193,7 @@ assertEqual(
 local invalidSequence = Addon.Client.AutopilotSequencePlanning.BuildSequence({ candidate("invalid") }, caster)
 assertEqual(#invalidSequence.actions, 0, "canonical invalid snapshot is not planned")
 assertEqual(#invalidSequence.rejected, 1, "canonical invalid snapshot is rejected")
-assertEqual(invalidSequence.rejected[1].reason, "invalid-cooldown-channel", "canonical invalid reason is retained")
+assertEqual(invalidSequence.rejected[1].reason, "illegal-activation", "invalid activation is rejected by sequence planning")
 assertTrue(resolverCalls == callsBeforePlanning, "invalid snapshot does not trigger another resolver call")
 
 print("SequencePlanningChannelSnapshotTest passed")

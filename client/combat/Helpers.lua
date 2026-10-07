@@ -56,6 +56,9 @@ local function wrapTextWithColor(text, colorHex)
     return ("|c%s%s|r"):format(normalized, tostring(text))
 end
 
+local SHIELD_BLOCK_VALUE_COLOR = "ff59e673"
+local SHIELD_BLOCK_VALUE_ICON = "Interface\\Icons\\Ability_Defend"
+
 local function buildDamageAmountText(amountMin, amountMax)
     local minimum = math.max(0, math.floor(tonumber(amountMin) or 0))
     local maximum = math.max(0, math.floor(tonumber(amountMax) or minimum))
@@ -76,9 +79,12 @@ local function buildAggregateDamageDetailText(aggregate)
 
     local absorbedMin = tonumber(aggregate.absorbedMin)
     local absorbedMax = tonumber(aggregate.absorbedMax)
+    local blockedMin = tonumber(aggregate.blockedMin)
+    local blockedMax = tonumber(aggregate.blockedMax)
     local hasAbsorption = absorbedMin ~= nil and absorbedMax ~= nil and absorbedMax > 0
+    local hasShieldBlockMitigation = blockedMin ~= nil and blockedMax ~= nil and blockedMax > 0
     local hasBonusDamage = type(aggregate.bonusDamageEntries) == "table" and #aggregate.bonusDamageEntries > 0
-    if not hasAbsorption and not hasBonusDamage then
+    if not hasAbsorption and not hasShieldBlockMitigation and not hasBonusDamage then
         return nil
     end
 
@@ -86,13 +92,19 @@ local function buildAggregateDamageDetailText(aggregate)
         buildDamageAmountText(aggregate.amountMin, aggregate.amountMax),
         tostring(aggregate.labelText or "") ~= "" and tostring(aggregate.labelText) or "True"
     )
-    if hasAbsorption then
-        baseText = ("%s (absorbed %s)"):format(baseText, buildDamageAmountText(absorbedMin, absorbedMax))
-    end
     baseText = wrapTextWithColor(baseText, aggregate.accentColor)
 
-    local bonusParts = {}
-    for index = 1, #aggregate.bonusDamageEntries do
+    local adjustmentParts = {}
+    if hasShieldBlockMitigation then
+        adjustmentParts[#adjustmentParts + 1] = wrapTextWithColor(
+            "-" .. buildDamageAmountText(blockedMin, blockedMax),
+            SHIELD_BLOCK_VALUE_COLOR
+        )
+    end
+    if hasAbsorption then
+        adjustmentParts[#adjustmentParts + 1] = ("absorbed %s"):format(buildDamageAmountText(absorbedMin, absorbedMax))
+    end
+    for index = 1, #(aggregate.bonusDamageEntries or {}) do
         local bonusEntry = aggregate.bonusDamageEntries[index]
         local amount = math.max(0, math.floor(tonumber(bonusEntry and bonusEntry.amount) or 0))
         local absorbedAmount = math.max(0, math.floor(tonumber(bonusEntry and bonusEntry.absorbedAmount) or 0))
@@ -101,15 +113,13 @@ local function buildAggregateDamageDetailText(aggregate)
             if absorbedAmount > 0 then
                 bonusText = ("%s (absorbed %d)"):format(bonusText, absorbedAmount)
             end
-            bonusParts[#bonusParts + 1] = wrapTextWithColor(bonusText, bonusEntry and bonusEntry.colorHex or nil)
+            adjustmentParts[#adjustmentParts + 1] = wrapTextWithColor(bonusText, bonusEntry and bonusEntry.colorHex or nil)
         end
     end
 
-    if #bonusParts == 0 then
-        return baseText
-    end
-
-    return ("%s (%s)"):format(baseText, table.concat(bonusParts, ", "))
+    local detailText = #adjustmentParts == 0 and baseText
+        or ("%s (%s)"):format(baseText, table.concat(adjustmentParts, ", "))
+    return detailText
 end
 
 local function emitSingleTargetDamageCombatLog(entry, damageResult)
@@ -137,7 +147,8 @@ local function emitSingleTargetDamageCombatLog(entry, damageResult)
 
     local amount = math.max(0, math.floor(tonumber(damageResult.amount) or 0))
     local absorbedAmount = math.max(0, math.floor(tonumber(damageResult.absorbedAmount) or 0))
-    if amount <= 0 and absorbedAmount <= 0 then
+    local blockedAmount = math.max(0, math.floor(tonumber(damageResult.blockedAmount) or 0))
+    if amount <= 0 and absorbedAmount <= 0 and blockedAmount <= 0 then
         return false
     end
 
@@ -166,6 +177,9 @@ local function emitSingleTargetDamageCombatLog(entry, damageResult)
         amountMax = amount,
         absorbedMin = absorbedAmount,
         absorbedMax = absorbedAmount,
+        blockedMin = blockedAmount,
+        blockedMax = blockedAmount,
+        blocked = damageResult.blocked == true,
         labelText = schoolLabel,
         accentColor = accentColor,
     }
@@ -182,7 +196,7 @@ local function emitSingleTargetDamageCombatLog(entry, damageResult)
         amountMax = amount,
         absorbedAmount = absorbedAmount,
         iconTexture = schoolIcon,
-        spellIconTexture = spellIcon,
+        spellIconTexture = damageResult.blocked == true and SHIELD_BLOCK_VALUE_ICON or spellIcon,
         spellRef = entry.spellRef or (context and context.spellRef) or nil,
         labelText = tostring(schoolLabel or "") ~= "" and tostring(schoolLabel) or "True",
         detailText = buildAggregateDamageDetailText(aggregate),
@@ -1133,6 +1147,9 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
             amountMax = nil,
             absorbedMin = nil,
             absorbedMax = nil,
+            blockedMin = nil,
+            blockedMax = nil,
+            blocked = false,
             iconTexture = nil,
             spellIconTexture = type(Addon.Client) == "table" and type(Addon.Client.ResolveCombatLogSpellIcon) == "function"
                 and Addon.Client:ResolveCombatLogSpellIcon(spell, type(context) == "table" and context.spellRef or nil)
@@ -1170,6 +1187,14 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
     if aggregate.absorbedMax == nil or absorbedAmount > aggregate.absorbedMax then
         aggregate.absorbedMax = absorbedAmount
     end
+    local blockedAmount = math.max(0, math.floor(tonumber(type(damageResult) == "table" and damageResult.blockedAmount or 0) or 0))
+    if aggregate.blockedMin == nil or blockedAmount < aggregate.blockedMin then
+        aggregate.blockedMin = blockedAmount
+    end
+    if aggregate.blockedMax == nil or blockedAmount > aggregate.blockedMax then
+        aggregate.blockedMax = blockedAmount
+    end
+    aggregate.blocked = aggregate.blocked == true or (type(damageResult) == "table" and damageResult.blocked == true)
     if tostring(type(damageResult) == "table" and damageResult.damageSchoolIcon or "") ~= "" then
         aggregate.iconTexture = tostring(damageResult.damageSchoolIcon)
     end
@@ -1312,7 +1337,7 @@ function Combat:FlushActionDamageCombatLog(client, context, castEntry, spell, co
         amountMin = aggregate.amountMin,
         amountMax = aggregate.amountMax,
         iconTexture = aggregate.iconTexture,
-        spellIconTexture = aggregate.spellIconTexture,
+        spellIconTexture = aggregate.blocked == true and SHIELD_BLOCK_VALUE_ICON or aggregate.spellIconTexture,
         labelText = tostring(aggregate.labelText or "") ~= "" and tostring(aggregate.labelText) or "True",
         detailText = buildAggregateDamageDetailText(aggregate),
         accentColor = aggregate.accentColor,

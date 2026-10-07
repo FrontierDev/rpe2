@@ -227,6 +227,10 @@ local function isLocalPlayerPet(eventUnit, localEventUnit)
     if type(eventUnit) ~= "table" or type(localEventUnit) ~= "table" or eventUnit.isPlayer == true then
         return false
     end
+    local isPetUnit = eventUnit.isPet == true or tostring(eventUnit.petRef or "") ~= ""
+    if not isPetUnit then
+        return false
+    end
 
     local localEventId = tonumber(localEventUnit.eventID) or 0
     if localEventId > 0 and tonumber(eventUnit.summonedByEventID) == localEventId then
@@ -234,13 +238,13 @@ local function isLocalPlayerPet(eventUnit, localEventUnit)
     end
 
     local controllerId = tonumber(eventUnit.controllerID) or 0
-    if controllerId > 0 and controllerId == localEventId and tostring(eventUnit.petRef or "") ~= "" then
+    if controllerId > 0 and controllerId == localEventId then
         return true
     end
 
     local localOwnerName = normalizeName(localEventUnit.ownerID or localEventUnit.controllerID or localEventUnit.name)
     local eventOwnerName = normalizeName(eventUnit.ownerID)
-    return tostring(eventUnit.petRef or "") ~= "" and localOwnerName ~= "" and eventOwnerName == localOwnerName
+    return localOwnerName ~= "" and eventOwnerName == localOwnerName
 end
 
 function ActionBarWidget:IsActionBarControlActive()
@@ -582,7 +586,6 @@ function ActionBarWidget:ResolveControllablePetUnit(controlContext)
 
     local preferredPetRef = Profile.GetPetRef and tostring(Profile.GetPetRef() or "") or ""
     local fallbackPet = nil
-
     for index = 1, #eventUnits do
         local eventUnit = eventUnits[index]
         if isLocalPlayerPet(eventUnit, localEventUnit)
@@ -592,8 +595,8 @@ function ActionBarWidget:ResolveControllablePetUnit(controlContext)
             if preferredPetRef ~= "" and tostring(eventUnit.petRef or "") == preferredPetRef then
                 return eventUnit
             end
-            if fallbackPet == nil then
-                fallbackPet = eventUnit
+            if eventUnit.isPet == true and tostring(eventUnit.petRef or "") == "" then
+                fallbackPet = fallbackPet or eventUnit
             end
         end
     end

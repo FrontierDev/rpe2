@@ -36,6 +36,30 @@ local SPELLCAST_SLOW_HELPER_MS = 25
 local EMPTY_RESOURCE_COSTS = {}
 local SPELL_RESOURCE_COSTS_BY_PHASE_CACHE = setmetatable({}, { __mode = "k" })
 
+local function normalizeDefenceStatRef(value)
+    local reference = type(value) == "string" and value or ""
+    reference = reference:gsub("^%s+", ""):gsub("%s+$", "")
+    if reference == "" then
+        return nil
+    end
+
+    local datasetId, statId = reference:match("^([^:]+):(.+)$")
+    if not datasetId or datasetId == "" or not statId or statId == "" then
+        return nil
+    end
+
+    return reference
+end
+
+local function isKnownDefenceStatRef(reference)
+    if not reference or type(Registry.ResolveStatReference) ~= "function" then
+        return reference ~= nil
+    end
+
+    local _, stat = Registry:ResolveStatReference(reference)
+    return type(stat) == "table"
+end
+
 local function getTimings()
     return Addon.Debug and Addon.Debug.Timings or nil
 end
@@ -1024,7 +1048,27 @@ local function getCombatTurnHistory(client, eventState, createIfMissing)
     return turnBucket, eventId, turnNumber
 end
 
-function Spellcasting.RecordCombatAttack(client, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+function Spellcasting.RecordCombatAttack(client, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity, defenceStatRef)
+    -- Keep the historical identity position compatible while also accepting
+    -- the natural extended form (..., successfullyDefended, defenceStatRef,
+    -- identity) used by callers that do not need a resolution key.
+    local identityAsDefenceStatRef = normalizeDefenceStatRef(identity)
+    local suppliedDefenceStatRef = normalizeDefenceStatRef(defenceStatRef)
+    local looksLikeResolutionKey = type(identity) == "string" and identity:match(":%d+$") ~= nil
+    local suppliedLooksLikeResolutionKey = type(defenceStatRef) == "string" and defenceStatRef:match(":%d+$") ~= nil
+    local identityIsKnownDefence = identityAsDefenceStatRef and isKnownDefenceStatRef(identityAsDefenceStatRef)
+    local suppliedIsKnownDefence = suppliedDefenceStatRef and isKnownDefenceStatRef(suppliedDefenceStatRef)
+    if identityAsDefenceStatRef
+        and not looksLikeResolutionKey
+        and (
+            not suppliedDefenceStatRef
+            or (identityIsKnownDefence and not suppliedIsKnownDefence)
+            or (suppliedLooksLikeResolutionKey and not looksLikeResolutionKey)
+        )
+    then
+        defenceStatRef = identity
+        identity = nil
+    end
     local attackerEventId = tonumber(attackerUnit and attackerUnit.eventID) or 0
     local targetEventId = tonumber(targetUnit and targetUnit.eventID) or 0
     local normalizedAttackType = tostring(attackType or ""):lower()
@@ -1051,6 +1095,10 @@ function Spellcasting.RecordCombatAttack(client, eventState, attackerUnit, targe
     end
 
     turnHistory.nextSequence = (tonumber(turnHistory.nextSequence) or 0) + 1
+    local normalizedDefenceStatRef = successfullyDefended == true and normalizeDefenceStatRef(defenceStatRef) or nil
+    if normalizedDefenceStatRef and not isKnownDefenceStatRef(normalizedDefenceStatRef) then
+        normalizedDefenceStatRef = nil
+    end
     turnHistory.attacks[#turnHistory.attacks + 1] = {
         eventId = eventId,
         turnNumber = turnNumber,
@@ -1060,6 +1108,7 @@ function Spellcasting.RecordCombatAttack(client, eventState, attackerUnit, targe
         resolved = true,
         landed = landed == true,
         successfullyDefended = successfullyDefended == true,
+        defenceStatRef = normalizedDefenceStatRef,
         sequence = turnHistory.nextSequence,
         resolutionKey = resolutionKey ~= "" and resolutionKey or nil,
     }
@@ -1142,19 +1191,27 @@ function Spellcasting.HasUnitAttackedTargetOnTurn(client, eventState, attackerEv
     return false
 end
 
-function Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(client, eventState, targetEventId)
-    local turnHistory = getCombatTurnHistory(client, eventState, false)
+function Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(client, eventState, targetEventId, defenceStatRef)
+    local turnHistory, eventId, turnNumber = getCombatTurnHistory(client, eventState, false)
     local numericTargetEventId = tonumber(targetEventId) or 0
-    if not turnHistory or numericTargetEventId <= 0 then
+    local requestedDefenceStatRef = normalizeDefenceStatRef(defenceStatRef)
+    local hasDefenceStatFilter = defenceStatRef ~= nil and tostring(defenceStatRef) ~= ""
+    if not turnHistory
+        or numericTargetEventId <= 0
+        or (hasDefenceStatFilter and (not requestedDefenceStatRef or not isKnownDefenceStatRef(requestedDefenceStatRef)))
+    then
         return false
     end
 
     for index = #turnHistory.attacks, 1, -1 do
         local record = turnHistory.attacks[index]
         if record.resolved == true
+            and record.eventId == eventId
+            and tonumber(record.turnNumber) == turnNumber
             and record.attackType == "melee"
             and record.targetEventId == numericTargetEventId
             and record.successfullyDefended == true
+            and (not requestedDefenceStatRef or record.defenceStatRef == requestedDefenceStatRef)
         then
             return true
         end
@@ -1255,7 +1312,7 @@ local function cloneSpellImpactOperation(operation)
     }
 end
 
-function Spellcasting.RecordRecentAttacker(client, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+function Spellcasting.RecordRecentAttacker(client, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity, defenceStatRef)
     local recorded = Spellcasting.RecordCombatAttack(
         client,
         eventState,
@@ -1264,7 +1321,8 @@ function Spellcasting.RecordRecentAttacker(client, eventState, attackerUnit, tar
         attackType or "spell",
         landed == true,
         successfullyDefended == true,
-        identity
+        identity,
+        defenceStatRef
     )
     if not recorded then
         return false
@@ -1489,12 +1547,12 @@ function Spellcasting.RevertLastSpellImpact(client, eventState, targetUnit, cont
     return true, reverted
 end
 
-function Client:RecordRecentAttacker(eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
-    return Spellcasting.RecordRecentAttacker(self, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+function Client:RecordRecentAttacker(eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity, defenceStatRef)
+    return Spellcasting.RecordRecentAttacker(self, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity, defenceStatRef)
 end
 
-function Client:RecordCombatAttack(eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
-    return Spellcasting.RecordCombatAttack(self, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity)
+function Client:RecordCombatAttack(eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity, defenceStatRef)
+    return Spellcasting.RecordCombatAttack(self, eventState, attackerUnit, targetUnit, attackType, landed, successfullyDefended, identity, defenceStatRef)
 end
 
 function Client:RecordCombatDeath(eventState, unit, identity)
@@ -1509,8 +1567,8 @@ function Client:HasUnitAttackedTargetOnTurn(eventState, attackerEventId, targetE
     return Spellcasting.HasUnitAttackedTargetOnTurn(self, eventState, attackerEventId, targetEventId, turnNumber)
 end
 
-function Client:HasSuccessfullyDefendedMeleeThisTurn(eventState, targetEventId)
-    return Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(self, eventState, targetEventId)
+function Client:HasSuccessfullyDefendedMeleeThisTurn(eventState, targetEventId, defenceStatRef)
+    return Spellcasting.HasSuccessfullyDefendedMeleeThisTurn(self, eventState, targetEventId, defenceStatRef)
 end
 
 function Client:HasFailedAttackThisTurn(eventState, attackerEventId)
@@ -2938,21 +2996,27 @@ function Spellcasting.ResolveComponentTargets(eventState, casterUnit, component,
     end
     if targetType == "pet" then
         local selectedPetRef = type(casterUnit) == "table" and tostring(casterUnit.petRef or "") or ""
-        if selectedPetRef == "" then
-            return {}
-        end
+        local controllerEventId = casterUnit.isPlayer == true
+            and tonumber(casterUnit.eventID)
+            or tonumber(casterUnit.controllerID)
+        local fallbackPet = nil
 
         for index = 1, #(eventState.units or {}) do
             local unit = eventState.units[index]
-            if unit
+            local isPetUnit = unit
                 and unit.isPlayer ~= true
-                and tostring(unit.petRef or "") == selectedPetRef
-                and tonumber(unit.controllerID) == tonumber(casterUnit.eventID)
-            then
-                return { unit }
+                and (unit.isPet == true or tostring(unit.petRef or "") ~= "")
+            if isPetUnit and tonumber(unit.controllerID) == controllerEventId then
+                if selectedPetRef ~= "" and tostring(unit.petRef or "") == selectedPetRef then
+                    return { unit }
+                end
+                if fallbackPet == nil then
+                    fallbackPet = unit
+                end
             end
         end
-        return {}
+
+        return fallbackPet and { fallbackPet } or {}
     end
 
     if type(castEntry) == "table" and type(castEntry.targetPolicy) == "table" then

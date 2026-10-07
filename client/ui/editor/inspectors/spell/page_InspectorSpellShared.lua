@@ -33,6 +33,7 @@ local EFFECT_TYPE_ITEMS = {
     { label = "Taunt", value = "taunt" },
     { label = "Revert", value = "revert" },
     { label = "Summon Pet", value = "summon_pet" },
+    { label = "Summon Unit", value = "summon_unit" },
 }
 
 local WEAPON_DAMAGE_MODE_ITEMS = {
@@ -431,7 +432,15 @@ function DataEditor:BuildSpellInspectorDamageSchoolsAcrossDatasets()
 end
 
 function DataEditor:BuildSpellInspectorUnitsAcrossDatasets()
-    return self:BuildReferenceItemsAcrossDatasets("units", { includeNone = true, noneLabel = "None" })
+    return self:BuildReferenceItemsAcrossDatasets("units", {
+        includeNone = true,
+        noneLabel = "None",
+        cacheSuffix = "active",
+        datasetFilter = function(editor, dataset)
+            return type(editor.IsDatasetActivated) ~= "function"
+                or editor:IsDatasetActivated(dataset and dataset.id)
+        end,
+    })
 end
 
 function DataEditor:BuildSpellInspectorAurasAcrossDatasets()

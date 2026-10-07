@@ -87,6 +87,7 @@ Rules.Definitions = {
         label = "Combat",
         rules = {
             { key = "block_chance_stat", label = "Block Chance Stat", type = "dropdown", default = "", description = "Select the stat reference used for block chance.", optionsSource = "statReference" },
+            { key = "shield_block_value_stat", label = "Shield Block Value Stat", type = "dropdown", default = "", description = "Select the stat reference that supplies the flat damage reduction for successful Blocks. Leave empty to keep successful Blocks as full avoidance.", optionsSource = "statReference" },
             { key = "allow_block_without_shield", label = "Allow Block Without Shield", type = "checkbox", default = true, description = "Allow the block reaction tied to the block chance stat even when the defender has no shield equipped." },
             {
                 key = "defence_system",

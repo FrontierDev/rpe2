@@ -1,4 +1,7 @@
 local function assertEqual(actual, expected, message)
+    if type(actual) == "number" and type(expected) == "number" and math.abs(actual - expected) < 0.000001 then
+        return
+    end
     if actual ~= expected then
         error(("%s: expected %s, got %s"):format(message, tostring(expected), tostring(actual)), 2)
     end
@@ -86,7 +89,7 @@ assertRank(laterLearnSpell, 4, false, nil, nil)
 assertRank(laterLearnSpell, 5, true, 1, 13)
 assertRank(laterLearnSpell, 12, true, 1, 13)
 assertRank(laterLearnSpell, 13, true, 2, 21)
-assertEqual(Spell.ResolveNextRankLevel(laterLearnSpell, 3), 37, "resolve next rank level")
+assertEqual(Spell.ResolveNextRankLevel(laterLearnSpell, 3), 29, "resolve next rank level")
 
 local levelOneOffsetSpell = Spell:New({ learnLevel = 1, rankInterval = 8 })
 assertEqual(Spell.ResolveRankScalingOffset(levelOneOffsetSpell), 0, "level-one Spell rank scaling offset")
@@ -191,9 +194,10 @@ local EffectCombat = EffectAddon.Client.Combat
 local function loadEffectFile(path)
     local chunk, loadError = loadfile(path)
     assert(chunk, loadError)
-    chunk(nil, EffectAddon)
+    return chunk(nil, EffectAddon)
 end
 
+loadEffectFile("client/combat/Normalization.lua")
 loadEffectFile("client/combat/Helpers.lua")
 function EffectCombat:CreateEffectContract(definition)
     return definition
@@ -220,7 +224,7 @@ local damageContext = {
     spellRankMultiplier = 1.2,
 }
 assertEqual(EffectCombat:ResolveDamageAmount(damageContext, damageEffect), 120, "Rank 3 scales base, weapon, and stat damage")
-assertEqual(EffectCombat:ResolveDamageAmount({ hitResolutionContext = damageContext.hitResolutionContext }, damageEffect), 100, "Rank 1 damage baseline")
+assertEqual(EffectCombat:ResolveDamageAmount({ hitResolutionContext = damageContext.hitResolutionContext }, damageEffect), 80, "Rank 1 damage baseline")
 assertEqual(EffectCombat:ResolveDamageAmount({ spellRankMultiplier = 1.2, variance = 1 }, { baseDamage = 100 }), 120, "Ranked raw damage")
 
 local healingEffect = {

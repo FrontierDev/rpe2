@@ -371,6 +371,13 @@ local function getSpellSourceRefs(spell)
         if type(resourceRef) == "string" and resourceRef ~= "" then
             refs[#refs + 1] = resourceRef
         end
+
+        if effectType == "summon_unit" then
+            local unitRef = effectTable and effectTable.unitRef or nil
+            if type(unitRef) == "string" and unitRef ~= "" then
+                refs[#refs + 1] = unitRef
+            end
+        end
     end
 
     return refs
@@ -1324,6 +1331,12 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                     local resourceDatasetId = effectTable and Dependecies.ParseSourceStatRef(effectTable.resourceRef) or nil
                     if effectTable and resourceDatasetId == datasetId then
                         effectTable.resourceRef = nil
+                        spellMutated = true
+                    end
+
+                    local unitDatasetId = effectTable and Dependecies.ParseSourceStatRef(effectTable.unitRef) or nil
+                    if effectTable and effectType == "summon_unit" and unitDatasetId == datasetId then
+                        effectTable.unitRef = nil
                         spellMutated = true
                     end
                 end

@@ -58,7 +58,7 @@ local foundVampiricRegeneration = false
 local function verifyVampiricRegeneration(value, visited)
     if type(value) ~= 'table' or visited[value] then return end
     visited[value] = true
-    if value.type == 'heal' and value.baseDamage == 8.84 then
+    if value.type == 'heal' and value.baseHealing == 8.84 then
         for _, scaling in ipairs(value.statScaling or {}) do
             if scaling.statRef == spellPowerRef then
                 assertEqual(scaling.coefficient, 0.221, 'Vampiric Regeneration remains non-damage scaling')

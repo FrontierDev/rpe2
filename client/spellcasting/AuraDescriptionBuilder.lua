@@ -377,8 +377,10 @@ local function appendAuraThreatDescription(auraDefinition, descriptionText)
 end
 
 local function buildPassiveDamageSentence(effect, targetContext, options)
-    local amount = math.max(0, resolveAmount(options, effect, "baseDamage"))
     local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amount = (amountMode == "base_percent" or amountMode == "max_percent")
+        and math.max(0, tonumber(effect and effect.baseDamage) or 0)
+        or math.max(0, resolveAmount(options, effect, "baseDamage"))
     local schoolLabel = resolveDamageSchoolLabel(effect)
     local amountText = ""
     
@@ -411,8 +413,10 @@ local function buildPassiveAbsorbSentence(effect, targetContext, options)
 end
 
 local function buildPassiveHealSentence(effect, targetContext, options)
-    local amount = math.max(0, resolveAmount(options, effect, "baseHealing"))
     local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amount = (amountMode == "base_percent" or amountMode == "max_percent")
+        and math.max(0, tonumber(effect and effect.baseHealing) or 0)
+        or math.max(0, resolveAmount(options, effect, "baseHealing"))
     local amountText = ""
     
     if amountMode == "base_percent" then
@@ -796,8 +800,10 @@ local function resolveTriggeredTargetContext(combatEventId, triggerTarget, auraT
 end
 
 local function buildEventDamageClause(effect, targetContext, options)
-    local amount = math.max(0, resolveAmount(options, effect, "baseDamage"))
     local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amount = (amountMode == "base_percent" or amountMode == "max_percent")
+        and math.max(0, tonumber(effect and effect.baseDamage) or 0)
+        or math.max(0, resolveAmount(options, effect, "baseDamage"))
     local schoolLabel = resolveDamageSchoolLabel(effect)
     local amountText = ""
     
@@ -817,8 +823,10 @@ local function buildEventDamageClause(effect, targetContext, options)
 end
 
 local function buildEventHealClause(effect, targetContext, options)
-    local amount = math.max(0, resolveAmount(options, effect, "baseHealing"))
     local amountMode = tostring(effect and effect.amountMode or "flat")
+    local amount = (amountMode == "base_percent" or amountMode == "max_percent")
+        and math.max(0, tonumber(effect and effect.baseHealing) or 0)
+        or math.max(0, resolveAmount(options, effect, "baseHealing"))
     local amountText = ""
     
     if amountMode == "base_percent" then
