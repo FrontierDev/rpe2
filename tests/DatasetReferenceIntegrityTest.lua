@@ -45,7 +45,11 @@ local function validateReferences(value, path, visited)
     for key, child in pairs(value) do
         local childPath = path .. "." .. tostring(key)
         if referenceFields[key] then
-            assertReference(child, childPath)
+            -- Damage/heal effects retain normalized aura fields even when aura
+            -- application is disabled. Only validate auraRef when it is active.
+            if key ~= "auraRef" or value.applyAura ~= false then
+                assertReference(child, childPath)
+            end
         elseif type(key) == "string" and key:match("Refs$") and type(child) == "table" then
             for index = 1, #child do assertReference(child[index], childPath .. "." .. index) end
         end
