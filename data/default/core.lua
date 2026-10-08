@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 81,
+    version = 82,
     dataset = {
         achievements = {},
         auras = {
@@ -172,7 +172,6 @@ Addon.Data.DefaultDatasets:Register({
                     version = 1,
                 },
             },
-        },
             {
                 description = "",
                 duration = 20,
@@ -5333,8 +5332,7 @@ Addon.Data.DefaultDatasets:Register({
         },
         totalTicks = 0,
         useCooldownCharges = false,
-    }
-        },
+    },
             {
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
@@ -5593,7 +5591,6 @@ Addon.Data.DefaultDatasets:Register({
                 totalTicks = 0,
                 useCooldownCharges = false,
             },
-        },
             {
                 allowDeadTargets = false,
                 canMoveWhileCasting = false,
@@ -5754,7 +5751,6 @@ Addon.Data.DefaultDatasets:Register({
                 totalTicks = 0,
                 useCooldownCharges = false,
             },
-        },
         {
             allowDeadTargets = false,
             canMoveWhileCasting = false,
@@ -6489,6 +6485,7 @@ Addon.Data.DefaultDatasets:Register({
             spellbookCategory = "", tags = { "npc", "goblin" }, tooltipTemplate = true,
             tooltipTemplateData = { auraSections = {  }, mainText = "Cast for 1 turn, then summon a Goblin Turret under your control.", tokens = {  }, version = 1 },
             totalTicks = 0, useCooldownCharges = false,
+        },
         },
         stats = {
             {
@@ -10283,7 +10280,6 @@ units = {
                 },
                 tags = {  },
             },
-        },
         {
             appearances = {  },
             attributes = {  },
@@ -12601,6 +12597,7 @@ units = {
                 { initialValue = 30, perLevelValue = 0, statRef = "f82db71a:s1mt6jh9" },
             },
             tags = {  },
+        },
         },
         weaponTypes = {
             {
