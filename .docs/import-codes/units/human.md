@@ -34,7 +34,9 @@ The Human base resource list includes Rage, Mana and Energy so presets can suppo
 | Cryomancer | Mage | Normal | Worn Wand | Spell Power, Spell Hit, Frost/Magic resistance |
 | Sharpshooter | Hunter | Normal | Worn Bow | Ranged Attack Power, Ranged Hit/Crit |
 | Assassin | Rogue | Normal | Dual Worn Daggers | Melee Attack Power, Melee Hit/Crit, Dodge |
-| Captain | Paladin | Elite | Worn Shortsword + Worn Shield | Health, Armor, mixed damage/healing, Block |
+| Bandit | Rogue | Normal | Worn Shortsword | Melee Attack Power, Melee Hit/Crit, Dodge |
+| Captain | Warrior | Elite | Worn Shortsword + Worn Shield | Health, Armor, Melee Attack Power, Block |
+| Paladin | Paladin | Elite | Worn Shortsword + Worn Shield | Health, Armor, mixed damage/healing, Block |
 
 All stat and resource modifiers below are authored directly on each preset. No preset references or reuses a pre-existing stat profile.
 
@@ -255,7 +257,67 @@ RPE_DATASET_ENTRY_V1
                 },
             },
             {
+                name = "Bandit",
+                challengeLevel = "normal",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -10, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = -30, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = 15, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:wbj4zuf3", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:jslmczbi", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:o6113cir", percentBonus = 0, flatBonus = 5 },
+                },
+                spells = {
+                    "f82db71a:z36xzk0w",
+                    "23d5dce2:g9o4t7uj",
+                    "23d5dce2:300h0gls",
+                    "23d5dce2:kbifnqpj",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwswd01",
+                },
+            },
+            {
                 name = "Captain",
+                challengeLevel = "elite",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = 25, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = 30, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = 35, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = -50, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:wbj4zuf3", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:jslmczbi", percentBonus = 0, flatBonus = 5 },
+                    { statRef = "f82db71a:p8syz5ba", percentBonus = 0, flatBonus = 15 },
+                    { statRef = "f82db71a:rgnrtg01", percentBonus = 0, flatBonus = 5 },
+                },
+                spells = {
+                    "f82db71a:z36xzk0w",
+                    "f82db71a:npcrage1",
+                    "f82db71a:npcmulti",
+                    "7bbb4cb9:c1s93sif",
+                    "7bbb4cb9:xniv44uu",
+                    "7bbb4cb9:ti2j4umn",
+                },
+                equipment = {
+                    mainHandWeapon = "f82db71a:stwswd01",
+                    shield = "f82db71a:stshld01",
+                },
+            },
+            {
+                name = "Paladin",
                 challengeLevel = "elite",
                 resourceModifiers = {
                     { resourceRef = "f82db71a:q2ktkztt", percentBonus = 30, flatBonus = 0 },
