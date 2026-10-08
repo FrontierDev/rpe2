@@ -1,10 +1,39 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 47,
+    version = 48,
     dataset = {
         achievements = {},
         auras = {
+            {
+                description = "",
+                duration = 1,
+                effects = {
+                    {
+                        cancelOnDamage = false,
+                        forceAutoHitAgainstTarget = true,
+                        movementRangeOverride = 0,
+                        preventCasting = true,
+                        statScaling = {},
+                        type = "control"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/ability_thunderbolt.blp",
+                id = "cncblwau",
+                maxStacks = 1,
+                name = "Concussive Blow",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
             {
                 description = "",
                 duration = 2,
@@ -6387,6 +6416,92 @@ Addon.Data.DefaultDatasets:Register({
                 charges = 0,
                 components = {
                     {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            auraRef = "7bbb4cb9:cncblwau",
+                            basePower = 0,
+                            duration = 1,
+                            stacks = 1,
+                            targetEvents = {},
+                            type = "apply_aura"
+                        },
+                        key = "cncblwc1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 6,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_thunderbolt.blp",
+                id = "cncblow1",
+                cooldownChannel = 1,
+                learnMode = "always_learned",
+                learnLevel = 30,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Concussive Blow",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 10,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:e2tfklq7"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Protection",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {
+                        {
+                            auraRef = "7bbb4cb9:cncblwau",
+                            datasetId = "7bbb4cb9",
+                            descriptionText = "Prevents the affected unit from casting spells. Sets the affected unit's movement range to 0. Causes all attacks against the affected unit to automatically hit.",
+                            duration = 1,
+                            icon = "interface/icons/ability_thunderbolt.blp",
+                            nameText = "Concussive Blow",
+                            powerLevel = 0,
+                            spellDatasetId = "7bbb4cb9",
+                            stacks = 1,
+                            targetContext = {
+                                object = "the affected enemy",
+                                possessive = "the affected enemy's",
+                                reflexive = "itself",
+                                subject = "the affected enemy"
+                            },
+                            tokens = {}
+                        }
+                    },
+                    mainText = "Stun an enemy for 1 turn.",
+                    tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {
