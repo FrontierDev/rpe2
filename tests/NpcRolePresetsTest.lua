@@ -104,6 +104,299 @@ end
 
 local voidwalker = findUnit("voidw001")
 assert(voidwalker, "Voidwalker Unit exists in Core")
+
+local abomination = findUnit("abom0001")
+assert(abomination, "Abomination Unit exists in Core")
+assertEqual(abomination.name, "Abomination", "Abomination unit name")
+assertEqual(abomination.challengeLevel, "elite", "Abomination challenge level")
+assertEqual(abomination.creatureSize, "large", "Abomination creature size")
+assertEqual(abomination.creatureType, "undead", "Abomination creature type")
+assertEqual(abomination.mainHandWeapon, "f82db71a:stwaxe01", "Abomination main-hand weapon")
+assertEqual(abomination.offHandWeapon, "f82db71a:stwaxe01", "Abomination off-hand weapon")
+assertEqual(abomination.resources[1].initialValue, 200, "Abomination base Health")
+assertEqual(abomination.resources[2].resourceRef, "f82db71a:e2tfklq7", "Abomination uses Rage")
+for index = 1, #(abomination.spells or {}) do
+    assert(entityRefs.spells[abomination.spells[index]], "Abomination spell ref resolves: " .. abomination.spells[index])
+end
+
+local banshee = findUnit("bansh001")
+assert(banshee, "Banshee Unit exists in Core")
+assertEqual(banshee.name, "Banshee", "Banshee unit name")
+assertEqual(banshee.challengeLevel, "elite", "Banshee challenge level")
+assertEqual(banshee.creatureSize, "medium", "Banshee creature size")
+assertEqual(banshee.creatureType, "undead", "Banshee creature type")
+assertEqual(banshee.resources[1].initialValue, 150, "Banshee base Health")
+assertEqual(banshee.resources[2].resourceRef, "f82db71a:4c8mfm99", "Banshee uses Mana")
+for index = 1, #(banshee.spells or {}) do
+    assert(entityRefs.spells[banshee.spells[index]], "Banshee spell ref resolves: " .. banshee.spells[index])
+end
+
+local gargoyle = findUnit("garg0001")
+assert(gargoyle, "Gargoyle Unit exists in Core")
+assertEqual(gargoyle.name, "Gargoyle", "Gargoyle unit name")
+assertEqual(gargoyle.challengeLevel, "normal", "Gargoyle challenge level")
+assertEqual(gargoyle.creatureSize, "medium", "Gargoyle creature size")
+assertEqual(gargoyle.creatureType, "undead", "Gargoyle creature type")
+assertEqual(gargoyle.attributes[1], "flying", "Gargoyle flying attribute")
+assertEqual(gargoyle.resources[1].initialValue, 160, "Gargoyle base Health")
+assertEqual(gargoyle.resources[2].resourceRef, "f82db71a:4c8mfm99", "Gargoyle uses Mana")
+for index = 1, #(gargoyle.spells or {}) do
+    assert(entityRefs.spells[gargoyle.spells[index]], "Gargoyle spell ref resolves: " .. gargoyle.spells[index])
+end
+
+local geist = findUnit("geist001")
+assert(geist, "Geist Unit exists in Core")
+assertEqual(geist.name, "Geist", "Geist unit name")
+assertEqual(geist.challengeLevel, "normal", "Geist challenge level")
+assertEqual(geist.creatureSize, "medium", "Geist creature size")
+assertEqual(geist.creatureType, "undead", "Geist creature type")
+assertEqual(geist.resources[1].initialValue, 140, "Geist base Health")
+assertEqual(geist.stats[6].initialValue, 8, "Geist Dodge Chance")
+assertEqual(geist.stats[8].initialValue, 0, "Geist Magic Resistance")
+assertEqual(geist.stats[12].initialValue, 8, "Geist Melee Crit Chance")
+assertEqual(geist.stats[23].initialValue, 40, "Geist Movement Speed")
+for index = 1, #(geist.spells or {}) do
+    assert(entityRefs.spells[geist.spells[index]], "Geist spell ref resolves: " .. geist.spells[index])
+end
+
+local ghost = findUnit("ghost001")
+assert(ghost, "Ghost Unit exists in Core")
+assertEqual(ghost.name, "Ghost", "Ghost unit name")
+assertEqual(ghost.challengeLevel, "normal", "Ghost challenge level")
+assertEqual(ghost.creatureSize, "medium", "Ghost creature size")
+assertEqual(ghost.creatureType, "undead", "Ghost creature type")
+assertEqual(ghost.resources[1].initialValue, 140, "Ghost base Health")
+assertEqual(ghost.resources[2].resourceRef, "f82db71a:4c8mfm99", "Ghost uses Mana")
+assertEqual(ghost.stats[8].initialValue, 10, "Ghost Magic Resistance")
+assertEqual(ghost.stats[20].initialValue, 25, "Ghost Shadow Resistance")
+assertEqual(ghost.stats[23].initialValue, 30, "Ghost Movement Speed")
+assertEqual(#(ghost.presets or {}), 3, "Ghost variant preset count")
+assertEqual(ghost.presets[1].name, "Wraith", "Ghost Wraith preset")
+assertEqual(ghost.presets[2].name, "Spectre", "Ghost Spectre preset")
+assertEqual(ghost.presets[3].name, "Shade", "Ghost Shade preset")
+for index = 1, #(ghost.spells or {}) do
+    assert(entityRefs.spells[ghost.spells[index]], "Ghost spell ref resolves: " .. ghost.spells[index])
+end
+for presetIndex = 1, #(ghost.presets or {}) do
+    local preset = ghost.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Ghost preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+end
+
+local ghoul = findUnit("ghoul001")
+assert(ghoul, "Ghoul Unit exists in Core")
+assertEqual(ghoul.name, "Ghoul", "Ghoul unit name")
+assertEqual(ghoul.challengeLevel, "minor", "Ghoul challenge level")
+assertEqual(ghoul.creatureSize, "medium", "Ghoul creature size")
+assertEqual(ghoul.creatureType, "undead", "Ghoul creature type")
+assertEqual(ghoul.resources[1].initialValue, 130, "Ghoul base Health")
+assertEqual(ghoul.resources[1].resourceRef, "f82db71a:q2ktkztt", "Ghoul uses Health")
+assertEqual(ghoul.stats[1].initialValue, 20, "Ghoul base Armor")
+assertEqual(ghoul.stats[6].initialValue, 3, "Ghoul Dodge Chance")
+assertEqual(ghoul.stats[9].initialValue, 45, "Ghoul Melee Attack Power")
+assertEqual(ghoul.stats[23].initialValue, 35, "Ghoul Movement Speed")
+assertEqual(#(ghoul.presets or {}), 3, "Ghoul variant preset count")
+assertEqual(ghoul.presets[1].name, "Plaguebearer", "Ghoul Plaguebearer preset")
+assertEqual(ghoul.presets[2].name, "Leaper", "Ghoul Leaper preset")
+assertEqual(ghoul.presets[3].name, "Ravager", "Ghoul Ravager preset")
+for index = 1, #(ghoul.spells or {}) do
+    assert(entityRefs.spells[ghoul.spells[index]], "Ghoul spell ref resolves: " .. ghoul.spells[index])
+end
+for presetIndex = 1, #(ghoul.presets or {}) do
+    local preset = ghoul.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Ghoul preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+end
+
+local gnoll = findUnit("gnoll001")
+assert(gnoll, "Gnoll Unit exists in Core")
+assertEqual(gnoll.name, "Gnoll", "Gnoll unit name")
+assertEqual(gnoll.challengeLevel, "minor", "Gnoll challenge level")
+assertEqual(gnoll.creatureSize, "medium", "Gnoll creature size")
+assertEqual(gnoll.creatureType, "humanoid", "Gnoll creature type")
+assertEqual(gnoll.resources[1].initialValue, 130, "Gnoll base Health")
+assertEqual(gnoll.resources[2].resourceRef, "f82db71a:4c8mfm99", "Gnoll Mana pool")
+assertEqual(gnoll.resources[3].resourceRef, "f82db71a:e2tfklq7", "Gnoll Rage pool")
+assertEqual(gnoll.stats[1].initialValue, 20, "Gnoll base Armor")
+assertEqual(gnoll.stats[9].initialValue, 45, "Gnoll Melee Attack Power")
+assertEqual(gnoll.stats[10].initialValue, 40, "Gnoll Ranged Attack Power")
+assertEqual(gnoll.stats[23].initialValue, 30, "Gnoll Movement Speed")
+assertEqual(#(gnoll.presets or {}), 4, "Gnoll variant preset count")
+assertEqual(gnoll.presets[1].name, "Brute", "Gnoll Brute preset")
+assertEqual(gnoll.presets[2].name, "Poacher", "Gnoll Poacher preset")
+assertEqual(gnoll.presets[3].name, "Shaman", "Gnoll Shaman preset")
+assertEqual(gnoll.presets[4].name, "Overseer", "Gnoll Overseer preset")
+assertEqual(gnoll.presets[4].challengeLevel, "elite", "Gnoll Overseer challenge level")
+for index = 1, #(gnoll.spells or {}) do
+    assert(entityRefs.spells[gnoll.spells[index]], "Gnoll spell ref resolves: " .. gnoll.spells[index])
+end
+for presetIndex = 1, #(gnoll.presets or {}) do
+    local preset = gnoll.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Gnoll preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+end
+
+local kobold = findUnit("kobold01")
+assert(kobold, "Kobold Unit exists in Core")
+assertEqual(kobold.name, "Kobold", "Kobold unit name")
+assertEqual(kobold.challengeLevel, "minor", "Kobold challenge level")
+assertEqual(kobold.creatureSize, "small", "Kobold creature size")
+assertEqual(kobold.creatureType, "humanoid", "Kobold creature type")
+assertEqual(kobold.resources[1].initialValue, 100, "Kobold base Health")
+assertEqual(kobold.resources[2].resourceRef, "f82db71a:4c8mfm99", "Kobold Mana pool")
+assertEqual(kobold.resources[3].resourceRef, "f82db71a:e2tfklq7", "Kobold Rage pool")
+assertEqual(kobold.stats[1].initialValue, 20, "Kobold base Armor")
+assertEqual(kobold.stats[9].initialValue, 35, "Kobold Melee Attack Power")
+assertEqual(kobold.stats[12].initialValue, 5, "Kobold Melee Crit Chance")
+assertEqual(kobold.stats[23].initialValue, 30, "Kobold Movement Speed")
+assertEqual(#(kobold.presets or {}), 3, "Kobold variant preset count")
+assertEqual(kobold.presets[1].name, "Tunneler", "Kobold Tunneler preset")
+assertEqual(kobold.presets[2].name, "Geomancer", "Kobold Geomancer preset")
+assertEqual(kobold.presets[3].name, "Taskmaster", "Kobold Taskmaster preset")
+assertEqual(kobold.presets[3].challengeLevel, "elite", "Kobold Taskmaster challenge level")
+for index = 1, #(kobold.spells or {}) do
+    assert(entityRefs.spells[kobold.spells[index]], "Kobold spell ref resolves: " .. kobold.spells[index])
+end
+for presetIndex = 1, #(kobold.presets or {}) do
+    local preset = kobold.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Kobold preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+end
+
+local murloc = findUnit("murloc01")
+assert(murloc, "Murloc Unit exists in Core")
+assertEqual(murloc.name, "Murloc", "Murloc unit name")
+assertEqual(murloc.challengeLevel, "minor", "Murloc challenge level")
+assertEqual(murloc.creatureSize, "medium", "Murloc creature size")
+assertEqual(murloc.creatureType, "humanoid", "Murloc creature type")
+assertEqual(murloc.resources[1].initialValue, 120, "Murloc base Health")
+assertEqual(murloc.stats[1].initialValue, 15, "Murloc base Armor")
+assertEqual(murloc.stats[9].initialValue, 40, "Murloc Melee Attack Power")
+assertEqual(murloc.stats[10].initialValue, 35, "Murloc Ranged Attack Power")
+assertEqual(murloc.stats[23].initialValue, 35, "Murloc Movement Speed")
+assertEqual(#(murloc.presets or {}), 4, "Murloc variant preset count")
+assertEqual(murloc.presets[1].name, "Tidehunter", "Murloc Tidehunter preset")
+assertEqual(murloc.presets[2].name, "Hunter", "Murloc Hunter preset")
+assertEqual(murloc.presets[3].name, "Oracle", "Murloc Oracle preset")
+assertEqual(murloc.presets[4].name, "Chieftain", "Murloc Chieftain preset")
+assertEqual(murloc.presets[4].challengeLevel, "elite", "Murloc Chieftain challenge level")
+for index = 1, #(murloc.spells or {}) do
+    assert(entityRefs.spells[murloc.spells[index]], "Murloc spell ref resolves: " .. murloc.spells[index])
+end
+for presetIndex = 1, #(murloc.presets or {}) do
+    local preset = murloc.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Murloc preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+end
+
+local nerubian = findUnit("nerub001")
+assert(nerubian, "Nerubian Unit exists in Core")
+assertEqual(nerubian.name, "Nerubian", "Nerubian unit name")
+assertEqual(nerubian.challengeLevel, "normal", "Nerubian challenge level")
+assertEqual(nerubian.creatureSize, "large", "Nerubian creature size")
+assertEqual(nerubian.creatureType, "undead", "Nerubian creature type")
+assertEqual(nerubian.resources[1].initialValue, 180, "Nerubian base Health")
+assertEqual(nerubian.resources[2].initialValue, 100, "Nerubian base Mana")
+assertEqual(nerubian.resources[3].initialValue, 100, "Nerubian base Rage")
+assertEqual(nerubian.stats[1].initialValue, 30, "Nerubian base Armor")
+assertEqual(nerubian.stats[9].initialValue, 50, "Nerubian Melee Attack Power")
+assertEqual(nerubian.stats[10].initialValue, 50, "Nerubian Ranged Attack Power")
+assertEqual(nerubian.stats[23].initialValue, 30, "Nerubian Movement Speed")
+assertEqual(#(nerubian.presets or {}), 4, "Nerubian variant preset count")
+assertEqual(nerubian.presets[1].name, "Fiend", "Nerubian Fiend preset")
+assertEqual(nerubian.presets[2].name, "Stalker", "Nerubian Stalker preset")
+assertEqual(nerubian.presets[3].name, "Vizier", "Nerubian Vizier preset")
+assertEqual(nerubian.presets[4].name, "Lord", "Nerubian Lord preset")
+assertEqual(nerubian.presets[3].challengeLevel, "elite", "Nerubian Vizier challenge level")
+assertEqual(nerubian.presets[4].challengeLevel, "elite", "Nerubian Lord challenge level")
+for index = 1, #(nerubian.spells or {}) do
+    assert(entityRefs.spells[nerubian.spells[index]], "Nerubian spell ref resolves: " .. nerubian.spells[index])
+end
+for presetIndex = 1, #(nerubian.presets or {}) do
+    local preset = nerubian.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Nerubian preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+end
+
+local skeletalHound = findUnit("skhound1")
+assert(skeletalHound, "Skeletal Hound Unit exists in Core")
+assertEqual(skeletalHound.name, "Skeletal Hound", "Skeletal Hound unit name")
+assertEqual(skeletalHound.challengeLevel, "minor", "Skeletal Hound challenge level")
+assertEqual(skeletalHound.creatureSize, "medium", "Skeletal Hound creature size")
+assertEqual(skeletalHound.creatureType, "undead", "Skeletal Hound creature type")
+assertEqual(skeletalHound.resources[1].initialValue, 125, "Skeletal Hound base Health")
+assertEqual(skeletalHound.resources[1].perLevelValue, 25, "Skeletal Hound health progression")
+assertEqual(skeletalHound.stats[1].initialValue, 20, "Skeletal Hound base Armor")
+assertEqual(skeletalHound.stats[6].initialValue, 5, "Skeletal Hound Dodge Chance")
+assertEqual(skeletalHound.stats[9].initialValue, 45, "Skeletal Hound Melee Attack Power")
+assertEqual(skeletalHound.stats[12].initialValue, 5, "Skeletal Hound Melee Crit Chance")
+assertEqual(skeletalHound.stats[23].initialValue, 40, "Skeletal Hound Movement Speed")
+assertEqual(#(skeletalHound.presets or {}), 0, "Skeletal Hound has no presets")
+assertEqual(#(skeletalHound.spells or {}), 1, "Skeletal Hound natural attack only")
+for index = 1, #(skeletalHound.spells or {}) do
+    assert(entityRefs.spells[skeletalHound.spells[index]], "Skeletal Hound spell ref resolves: " .. skeletalHound.spells[index])
+end
+
+local skeleton = findUnit("skeleton1")
+assert(skeleton, "Skeleton Unit exists in Core")
+assertEqual(skeleton.name, "Skeleton", "Skeleton unit name")
+assertEqual(skeleton.challengeLevel, "minor", "Skeleton challenge level")
+assertEqual(skeleton.creatureSize, "medium", "Skeleton creature size")
+assertEqual(skeleton.creatureType, "undead", "Skeleton creature type")
+assertEqual(skeleton.resources[1].initialValue, 110, "Skeleton base Health")
+assertEqual(skeleton.resources[2].initialValue, 80, "Skeleton base Mana")
+assertEqual(skeleton.resources[3].initialValue, 100, "Skeleton base Rage")
+assertEqual(skeleton.stats[1].initialValue, 25, "Skeleton base Armor")
+assertEqual(skeleton.stats[9].initialValue, 45, "Skeleton Melee Attack Power")
+assertEqual(skeleton.stats[10].initialValue, 45, "Skeleton Ranged Attack Power")
+assertEqual(skeleton.stats[11].perLevelValue, 2.542373, "Skeleton Spell Power progression")
+assertEqual(skeleton.stats[23].initialValue, 30, "Skeleton Movement Speed")
+assertEqual(#(skeleton.presets or {}), 5, "Skeleton variant preset count")
+assertEqual(skeleton.presets[1].name, "Warrior", "Skeleton Warrior preset")
+assertEqual(skeleton.presets[2].name, "Archer", "Skeleton Archer preset")
+assertEqual(skeleton.presets[3].name, "Mage", "Skeleton Mage preset")
+assertEqual(skeleton.presets[4].name, "Shadowmage", "Skeleton Shadowmage preset")
+assertEqual(skeleton.presets[5].name, "Warder", "Skeleton Warder preset")
+assertEqual(skeleton.presets[4].challengeLevel, "elite", "Skeleton Shadowmage challenge level")
+assertEqual(skeleton.presets[5].challengeLevel, "elite", "Skeleton Warder challenge level")
+for index = 1, #(skeleton.spells or {}) do
+    assert(entityRefs.spells[skeleton.spells[index]], "Skeleton spell ref resolves: " .. skeleton.spells[index])
+end
+for presetIndex = 1, #(skeleton.presets or {}) do
+    local preset = skeleton.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Skeleton preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Skeleton equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
+local zombie = findUnit("zombie01")
+assert(zombie, "Zombie Unit exists in Core")
+assertEqual(zombie.name, "Zombie", "Zombie unit name")
+assertEqual(zombie.challengeLevel, "minor", "Zombie challenge level")
+assertEqual(zombie.creatureSize, "medium", "Zombie creature size")
+assertEqual(zombie.creatureType, "undead", "Zombie creature type")
+assertEqual(zombie.resources[1].initialValue, 120, "Zombie base Health")
+assertEqual(zombie.resources[1].perLevelValue, 23.389831, "Zombie health progression")
+assertEqual(zombie.stats[1].initialValue, 25, "Zombie base Armor")
+assertEqual(zombie.stats[9].initialValue, 40, "Zombie Melee Attack Power")
+assertEqual(zombie.stats[12].initialValue, 5, "Zombie Melee Crit Chance")
+assertEqual(zombie.stats[23].initialValue, 20, "Zombie Movement Speed")
+assertEqual(#(zombie.presets or {}), 0, "Zombie has no presets")
+assertEqual(#(zombie.resources or {}), 1, "Zombie has Health only")
+assertEqual(#(zombie.spells or {}), 1, "Zombie natural attack only")
+for index = 1, #(zombie.spells or {}) do
+    assert(entityRefs.spells[zombie.spells[index]], "Zombie spell ref resolves: " .. zombie.spells[index])
+end
+
 local corruptor
 for index = 1, #(voidwalker.presets or {}) do
     if voidwalker.presets[index].name == "Corruptor" then
