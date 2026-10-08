@@ -397,6 +397,310 @@ for index = 1, #(zombie.spells or {}) do
     assert(entityRefs.spells[zombie.spells[index]], "Zombie spell ref resolves: " .. zombie.spells[index])
 end
 
+local furbolg = findUnit("furbolg01")
+assert(furbolg, "Furbolg Unit exists in Core")
+assertEqual(furbolg.name, "Furbolg", "Furbolg unit name")
+assertEqual(furbolg.challengeLevel, "minor", "Furbolg challenge level")
+assertEqual(furbolg.creatureSize, "medium", "Furbolg creature size")
+assertEqual(furbolg.creatureType, "humanoid", "Furbolg creature type")
+assertEqual(furbolg.resources[1].initialValue, 150, "Furbolg base Health")
+assertEqual(furbolg.stats[1].initialValue, 25, "Furbolg base Armor")
+assertEqual(furbolg.stats[9].initialValue, 50, "Furbolg Melee Attack Power")
+assertEqual(furbolg.stats[11].perLevelValue, 2.542373, "Furbolg Spell Power progression")
+assertEqual(furbolg.stats[14].initialValue, 5, "Furbolg Spell Crit Chance")
+assertEqual(furbolg.stats[23].initialValue, 30, "Furbolg Movement Speed")
+assertEqual(#(furbolg.presets or {}), 4, "Furbolg variant preset count")
+assertEqual(furbolg.presets[1].name, "Mauler", "Furbolg Mauler preset")
+assertEqual(furbolg.presets[2].name, "Shaman", "Furbolg Shaman preset")
+assertEqual(furbolg.presets[3].name, "Ursa Warrior", "Furbolg Ursa Warrior preset")
+assertEqual(furbolg.presets[4].name, "Elder", "Furbolg Elder preset")
+assertEqual(furbolg.presets[4].challengeLevel, "elite", "Furbolg Elder challenge level")
+for index = 1, #(furbolg.spells or {}) do
+    assert(entityRefs.spells[furbolg.spells[index]], "Furbolg spell ref resolves: " .. furbolg.spells[index])
+end
+for presetIndex = 1, #(furbolg.presets or {}) do
+    local preset = furbolg.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Furbolg preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Furbolg equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
+local quilboar = findUnit("quilbr01")
+assert(quilboar, "Quilboar Unit exists in Core")
+assertEqual(quilboar.name, "Quilboar", "Quilboar unit name")
+assertEqual(quilboar.challengeLevel, "minor", "Quilboar challenge level")
+assertEqual(quilboar.creatureSize, "medium", "Quilboar creature size")
+assertEqual(quilboar.creatureType, "humanoid", "Quilboar creature type")
+assertEqual(quilboar.resources[1].initialValue, 135, "Quilboar base Health")
+assertEqual(quilboar.stats[1].initialValue, 20, "Quilboar base Armor")
+assertEqual(quilboar.stats[9].initialValue, 45, "Quilboar Melee Attack Power")
+assertEqual(quilboar.stats[11].perLevelValue, 2.542373, "Quilboar Spell Power progression")
+assertEqual(quilboar.stats[14].initialValue, 5, "Quilboar Spell Crit Chance")
+assertEqual(quilboar.stats[23].initialValue, 30, "Quilboar Movement Speed")
+assertEqual(#(quilboar.presets or {}), 5, "Quilboar variant preset count")
+assertEqual(quilboar.presets[1].name, "Thornweaver", "Quilboar Thornweaver preset")
+assertEqual(quilboar.presets[2].name, "Geomancer", "Quilboar Geomancer preset")
+assertEqual(quilboar.presets[3].name, "Spiritcaller", "Quilboar Spiritcaller preset")
+assertEqual(quilboar.presets[4].name, "Berserker", "Quilboar Berserker preset")
+assertEqual(quilboar.presets[5].name, "Warlord", "Quilboar Warlord preset")
+assertEqual(quilboar.presets[5].challengeLevel, "elite", "Quilboar Warlord challenge level")
+for index = 1, #(quilboar.spells or {}) do
+    assert(entityRefs.spells[quilboar.spells[index]], "Quilboar spell ref resolves: " .. quilboar.spells[index])
+end
+for presetIndex = 1, #(quilboar.presets or {}) do
+    local preset = quilboar.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Quilboar preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Quilboar equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
+local trogg = findUnit("trogg001")
+assert(trogg, "Trogg Unit exists in Core")
+assertEqual(trogg.name, "Trogg", "Trogg unit name")
+assertEqual(trogg.challengeLevel, "minor", "Trogg challenge level")
+assertEqual(trogg.creatureSize, "medium", "Trogg creature size")
+assertEqual(trogg.creatureType, "humanoid", "Trogg creature type")
+assertEqual(trogg.resources[1].initialValue, 140, "Trogg base Health")
+assertEqual(trogg.stats[1].initialValue, 25, "Trogg base Armor")
+assertEqual(trogg.stats[9].initialValue, 50, "Trogg Melee Attack Power")
+assertEqual(trogg.stats[11].perLevelValue, 2.542373, "Trogg Spell Power progression")
+assertEqual(trogg.stats[14].initialValue, 5, "Trogg Spell Crit Chance")
+assertEqual(trogg.stats[23].initialValue, 30, "Trogg Movement Speed")
+assertEqual(#(trogg.presets or {}), 5, "Trogg variant preset count")
+assertEqual(trogg.presets[1].name, "Stonebreaker", "Trogg Stonebreaker preset")
+assertEqual(trogg.presets[2].name, "Brawler", "Trogg Brawler preset")
+assertEqual(trogg.presets[3].name, "Geomancer", "Trogg Geomancer preset")
+assertEqual(trogg.presets[4].name, "Seer", "Trogg Seer preset")
+assertEqual(trogg.presets[5].name, "Chieftain", "Trogg Chieftain preset")
+assertEqual(trogg.presets[5].challengeLevel, "elite", "Trogg Chieftain challenge level")
+for index = 1, #(trogg.spells or {}) do
+    assert(entityRefs.spells[trogg.spells[index]], "Trogg spell ref resolves: " .. trogg.spells[index])
+end
+for presetIndex = 1, #(trogg.presets or {}) do
+    local preset = trogg.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Trogg preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Trogg equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
+local ogre = findUnit("ogre001")
+assert(ogre, "Ogre Unit exists in Core")
+assertEqual(ogre.name, "Ogre", "Ogre unit name")
+assertEqual(ogre.challengeLevel, "minor", "Ogre challenge level")
+assertEqual(ogre.creatureSize, "large", "Ogre creature size")
+assertEqual(ogre.creatureType, "humanoid", "Ogre creature type")
+assertEqual(ogre.resources[1].initialValue, 160, "Ogre base Health")
+assertEqual(ogre.stats[1].initialValue, 30, "Ogre base Armor")
+assertEqual(ogre.stats[9].initialValue, 55, "Ogre Melee Attack Power")
+assertEqual(ogre.stats[11].perLevelValue, 2.542373, "Ogre Spell Power progression")
+assertEqual(ogre.stats[14].initialValue, 5, "Ogre Spell Crit Chance")
+assertEqual(ogre.stats[23].initialValue, 25, "Ogre Movement Speed")
+assertEqual(#(ogre.presets or {}), 4, "Ogre variant preset count")
+assertEqual(ogre.presets[1].name, "Bruiser", "Ogre Bruiser preset")
+assertEqual(ogre.presets[2].name, "Warlock", "Ogre Warlock preset")
+assertEqual(ogre.presets[3].name, "Magus", "Ogre Magus preset")
+assertEqual(ogre.presets[4].name, "Enforcer", "Ogre Enforcer preset")
+assertEqual(ogre.presets[3].challengeLevel, "elite", "Ogre Magus challenge level")
+assertEqual(ogre.presets[4].challengeLevel, "elite", "Ogre Enforcer challenge level")
+for index = 1, #(ogre.spells or {}) do
+    assert(entityRefs.spells[ogre.spells[index]], "Ogre spell ref resolves: " .. ogre.spells[index])
+end
+for presetIndex = 1, #(ogre.presets or {}) do
+    local preset = ogre.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Ogre preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Ogre equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
+local centaur = findUnit("centaur01")
+assert(centaur, "Centaur Unit exists in Core")
+assertEqual(centaur.name, "Centaur", "Centaur unit name")
+assertEqual(centaur.challengeLevel, "minor", "Centaur challenge level")
+assertEqual(centaur.creatureSize, "large", "Centaur creature size")
+assertEqual(centaur.creatureType, "humanoid", "Centaur creature type")
+assertEqual(centaur.resources[1].initialValue, 130, "Centaur base Health")
+assertEqual(centaur.stats[1].initialValue, 20, "Centaur base Armor")
+assertEqual(centaur.stats[9].initialValue, 45, "Centaur Melee Attack Power")
+assertEqual(centaur.stats[10].initialValue, 40, "Centaur Ranged Attack Power")
+assertEqual(centaur.stats[23].initialValue, 40, "Centaur Movement Speed")
+assertEqual(#(centaur.presets or {}), 5, "Centaur variant preset count")
+assertEqual(centaur.presets[1].name, "Marauder", "Centaur Marauder preset")
+assertEqual(centaur.presets[2].name, "Archer", "Centaur Archer preset")
+assertEqual(centaur.presets[3].name, "Geomancer", "Centaur Geomancer preset")
+assertEqual(centaur.presets[4].name, "Windchaser", "Centaur Windchaser preset")
+assertEqual(centaur.presets[5].name, "Khan", "Centaur Khan preset")
+assertEqual(centaur.presets[5].challengeLevel, "elite", "Centaur Khan challenge level")
+for index = 1, #(centaur.spells or {}) do
+    assert(entityRefs.spells[centaur.spells[index]], "Centaur spell ref resolves: " .. centaur.spells[index])
+end
+for presetIndex = 1, #(centaur.presets or {}) do
+    local preset = centaur.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Centaur preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Centaur equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
+local satyr = findUnit("satyr01")
+assert(satyr, "Satyr Unit exists in Core")
+assertEqual(satyr.name, "Satyr", "Satyr unit name")
+assertEqual(satyr.challengeLevel, "minor", "Satyr challenge level")
+assertEqual(satyr.creatureSize, "medium", "Satyr creature size")
+assertEqual(satyr.creatureType, "humanoid", "Satyr creature type")
+assertEqual(satyr.resources[1].initialValue, 120, "Satyr base Health")
+assertEqual(satyr.stats[1].initialValue, 15, "Satyr base Armor")
+assertEqual(satyr.stats[6].initialValue, 8, "Satyr base Dodge Chance")
+assertEqual(satyr.stats[9].initialValue, 40, "Satyr Melee Attack Power")
+assertEqual(satyr.stats[20].initialValue, 10, "Satyr base Shadow Resistance")
+assertEqual(satyr.stats[23].initialValue, 35, "Satyr Movement Speed")
+assertEqual(#(satyr.presets or {}), 4, "Satyr variant preset count")
+assertEqual(satyr.presets[1].name, "Trickster", "Satyr Trickster preset")
+assertEqual(satyr.presets[2].name, "Hellcaller", "Satyr Hellcaller preset")
+assertEqual(satyr.presets[3].name, "Shadowstalker", "Satyr Shadowstalker preset")
+assertEqual(satyr.presets[4].name, "Soulstealer", "Satyr Soulstealer preset")
+assertEqual(satyr.presets[4].challengeLevel, "elite", "Satyr Soulstealer challenge level")
+for index = 1, #(satyr.spells or {}) do
+    assert(entityRefs.spells[satyr.spells[index]], "Satyr spell ref resolves: " .. satyr.spells[index])
+end
+for presetIndex = 1, #(satyr.presets or {}) do
+    local preset = satyr.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Satyr preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Satyr equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
+local harpy = findUnit("harpy001")
+assert(harpy, "Harpy Unit exists in Core")
+assertEqual(harpy.name, "Harpy", "Harpy unit name")
+assertEqual(harpy.challengeLevel, "minor", "Harpy challenge level")
+assertEqual(harpy.creatureSize, "medium", "Harpy creature size")
+assertEqual(harpy.creatureType, "humanoid", "Harpy creature type")
+assertEqual(harpy.attributes[1], "flying", "Harpy flying attribute")
+assertEqual(harpy.resources[1].initialValue, 120, "Harpy base Health")
+assertEqual(harpy.stats[1].initialValue, 10, "Harpy base Armor")
+assertEqual(harpy.stats[6].initialValue, 10, "Harpy base Dodge Chance")
+assertEqual(harpy.stats[9].initialValue, 40, "Harpy Melee Attack Power")
+assertEqual(harpy.stats[23].initialValue, 40, "Harpy Movement Speed")
+assertEqual(#(harpy.presets or {}), 4, "Harpy variant preset count")
+assertEqual(harpy.presets[1].name, "Windcaller", "Harpy Windcaller preset")
+assertEqual(harpy.presets[2].name, "Stormwitch", "Harpy Stormwitch preset")
+assertEqual(harpy.presets[3].name, "Screecher", "Harpy Screecher preset")
+assertEqual(harpy.presets[4].name, "Matriarch", "Harpy Matriarch preset")
+assertEqual(harpy.presets[4].challengeLevel, "elite", "Harpy Matriarch challenge level")
+for index = 1, #(harpy.spells or {}) do
+    assert(entityRefs.spells[harpy.spells[index]], "Harpy spell ref resolves: " .. harpy.spells[index])
+end
+for presetIndex = 1, #(harpy.presets or {}) do
+    local preset = harpy.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Harpy preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Harpy equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
+local goblinTurret = findUnit("gobtur01")
+assert(goblinTurret, "Goblin Turret Unit exists in Core")
+assertEqual(goblinTurret.name, "Goblin Turret", "Goblin Turret unit name")
+assertEqual(goblinTurret.challengeLevel, "minor", "Goblin Turret challenge level")
+assertEqual(goblinTurret.creatureSize, "small", "Goblin Turret creature size")
+assertEqual(goblinTurret.creatureType, "mechanical", "Goblin Turret creature type")
+assertEqual(goblinTurret.resources[1].initialValue, 80, "Goblin Turret base Health")
+assertEqual(goblinTurret.stats[1].initialValue, 20, "Goblin Turret base Armor")
+assertEqual(goblinTurret.stats[3].initialValue, 5, "Goblin Turret base Ranged Hit")
+assertEqual(goblinTurret.stats[10].initialValue, 35, "Goblin Turret base Ranged Attack Power")
+assertEqual(goblinTurret.stats[13].initialValue, 5, "Goblin Turret base Ranged Crit Chance")
+assertEqual(#(goblinTurret.presets or {}), 0, "Goblin Turret preset count")
+assertEqual(#(goblinTurret.spells or {}), 1, "Goblin Turret spell count")
+for index = 1, #(goblinTurret.spells or {}) do
+    assert(entityRefs.spells[goblinTurret.spells[index]], "Goblin Turret spell ref resolves: " .. goblinTurret.spells[index])
+end
+
+local goblin = findUnit("gobnpc01")
+assert(goblin, "Goblin Unit exists in Core")
+assertEqual(goblin.name, "Goblin", "Goblin unit name")
+assertEqual(goblin.challengeLevel, "minor", "Goblin challenge level")
+assertEqual(goblin.creatureSize, "small", "Goblin creature size")
+assertEqual(goblin.creatureType, "humanoid", "Goblin creature type")
+assertEqual(goblin.resources[1].initialValue, 100, "Goblin base Health")
+assertEqual(goblin.stats[1].initialValue, 10, "Goblin base Armor")
+assertEqual(goblin.stats[6].initialValue, 5, "Goblin base Dodge Chance")
+assertEqual(goblin.stats[9].initialValue, 30, "Goblin base Melee Attack Power")
+assertEqual(goblin.stats[10].initialValue, 35, "Goblin base Ranged Attack Power")
+assertEqual(goblin.stats[23].initialValue, 35, "Goblin Movement Speed")
+assertEqual(#(goblin.presets or {}), 5, "Goblin variant preset count")
+assertEqual(goblin.presets[1].name, "Bruiser", "Goblin Bruiser preset")
+assertEqual(goblin.presets[2].name, "Sharpshooter", "Goblin Sharpshooter preset")
+assertEqual(goblin.presets[3].name, "Sapper", "Goblin Sapper preset")
+assertEqual(goblin.presets[4].name, "Engineer", "Goblin Engineer preset")
+assertEqual(goblin.presets[5].name, "Foreman", "Goblin Foreman preset")
+assertEqual(goblin.presets[5].challengeLevel, "elite", "Goblin Foreman challenge level")
+for index = 1, #(goblin.spells or {}) do
+    assert(entityRefs.spells[goblin.spells[index]], "Goblin spell ref resolves: " .. goblin.spells[index])
+end
+for presetIndex = 1, #(goblin.presets or {}) do
+    local preset = goblin.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Goblin preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Goblin equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
+local naga = findUnit("naga001")
+assert(naga, "Naga Unit exists in Core")
+assertEqual(naga.name, "Naga", "Naga unit name")
+assertEqual(naga.challengeLevel, "minor", "Naga challenge level")
+assertEqual(naga.creatureSize, "medium", "Naga creature size")
+assertEqual(naga.creatureType, "humanoid", "Naga creature type")
+assertEqual(naga.resources[1].initialValue, 130, "Naga base Health")
+assertEqual(naga.stats[1].initialValue, 20, "Naga base Armor")
+assertEqual(naga.stats[9].initialValue, 40, "Naga Melee Attack Power")
+assertEqual(naga.stats[11].perLevelValue, 2.542373, "Naga Spell Power progression")
+assertEqual(naga.stats[14].initialValue, 5, "Naga Spell Crit Chance")
+assertEqual(naga.stats[18].initialValue, 10, "Naga Nature Resistance")
+assertEqual(naga.stats[23].initialValue, 30, "Naga Movement Speed")
+assertEqual(#(naga.presets or {}), 6, "Naga variant preset count")
+assertEqual(naga.presets[1].name, "Tidehunter", "Naga Tidehunter preset")
+assertEqual(naga.presets[2].name, "Priestess", "Naga Priestess preset")
+assertEqual(naga.presets[3].name, "Enchantress", "Naga Enchantress preset")
+assertEqual(naga.presets[4].name, "Siren", "Naga Siren preset")
+assertEqual(naga.presets[5].name, "Sea Witch", "Naga Sea Witch preset")
+assertEqual(naga.presets[6].name, "Myrmidon", "Naga Myrmidon preset")
+assertEqual(naga.presets[5].challengeLevel, "elite", "Naga Sea Witch challenge level")
+assertEqual(naga.presets[6].challengeLevel, "elite", "Naga Myrmidon challenge level")
+for index = 1, #(naga.spells or {}) do
+    assert(entityRefs.spells[naga.spells[index]], "Naga spell ref resolves: " .. naga.spells[index])
+end
+for presetIndex = 1, #(naga.presets or {}) do
+    local preset = naga.presets[presetIndex]
+    for spellIndex = 1, #(preset.spells or {}) do
+        assert(entityRefs.spells[preset.spells[spellIndex]], "Naga preset spell ref resolves: " .. preset.spells[spellIndex])
+    end
+    for slot, itemRef in pairs(preset.equipment or {}) do
+        assert(entityRefs.items[itemRef], "Naga equipment ref resolves for " .. slot .. ": " .. itemRef)
+    end
+end
+
 local corruptor
 for index = 1, #(voidwalker.presets or {}) do
     if voidwalker.presets[index].name == "Corruptor" then
