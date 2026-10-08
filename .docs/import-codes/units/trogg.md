@@ -260,7 +260,6 @@ RPE_DATASET_ENTRY_V1
             { initialValue = 5, perLevelValue = 0, statRef = "f82db71a:jslmczbi" },
             { initialValue = 0, perLevelValue = 0, statRef = "f82db71a:fercjhm5" },
             { initialValue = 5, perLevelValue = 0, statRef = "f82db71a:69hfqhne" },
-            { initialValue = 0, perLevelValue = 0, statRef = "f82db71a:hj6d4kvy" },
             { initialValue = 0, perLevelValue = 2.542373, statRef = "f82db71a:hj6d4kvy" },
             { initialValue = 0, perLevelValue = 0, statRef = "f82db71a:0w7c7p09" },
             { initialValue = 0, perLevelValue = 0, statRef = "f82db71a:jjn0my8k" },
