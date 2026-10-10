@@ -270,7 +270,43 @@ local function logLifecycle(phase, authorityType, casterName, spellName, turnCou
     return false
 end
 
-local function validateInboundSpellcast(self, arguments, sender)
+local function isAuthorizedInterruptEffect(eventState, arguments, normalizedSender)
+    local sourceEventId = math.floor(tonumber(arguments and arguments[6]) or 0)
+    local sourceSpellRef = arguments and arguments[7] or nil
+    if sourceEventId <= 0 or type(sourceSpellRef) ~= "string" or sourceSpellRef == "" then
+        return false
+    end
+
+    local sourceUnit = findEventUnitById(eventState.units, sourceEventId)
+    if not isEventUnitActive(sourceUnit) then
+        return false
+    end
+    local expectedSender
+    if sourceUnit.isPlayer == true then
+        expectedSender = sourceUnit.ownerID or sourceUnit.controllerID or sourceUnit.name
+    else
+        local controller = resolveControllerPlayerUnit(eventState, sourceUnit)
+        expectedSender = controller and (controller.ownerID or controller.controllerID or controller.name)
+            or eventState.hostName
+    end
+    if normalizedSender == "" or normalizedSender ~= normalizeName(expectedSender) then
+        return false
+    end
+
+    local _, sourceSpell = Registry:ResolveSpellReference(sourceSpellRef)
+    if type(sourceSpell) ~= "table" then
+        return false
+    end
+    for index = 1, #(sourceSpell.components or {}) do
+        local effect = sourceSpell.components[index] and sourceSpell.components[index].effect
+        if type(effect) == "table" and tostring(effect.type or "") == "interrupt" then
+            return true
+        end
+    end
+    return false
+end
+
+local function validateInboundSpellcast(self, arguments, sender, allowInterruptEffect)
     local sessionState = self.GetState and self:GetState() or nil
     local eventState = self.GetEventState and self:GetEventState() or nil
     if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true then
@@ -301,7 +337,10 @@ local function validateInboundSpellcast(self, arguments, sender)
         return nil
     end
 
-    local authorityType = tostring(arguments and arguments[6] or arguments and arguments[5] or "")
+    local authorityType = tostring(arguments and arguments[5] or "")
+    if authorityType ~= "player" and authorityType ~= "npc" then
+        authorityType = tostring(arguments and arguments[6] or "")
+    end
     if authorityType ~= "player" and authorityType ~= "npc" then
         return nil
     end
@@ -320,15 +359,17 @@ local function validateInboundSpellcast(self, arguments, sender)
     end
 
     local normalizedSender = normalizeName(sender)
+    local expectedSender
     if authorityType == "player" then
-        local expectedSender = normalizeName(casterUnit.ownerID or casterUnit.controllerID or casterUnit.name)
-        if normalizedSender == "" or expectedSender == "" or normalizedSender ~= expectedSender then
-            return nil
-        end
+        expectedSender = casterUnit.ownerID or casterUnit.controllerID or casterUnit.name
     else
         local controllerUnit = resolveControllerPlayerUnit(eventState, casterUnit)
-        local expectedHost = normalizeName(controllerUnit and (controllerUnit.ownerID or controllerUnit.controllerID or controllerUnit.name) or nil)
-        if normalizedSender == "" or expectedHost == "" or normalizedSender ~= expectedHost then
+        expectedSender = controllerUnit and (controllerUnit.ownerID or controllerUnit.controllerID or controllerUnit.name)
+    end
+    if normalizedSender == "" or normalizedSender ~= normalizeName(expectedSender) then
+        if allowInterruptEffect ~= true
+            or not isAuthorizedInterruptEffect(eventState, arguments, normalizedSender)
+        then
             return nil
         end
     end
@@ -463,7 +504,7 @@ function Server:HandleSpellcastComplete(arguments, sender)
 end
 
 function Server:HandleSpellcastInterrupt(arguments, sender)
-    local payload = validateInboundSpellcast(self, arguments, sender)
+    local payload = validateInboundSpellcast(self, arguments, sender, true)
     if not payload then
         return false
     end
