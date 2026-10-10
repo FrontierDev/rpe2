@@ -28,7 +28,10 @@ function Autopilot.EvaluateCoordinateCapability(_, unitPositionFn)
         return false, "position-api-unavailable"
     end
 
-    local x, y, z, instanceID = unitPositionFn("player")
+    local sampled, x, y, z, instanceID = pcall(unitPositionFn, "player")
+    if not sampled then
+        return false, "position-unavailable"
+    end
     x = tonumber(x)
     y = tonumber(y)
     if x == nil or y == nil then
