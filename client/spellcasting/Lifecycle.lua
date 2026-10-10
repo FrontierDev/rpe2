@@ -418,12 +418,18 @@ function Spellcasting.InterruptUnitSpellcast(self, eventState, targetUnit, optio
 
     local channelId = sessionState and Spellcasting.ResolveSessionChannelId(sessionState) or nil
     if channelId then
+        local sourceContext = type(options) == "table" and options.sourceContext or nil
+        local sourceUnit = sourceContext and (sourceContext.casterUnit or sourceContext.attackerUnit) or nil
+        local sourceEventId = tonumber(sourceUnit and sourceUnit.eventID) or 0
+        local sourceSpellRef = type(sourceContext) == "table" and sourceContext.spellRef or nil
         sendSpellcastPacket(channelId, SPELLCAST_INTERRUPT_OPCODE, {
             sessionState.channelName,
             eventState.id,
             numericTargetEventId,
             removedEntry.spellRef,
             targetUnit.isPlayer == true and "player" or "npc",
+            sourceEventId > 0 and sourceEventId or nil,
+            sourceEventId > 0 and sourceSpellRef or nil,
         })
     end
 
@@ -546,7 +552,7 @@ function Client:HandleSpellcastComplete(arguments, sender)
 end
 
 function Client:HandleSpellcastInterrupt(arguments, sender)
-    local payload = Spellcasting.ValidateInboundSpellcast and Spellcasting.ValidateInboundSpellcast(self, arguments, sender) or nil
+    local payload = Spellcasting.ValidateInboundSpellcast and Spellcasting.ValidateInboundSpellcast(self, arguments, sender, true) or nil
     if not payload then
         return false
     end
@@ -809,6 +815,17 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
     local casterUnit = resolveLifecycleCasterUnit(self, eventState, candidateEntry, activeCasterUnit)
     if timingEnabled then
         appendTimingPhase(timingPhases, "resolve-caster", getNowMilliseconds() - casterResolveStartTime, SPELLCAST_SLOW_HELPER_MS)
+    end
+
+    -- A delayed completion callback must not resurrect a multi-turn cast
+    -- removed by an interrupt.  Instant spells have no active cast entry.
+    if type(candidateEntry) == "table"
+        and Spellcasting.NormalizeTurnCount(candidateEntry.turnsTotal) ~= nil
+    then
+        local current = casterUnit and Spellcasting.GetCastEntry(self, eventState.id, casterUnit.eventID) or nil
+        if current ~= candidateEntry or current.spellRef ~= spellRef then
+            return false
+        end
     end
 
     local spellResolveStartTime = timingEnabled and getNowMilliseconds() or nil
