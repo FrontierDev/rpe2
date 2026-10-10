@@ -310,7 +310,18 @@ local function samplePlayerByToken(runtime, eventState, eventUnit, unitToken, tu
         return false, "position-api-unavailable"
     end
 
-    local x, y, _, instanceID = unitPosition(unitToken)
+    local sampled, x, y, _, instanceID = pcall(unitPosition, unitToken)
+    if not sampled then
+        runtime.playerPositionByEventId[eventId] = newUnavailablePlayerPosition(
+            eventUnit,
+            unitToken,
+            "position-unavailable",
+            turnNumber,
+            tickNumber
+        )
+        return false, "position-unavailable"
+    end
+
     local position, reason = buildAvailablePlayerPosition(
         runtime,
         eventUnit,
