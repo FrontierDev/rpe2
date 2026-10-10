@@ -107,6 +107,15 @@ assertEqual(noApiRuntime.playerPositionByEventId[1].reason, "position-api-unavai
 assertEqual(noApiRuntime.playerPositionByEventId[2].reason, "position-api-unavailable", "party position records the limitation")
 assertEqual(Server:GetLastEventStartError(), "", "coordinate failure does not become an event-start failure")
 
+-- A position API throwing an error is also a per-unit limitation.
+UnitPosition = function() error("coordinate query failed") end
+local errorEvent = Server:StartEvent({ turnMode = "autopilot" })
+assertTrue(type(errorEvent) == "table", "coordinate query error does not prevent event start")
+local errorRuntime = Client:GetAutopilotSpatialRuntime(errorEvent)
+assertEqual(errorRuntime.status, "ready", "coordinate query error does not disable Autopilot")
+assertEqual(errorRuntime.playerPositionByEventId[1].reason, "position-unavailable", "API error becomes missing host coordinates")
+assertEqual(errorRuntime.playerPositionByEventId[2].reason, "position-unavailable", "API error becomes missing party coordinates")
+
 -- A partial sample and a cross-instance member must not prevent other actors
 -- or subsequent player-position refreshes from being processed.
 UnitPosition = function(token)
