@@ -490,6 +490,16 @@ function Server:HandleSpellcastComplete(arguments, sender)
         return false
     end
 
+    -- A cast-time spell can only complete while its matching cast is still
+    -- active.  In particular, do not execute a delayed completion after the
+    -- interrupted cast has already been removed.
+    if resolveSpellcastTurns(payload.spell) ~= nil then
+        local active = getCastEntry(self, payload.eventId, payload.casterEventId)
+        if type(active) ~= "table" or active.spellRef ~= payload.spellRef then
+            return false
+        end
+    end
+
     revealCasterForSpell(self, payload.casterUnit, payload.spell)
 
     local suppressLog = shouldSuppressLoopbackLog(self, payload.eventId, payload.casterEventId, payload.spellRef, payload.authorityType, payload.sender, "complete")
@@ -506,6 +516,10 @@ end
 function Server:HandleSpellcastInterrupt(arguments, sender)
     local payload = validateInboundSpellcast(self, arguments, sender, true)
     if not payload then
+        return false
+    end
+    local active = getCastEntry(self, payload.eventId, payload.casterEventId)
+    if type(active) ~= "table" or active.spellRef ~= payload.spellRef then
         return false
     end
 
