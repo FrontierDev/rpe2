@@ -831,17 +831,6 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
         appendTimingPhase(timingPhases, "resolve-caster", getNowMilliseconds() - casterResolveStartTime, SPELLCAST_SLOW_HELPER_MS)
     end
 
-    -- A delayed completion callback must not resurrect a multi-turn cast
-    -- removed by an interrupt.  Instant spells have no active cast entry.
-    if type(candidateEntry) == "table"
-        and Spellcasting.NormalizeTurnCount(candidateEntry.turnsTotal) ~= nil
-    then
-        local current = casterUnit and Spellcasting.GetCastEntry(self, eventState.id, casterUnit.eventID) or nil
-        if current ~= candidateEntry or current.spellRef ~= spellRef then
-            return false
-        end
-    end
-
     local spellResolveStartTime = timingEnabled and getNowMilliseconds() or nil
     local dataset, spell = nil, nil
     if Registry.ResolveSpellReference then
@@ -852,6 +841,21 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
     end
     if not casterUnit or not dataset or not spell then
         return false
+    end
+
+    -- A cast-time spell may only finish if the currently active cast matches.
+    -- This also blocks completion requests that omit a saved cast override.
+    local expectedCastTurns = Spellcasting.NormalizeTurnCount(spell.totalTicks)
+        or Spellcasting.NormalizeTurnCount(spell.castTime)
+    if expectedCastTurns ~= nil then
+        local current = Spellcasting.GetCastEntry(self, eventState.id, casterUnit.eventID)
+        if type(current) ~= "table"
+            or current.spellRef ~= spellRef
+            or (type(candidateEntry) == "table" and candidateEntry ~= current)
+        then
+            return false
+        end
+        candidateEntry = current
     end
 
     local rankContext = type(candidateEntry) == "table" and candidateEntry.spellRankContext or nil
