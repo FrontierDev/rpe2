@@ -535,6 +535,15 @@ function Client:HandleSpellcastComplete(arguments, sender)
         return false
     end
 
+    local castTurns = Spellcasting.NormalizeTurnCount(payload.spell.totalTicks)
+        or Spellcasting.NormalizeTurnCount(payload.spell.castTime)
+    if castTurns ~= nil then
+        local active = Spellcasting.GetCastEntry(self, payload.eventId, payload.casterEventId)
+        if type(active) ~= "table" or active.spellRef ~= payload.spellRef then
+            return false
+        end
+    end
+
     revealLocalCasterForSpell(self, payload.casterUnit, payload.spell)
 
     local previous = Spellcasting.RemoveCastEntry(self, payload.eventId, payload.casterEventId)
@@ -554,6 +563,11 @@ end
 function Client:HandleSpellcastInterrupt(arguments, sender)
     local payload = Spellcasting.ValidateInboundSpellcast and Spellcasting.ValidateInboundSpellcast(self, arguments, sender, true) or nil
     if not payload then
+        return false
+    end
+
+    local active = Spellcasting.GetCastEntry(self, payload.eventId, payload.casterEventId)
+    if type(active) ~= "table" or active.spellRef ~= payload.spellRef then
         return false
     end
 
