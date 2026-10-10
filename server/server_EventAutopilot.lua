@@ -38,13 +38,11 @@ function Server:StartEvent(data)
     )
 
     if requestedMode == "autopilot" then
-        local available, reason, details = self:GetNpcAutopilotCapability()
-        if available ~= true then
-            local message = type(Autopilot.GetCapabilityMessage) == "function"
-                and Autopilot.GetCapabilityMessage(reason, details)
-                or "NPC Autopilot is unavailable. Use Manual mode."
-            self.LastEventStartError = message
-            return nil, message, reason
+        -- This is an optional coordinate sample for the host's spatial cache,
+        -- not a prerequisite for starting an NPC Autopilot event.  Missing or
+        -- unsupported position data must never block the event itself.
+        if type(self.GetNpcAutopilotCapability) == "function" then
+            pcall(self.GetNpcAutopilotCapability, self)
         end
     end
 

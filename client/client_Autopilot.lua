@@ -198,17 +198,6 @@ local function newUnavailablePlayerPosition(eventUnit, unitToken, reason, turnNu
     }
 end
 
-local function markRuntimeUnavailable(runtime, reason, details)
-    if type(runtime) ~= "table" then
-        return false
-    end
-
-    runtime.status = "unavailable"
-    runtime.unavailableReason = tostring(reason or "position-unavailable")
-    runtime.unavailableDetails = type(details) == "table" and details or nil
-    return true
-end
-
 local function setRuntimeInstance(runtime, instanceID)
     if type(runtime) ~= "table" or instanceID == nil then
         return true
@@ -304,32 +293,13 @@ local function samplePlayerByToken(runtime, eventState, eventUnit, unitToken, tu
     end
 
     local api = resolveApi(options)
-    local isInInstance = api.isInInstance
-    if type(isInInstance) ~= "function" then
-        isInInstance = IsInInstance
-    end
-    if type(isInInstance) == "function" then
-        local inInstance, instanceType = isInInstance()
-        if inInstance == true then
-            local details = { instanceType = tostring(instanceType or "") }
-            markRuntimeUnavailable(runtime, "instance", details)
-            runtime.playerPositionByEventId[eventId] = newUnavailablePlayerPosition(
-                eventUnit,
-                unitToken,
-                "instance",
-                turnNumber,
-                tickNumber
-            )
-            return false, "instance"
-        end
-    end
-
+    -- The current map being an instance is not a spatial failure: sample the
+    -- unit normally and evaluate whether useful coordinates were returned.
     local unitPosition = api.unitPosition
     if type(unitPosition) ~= "function" then
         unitPosition = UnitPosition
     end
     if type(unitPosition) ~= "function" then
-        markRuntimeUnavailable(runtime, "position-api-unavailable")
         runtime.playerPositionByEventId[eventId] = newUnavailablePlayerPosition(
             eventUnit,
             unitToken,
@@ -340,7 +310,18 @@ local function samplePlayerByToken(runtime, eventState, eventUnit, unitToken, tu
         return false, "position-api-unavailable"
     end
 
-    local x, y, _, instanceID = unitPosition(unitToken)
+    local sampled, x, y, _, instanceID = pcall(unitPosition, unitToken)
+    if not sampled then
+        runtime.playerPositionByEventId[eventId] = newUnavailablePlayerPosition(
+            eventUnit,
+            unitToken,
+            "position-unavailable",
+            turnNumber,
+            tickNumber
+        )
+        return false, "position-unavailable"
+    end
+
     local position, reason = buildAvailablePlayerPosition(
         runtime,
         eventUnit,
@@ -359,14 +340,8 @@ local function samplePlayerByToken(runtime, eventState, eventUnit, unitToken, tu
             turnNumber,
             tickNumber
         )
-        if reason == "instance-mismatch" then
-            markRuntimeUnavailable(runtime, reason, {
-                expectedInstanceID = runtime.instanceID,
-                receivedInstanceID = instanceID,
-            })
-        elseif unitToken == "player" then
-            markRuntimeUnavailable(runtime, reason)
-        end
+        -- A failed sample belongs to this unit, not to the entire Autopilot
+        -- runtime.  Other NPC actions can proceed without spatial information.
         return false, reason
     end
 
@@ -405,7 +380,6 @@ local function applyProvidedHostSample(runtime, eventState, eventUnit, unitToken
             turnNumber,
             tickNumber
         )
-        markRuntimeUnavailable(runtime, reason)
         return false
     end
 

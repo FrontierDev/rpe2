@@ -3556,7 +3556,46 @@ function Spellcasting.RefreshVisiblePlayerTooltip(reason, options)
     return refreshed
 end
 
-function Spellcasting.ValidateInboundSpellcast(self, arguments, sender)
+-- Interrupt effects are emitted by the attacking spellcaster rather than
+-- the victim.  Authorize that source separately from self-cast lifecycle
+-- messages; never trust a claimed source event ID without checking ownership.
+local function isAuthorizedInterruptEffect(eventState, arguments, normalizedSender)
+    local sourceEventId = math.floor(tonumber(arguments and arguments[6]) or 0)
+    local sourceSpellRef = arguments and arguments[7] or nil
+    if sourceEventId <= 0 or type(sourceSpellRef) ~= "string" or sourceSpellRef == "" then
+        return false
+    end
+
+    local sourceUnit = Lookup.FindEventUnitById and Lookup.FindEventUnitById(eventState.units, sourceEventId) or nil
+    if type(sourceUnit) ~= "table" then
+        return false
+    end
+    local expectedSender
+    if sourceUnit.isPlayer == true then
+        expectedSender = sourceUnit.ownerID or sourceUnit.controllerID or sourceUnit.name
+    else
+        local controller = Spellcasting.ResolveControllerPlayerUnit(eventState, sourceUnit)
+        expectedSender = controller and (controller.ownerID or controller.controllerID or controller.name)
+            or eventState.hostName
+    end
+    if normalizedSender == "" or normalizedSender ~= Spellcasting.NormalizeName(expectedSender) then
+        return false
+    end
+
+    local _, sourceSpell = Registry:ResolveSpellReference(sourceSpellRef)
+    if type(sourceSpell) ~= "table" then
+        return false
+    end
+    for index = 1, #(sourceSpell.components or {}) do
+        local effect = sourceSpell.components[index] and sourceSpell.components[index].effect
+        if type(effect) == "table" and tostring(effect.type or "") == "interrupt" then
+            return true
+        end
+    end
+    return false
+end
+
+function Spellcasting.ValidateInboundSpellcast(self, arguments, sender, allowInterruptEffect)
     local sessionState, eventState = Spellcasting.GetActiveSpellcastContext(self)
     if not sessionState or not eventState then
         return nil
@@ -3586,7 +3625,11 @@ function Spellcasting.ValidateInboundSpellcast(self, arguments, sender)
         return nil
     end
 
-    local authorityType = tostring(arguments and arguments[6] or arguments and arguments[5] or "")
+    local authorityType = tostring(arguments and arguments[5] or "")
+    if authorityType ~= "player" and authorityType ~= "npc" then
+        -- SPELLCAST_START has its cast duration at index 5.
+        authorityType = tostring(arguments and arguments[6] or "")
+    end
     if authorityType ~= "player" and authorityType ~= "npc" then
         return nil
     end
@@ -3606,15 +3649,17 @@ function Spellcasting.ValidateInboundSpellcast(self, arguments, sender)
     end
 
     local normalizedSender = Spellcasting.NormalizeName(sender)
+    local expectedSender
     if authorityType == "player" then
-        local expectedSender = Spellcasting.NormalizeName(casterUnit.ownerID or casterUnit.controllerID or casterUnit.name)
-        if normalizedSender == "" or expectedSender == "" or normalizedSender ~= expectedSender then
-            return nil
-        end
+        expectedSender = casterUnit.ownerID or casterUnit.controllerID or casterUnit.name
     else
         local controllerUnit = Spellcasting.ResolveControllerPlayerUnit(eventState, casterUnit)
-        local expectedSender = Spellcasting.NormalizeName(controllerUnit and (controllerUnit.ownerID or controllerUnit.controllerID or controllerUnit.name) or nil)
-        if normalizedSender == "" or expectedSender == "" or normalizedSender ~= expectedSender then
+        expectedSender = controllerUnit and (controllerUnit.ownerID or controllerUnit.controllerID or controllerUnit.name)
+    end
+    if normalizedSender == "" or normalizedSender ~= Spellcasting.NormalizeName(expectedSender) then
+        if allowInterruptEffect ~= true
+            or not isAuthorizedInterruptEffect(eventState, arguments, normalizedSender)
+        then
             return nil
         end
     end

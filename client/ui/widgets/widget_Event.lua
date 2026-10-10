@@ -125,21 +125,15 @@ local function isPlayerSharedTurnPet(eventUnit, units)
 end
 
 local function getWidgetUnitsForPage(units, pageNumber, pageSize)
-    local normalizedPageNumber = math.max(1, math.floor(tonumber(pageNumber) or 1))
-    local normalizedPageSize = math.max(1, math.floor(tonumber(pageSize) or 5))
-    local startIndex = ((normalizedPageNumber - 1) * normalizedPageSize) + 1
-    local activeIndex = 0
+    -- Turn pages include boss units.  Filter bosses only after resolving the
+    -- authoritative page so the ordinary row cannot borrow the next turn's units.
+    local turnUnits = getEventClass().GetUnitsForPage(units, pageNumber, pageSize)
     local pageUnits = {}
 
-    for index = 1, #(units or {}) do
-        local eventUnit = units[index]
-        if isEventUnitActive(eventUnit) and not isEventUnitBoss(eventUnit) and not isPlayerSharedTurnPet(eventUnit, units) then
-            activeIndex = activeIndex + 1
-            if activeIndex >= startIndex and #pageUnits < normalizedPageSize then
-                pageUnits[#pageUnits + 1] = eventUnit
-            elseif #pageUnits >= normalizedPageSize then
-                break
-            end
+    for index = 1, #turnUnits do
+        local eventUnit = turnUnits[index]
+        if not isEventUnitBoss(eventUnit) then
+            pageUnits[#pageUnits + 1] = eventUnit
         end
     end
 

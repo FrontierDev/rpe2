@@ -21,21 +21,17 @@ function Autopilot.NormalizeTurnMode(value)
     return TURN_MODE_MANUAL
 end
 
-function Autopilot.EvaluateCoordinateCapability(isInInstanceFn, unitPositionFn)
-    if type(isInInstanceFn) == "function" then
-        local inInstance, instanceType = isInInstanceFn()
-        if inInstance == true then
-            return false, "instance", {
-                instanceType = tostring(instanceType or ""),
-            }
-        end
-    end
-
+function Autopilot.EvaluateCoordinateCapability(_, unitPositionFn)
+    -- Instanced maps can provide valid UnitPosition coordinates.  Probe the
+    -- position API instead of rejecting an environment by its instance type.
     if type(unitPositionFn) ~= "function" then
         return false, "position-api-unavailable"
     end
 
-    local x, y, z, instanceID = unitPositionFn("player")
+    local sampled, x, y, z, instanceID = pcall(unitPositionFn, "player")
+    if not sampled then
+        return false, "position-unavailable"
+    end
     x = tonumber(x)
     y = tonumber(y)
     if x == nil or y == nil then
@@ -56,14 +52,11 @@ end
 
 function Autopilot.GetCapabilityMessage(reason, details)
     local normalizedReason = tostring(reason or "")
-    if normalizedReason == "instance" then
-        return "NPC Autopilot does not work in instances. Use Manual mode in dungeons, raids, battlegrounds and arenas."
-    end
     if normalizedReason == "position-api-unavailable" or normalizedReason == "position-unavailable" then
-        return "NPC Autopilot requires outdoor party/raid position data, but position data is unavailable. Use Manual mode."
+        return "Position data is unavailable. NPC Autopilot can still run, but spatial movement and melee decisions may be limited."
     end
 
-    return "NPC Autopilot is unavailable. Use Manual mode."
+    return "Spatial positioning is unavailable. NPC Autopilot can still run without spatial actions."
 end
 
 function Autopilot.SetEventStartTurnModeContext(value)

@@ -418,12 +418,18 @@ function Spellcasting.InterruptUnitSpellcast(self, eventState, targetUnit, optio
 
     local channelId = sessionState and Spellcasting.ResolveSessionChannelId(sessionState) or nil
     if channelId then
+        local sourceContext = type(options) == "table" and options.sourceContext or nil
+        local sourceUnit = sourceContext and (sourceContext.casterUnit or sourceContext.attackerUnit) or nil
+        local sourceEventId = tonumber(sourceUnit and sourceUnit.eventID) or 0
+        local sourceSpellRef = type(sourceContext) == "table" and sourceContext.spellRef or nil
         sendSpellcastPacket(channelId, SPELLCAST_INTERRUPT_OPCODE, {
             sessionState.channelName,
             eventState.id,
             numericTargetEventId,
             removedEntry.spellRef,
             targetUnit.isPlayer == true and "player" or "npc",
+            sourceEventId > 0 and sourceEventId or nil,
+            sourceEventId > 0 and sourceSpellRef or nil,
         })
     end
 
@@ -529,6 +535,15 @@ function Client:HandleSpellcastComplete(arguments, sender)
         return false
     end
 
+    local castTurns = Spellcasting.NormalizeTurnCount(payload.spell.totalTicks)
+        or Spellcasting.NormalizeTurnCount(payload.spell.castTime)
+    if castTurns ~= nil then
+        local active = Spellcasting.GetCastEntry(self, payload.eventId, payload.casterEventId)
+        if type(active) ~= "table" or active.spellRef ~= payload.spellRef then
+            return false
+        end
+    end
+
     revealLocalCasterForSpell(self, payload.casterUnit, payload.spell)
 
     local previous = Spellcasting.RemoveCastEntry(self, payload.eventId, payload.casterEventId)
@@ -546,8 +561,13 @@ function Client:HandleSpellcastComplete(arguments, sender)
 end
 
 function Client:HandleSpellcastInterrupt(arguments, sender)
-    local payload = Spellcasting.ValidateInboundSpellcast and Spellcasting.ValidateInboundSpellcast(self, arguments, sender) or nil
+    local payload = Spellcasting.ValidateInboundSpellcast and Spellcasting.ValidateInboundSpellcast(self, arguments, sender, true) or nil
     if not payload then
+        return false
+    end
+
+    local active = Spellcasting.GetCastEntry(self, payload.eventId, payload.casterEventId)
+    if type(active) ~= "table" or active.spellRef ~= payload.spellRef then
         return false
     end
 
@@ -821,6 +841,21 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
     end
     if not casterUnit or not dataset or not spell then
         return false
+    end
+
+    -- A cast-time spell may only finish if the currently active cast matches.
+    -- This also blocks completion requests that omit a saved cast override.
+    local expectedCastTurns = Spellcasting.NormalizeTurnCount(spell.totalTicks)
+        or Spellcasting.NormalizeTurnCount(spell.castTime)
+    if expectedCastTurns ~= nil then
+        local current = Spellcasting.GetCastEntry(self, eventState.id, casterUnit.eventID)
+        if type(current) ~= "table"
+            or current.spellRef ~= spellRef
+            or (type(candidateEntry) == "table" and candidateEntry ~= current)
+        then
+            return false
+        end
+        candidateEntry = current
     end
 
     local rankContext = type(candidateEntry) == "table" and candidateEntry.spellRankContext or nil
