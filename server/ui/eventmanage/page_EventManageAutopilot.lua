@@ -14,7 +14,7 @@ local Event = Addon.Internal
     or nil
 local UI = Addon.UI or {}
 
-local WARNING_TEXT = "NPC Autopilot does not work in instances. Use Manual mode in dungeons, raids, battlegrounds and arenas."
+local WARNING_TEXT = "NPC Autopilot works in instances. If unit positions are unavailable, spatial movement and melee decisions may be limited."
 local CONTROL_HEIGHT = 20
 
 local function normalizeTurnMode(value)
