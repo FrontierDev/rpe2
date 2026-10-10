@@ -12,6 +12,7 @@ end
 
 local savedDatasetRoot = rawget(_G, "RPEngineDatasetDB")
 local savedManagerRoot = rawget(_G, "RPEngineManagerDB")
+local savedSlashCmdList = rawget(_G, "SlashCmdList")
 local diagnostics = {}
 local TestSupport = dofile("tests/support/RuntimeStubs.lua")
 local Addon = TestSupport.CreateAddon({
@@ -29,6 +30,8 @@ local Addon = TestSupport.CreateAddon({
 local definitions = TestSupport.LoadPackagedDefaultData(Addon)
 
 TestSupport.LoadAddonFile("data/default/Install.lua", Addon)
+rawset(_G, "SlashCmdList", {})
+TestSupport.LoadAddonFile("Commands.lua", Addon)
 TestSupport.LoadAddonFile("core/internal/manager/ExternalManager.lua", Addon)
 TestSupport.LoadAddonFile("core/internal/Runtime.lua", Addon)
 
@@ -202,22 +205,33 @@ for _ in pairs(root.datasets) do
 end
 assertEqual(secondStartupCount, installedCount, "second startup is idempotent")
 
-local updatedDatasetId, updatedDefinition = next(definitions)
-assertTrue(updatedDatasetId ~= nil, "a packaged definition exists for update coverage")
+local updatedDatasetId = "f82db71a"
+local updatedDefinition = definitions[updatedDatasetId]
+assertTrue(updatedDefinition ~= nil, "Core packaged definition exists for update coverage")
 assertTrue(Database.SetDatasetActivated(updatedDatasetId, false), "user can deactivate a packaged dataset")
 local originalVersion = updatedDefinition.version
 updatedDefinition.version = originalVersion + 1
 Addon.Internal.DispatchEvent("ADDON_LOADED", Addon.Name)
 assertEqual(root.defaultDatasetVersions[updatedDatasetId], originalVersion + 1, "package version update rewrites its dataset")
 assertEqual(Database.IsDatasetActivated(updatedDatasetId), false, "package update preserves user deactivation")
-updatedDefinition.version = originalVersion
 
-local forceReinstallDataset = root.datasets[updatedDatasetId]
 local packagedName = updatedDefinition.dataset.name
-forceReinstallDataset.name = "Locally modified default dataset"
+root.datasets[updatedDatasetId].name = "Locally modified default dataset"
 assertEqual(Addon.Data.SyncDefaultDatasets({ force = true }), true, "explicit force sync succeeds")
 assertEqual(root.datasets[updatedDatasetId].name, packagedName, "explicit force sync rewrites unchanged packaged datasets")
 assertEqual(Database.IsDatasetActivated(updatedDatasetId), false, "explicit force sync preserves user deactivation")
+
+local unchangedDataset = root.datasets[updatedDatasetId]
+unchangedDataset.name = "Unchanged-version sentinel"
+assertEqual(Addon.Data.SyncDefaultDatasets(), true, "unchanged-version synchronization succeeds")
+assertEqual(root.datasets[updatedDatasetId], unchangedDataset, "unchanged package version does not rewrite its dataset")
+assertEqual(root.datasets[updatedDatasetId].name, "Unchanged-version sentinel", "unchanged package version preserves saved contents")
+unchangedDataset.name = packagedName
+
+root.datasets[updatedDatasetId].name = "Command reinstall sentinel"
+assertEqual(Addon.Commands:Run("data reinstall"), true, "manual data reinstall command succeeds")
+assertEqual(root.datasets[updatedDatasetId].name, packagedName, "manual data reinstall restores packaged contents")
+assertEqual(Database.IsDatasetActivated(updatedDatasetId), false, "manual data reinstall preserves user deactivation")
 
 definitions["malformed-default-regression"] = {
     version = 0,
@@ -238,6 +252,7 @@ Dependecies.RecomputeDatasetDependencies = originalRecompute
 manager.Initialize = originalManagerInitialize
 rawset(_G, "RPEngineDatasetDB", savedDatasetRoot)
 rawset(_G, "RPEngineManagerDB", savedManagerRoot)
+rawset(_G, "SlashCmdList", savedSlashCmdList)
 Database.Datasets = savedDatasetRoot
 
 print("DefaultDatasetStartupTest passed")

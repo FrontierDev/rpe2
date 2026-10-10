@@ -335,6 +335,24 @@ end, {
     description = "Print recent slow timing records and TaskQueue diagnostics.",
 })
 
+Commands:RegisterCommand({ "data", "reinstall" }, function(context)
+    local data = Addon.Data or {}
+    if type(data.SyncDefaultDatasets) ~= "function" then
+        context.router:Print("Packaged default dataset synchronization is unavailable.", "error")
+        return false
+    end
+
+    if data.SyncDefaultDatasets({ force = true }) ~= true then
+        context.router:Print("Packaged default dataset reinstall failed. Check /rpe debug internal for details.", "error")
+        return false
+    end
+
+    context.router:Print("Packaged default datasets reinstalled.")
+    return true
+end, {
+    description = "Reinstall packaged default datasets while preserving their activation choices.",
+})
+
 function Commands:Run(message)
     local tokens = tokenizeMessage(message)
     if #tokens == 0 then

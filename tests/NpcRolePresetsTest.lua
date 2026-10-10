@@ -714,6 +714,33 @@ for index = 1, #(corruptor.spells or {}) do
 end
 
 assert(#(human.presets or {}) > 0, "Human has role presets")
+local expectedHumanPresetNames = {
+    "Militant",
+    "Cleric",
+    "Pyromancer",
+    "Arcanist",
+    "Cryomancer",
+    "Sharpshooter",
+    "Assassin",
+    "Bandit",
+    "Captain",
+    "Paladin",
+}
+assertEqual(#human.presets, #expectedHumanPresetNames, "Human preset count matches import")
+for index, expectedName in ipairs(expectedHumanPresetNames) do
+    assertEqual(human.presets[index].name, expectedName, "Human preset order at index " .. index)
+end
+assertEqual(human.presets[8].challengeLevel, "normal", "Human Bandit challenge level")
+assertEqual(human.presets[8].resourceModifiers[1].percentBonus, -10, "Human Bandit Health modifier")
+assertEqual(human.presets[8].spells[2], "23d5dce2:g9o4t7uj", "Human Bandit spell")
+assertEqual(human.presets[8].equipment.mainHandWeapon, "f82db71a:stwswd01", "Human Bandit weapon")
+assertEqual(human.presets[9].challengeLevel, "elite", "Human Captain challenge level")
+assertEqual(human.presets[9].resourceModifiers[1].percentBonus, 25, "Human Captain Health modifier")
+assertEqual(human.presets[9].spells[2], "f82db71a:npcrage1", "Human Captain spell")
+assertEqual(human.presets[10].challengeLevel, "elite", "Human Paladin challenge level")
+assertEqual(human.presets[10].resourceModifiers[1].percentBonus, 30, "Human Paladin Health modifier")
+assertEqual(human.presets[10].spells[2], "b0211ab3:uesn7obf", "Human Paladin spell")
+assertEqual(human.presets[10].equipment.shield, "f82db71a:stshld01", "Human Paladin shield")
 local originalHuman = deepCopy(human)
 local presetNames = {}
 for index = 1, #human.presets do

@@ -6416,13 +6416,6 @@ Addon.Data.DefaultDatasets:Register({
                 charges = 0,
                 components = {
                     {
-                allowDeadTargets = false,
-                canMoveWhileCasting = false,
-                castTime = 0,
-                casterEvents = {},
-                charges = 0,
-                components = {
-                    {
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {
@@ -6502,6 +6495,13 @@ Addon.Data.DefaultDatasets:Register({
                 useCooldownCharges = false
             },
             {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {

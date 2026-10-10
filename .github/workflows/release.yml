@@ -162,6 +162,39 @@ jobs:
           print(f"validated {len(names)} archive entries under RPEngine2/")
           PY
 
+      - name: Validate packaged Core dataset
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import re
+          import zipfile
+          from pathlib import Path
+
+          archive_path = Path("dist") / "RPEngine2-${{ steps.version.outputs.version }}.zip"
+          source_core = Path("data/default/core.lua").read_text(encoding="utf-8")
+          source_version = re.search(r"^\s*version\s*=\s*(\d+),", source_core, re.MULTILINE)
+          if source_version is None:
+              raise SystemExit("source Core dataset has no packaged version")
+
+          with zipfile.ZipFile(archive_path) as archive:
+              packaged_core = archive.read("RPEngine2/data/default/core.lua").decode("utf-8")
+
+          packaged_version = re.search(r"^\s*version\s*=\s*(\d+),", packaged_core, re.MULTILINE)
+          if packaged_version is None or packaged_version.group(1) != source_version.group(1):
+              raise SystemExit("archive Core dataset version does not match source Core dataset version")
+
+          for entry_id in ("nrbvenau", "harscrau", "nrbven01", "harscr01"):
+              if packaged_core.count(f'id = "{entry_id}"') != 1:
+                  raise SystemExit(f"archive Core dataset entry count is invalid for {entry_id}")
+
+          packaged_warrior = archive.read("RPEngine2/data/default/classes/warrior.lua").decode("utf-8")
+          if packaged_warrior.count('id = "cncblow1"') != 1:
+              raise SystemExit("archive Warrior dataset is missing a unique Concussive Blow spell")
+
+          print(f"validated packaged Core dataset version {packaged_version.group(1)} and repaired entries")
+          PY
+
       - name: Publish GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
         env:
