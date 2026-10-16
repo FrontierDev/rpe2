@@ -280,6 +280,10 @@ local renamedDeltaUnit = materializeNpc(5, 60, 0)
 renamedDeltaUnit.displayNameOverride = "Delta Citizen"
 local renamedDelta = Event.SerializeUnitDeltaBatchForNetwork({
     { operation = "upsert", eventID = 5, unit = renamedDeltaUnit },
+}, {
+    level = 60,
+    difficulty = "normal",
+    playerCount = 2,
 })
 local renamedDeltaFields = splitPreservingEmpty(splitPreservingEmpty(renamedDelta, string.char(23))[1], string.char(22))
 local renamedDeltaUnitFields = splitPreservingEmpty(renamedDeltaFields[3], string.char(29))
