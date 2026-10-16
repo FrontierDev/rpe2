@@ -6,6 +6,7 @@ Addon.Internal.Loot = Addon.Internal.Loot or {}
 local Loot = Addon.Internal.Loot
 local Registry = Addon.Internal.Registry or {}
 local Profile = Addon.Internal.Profile or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 
 local function trim(value)
     return tostring(value or ""):match("^%s*(.-)%s*$")
@@ -40,11 +41,15 @@ local function positiveNumber(value)
 end
 
 local function copyReward(reward)
-    return {
+    local copy = {
         type = reward.type,
         ref = reward.ref,
         amount = reward.amount,
     }
+    if reward.type == "item" then
+        copy.itemTier = ItemTier.Normalize(reward.itemTier) or "normal"
+    end
+    return copy
 end
 
 local function normalizeRewardType(value)
@@ -195,10 +200,23 @@ function Loot.ValidateConcreteReward(reward)
         return nil, err, detail
     end
 
+    local itemTier = nil
+    if rewardType == "item" then
+        if type(ItemTier.Validate) == "function" then
+            itemTier, err = ItemTier.Validate(reward.itemTier)
+        else
+            itemTier = reward.itemTier or "normal"
+        end
+        if not itemTier then
+            return nil, err or "invalid-item-tier", { field = "itemTier", value = reward.itemTier }
+        end
+    end
+
     return {
         type = rewardType,
         ref = reference,
         amount = amount,
+        itemTier = itemTier,
     }
 end
 
@@ -395,7 +413,7 @@ local function mergeValidatedRewards(rewards)
     local indexByKey = {}
     for index = 1, #(rewards or {}) do
         local reward = rewards[index]
-        local key = reward.type .. "\0" .. reward.ref
+        local key = reward.type .. "\0" .. reward.ref .. "\0" .. (reward.type == "item" and (reward.itemTier or "normal") or "")
         local existingIndex = indexByKey[key]
         if existingIndex then
             merged[existingIndex].amount = merged[existingIndex].amount + reward.amount
@@ -519,6 +537,15 @@ function Loot.PrepareSource(source)
     end
 
     if sourceType == "table" then
+        local itemTier
+        if type(ItemTier.Validate) == "function" then
+            itemTier = ItemTier.Validate(source.itemTier)
+        else
+            itemTier = source.itemTier or "normal"
+        end
+        if not itemTier then
+            return nil, "invalid-item-tier", { field = "itemTier", value = source.itemTier }
+        end
         local validated, err, detail = Loot.ResolveLootReference(source.lootRef)
         if not validated then
             return nil, err, detail
@@ -526,6 +553,7 @@ function Loot.PrepareSource(source)
         return {
             type = "table",
             lootRef = trim(source.lootRef),
+            itemTier = itemTier,
             loot = validated,
         }
     end
@@ -592,7 +620,16 @@ local function appendAssignment(assignments, assignmentByPlayer, player, rewards
 end
 
 local function resolvePreparedTable(preparedSource, rng)
-    return Loot.ResolveValidatedLootTable(preparedSource.loot, rng)
+    local rewards, err, detail = Loot.ResolveValidatedLootTable(preparedSource.loot, rng)
+    if not rewards then
+        return nil, err, detail
+    end
+    for index = 1, #rewards do
+        if rewards[index].type == "item" then
+            rewards[index].itemTier = preparedSource.itemTier or "normal"
+        end
+    end
+    return rewards
 end
 
 function Loot.BuildAssignments(source, distribution, eligiblePlayers, rng)

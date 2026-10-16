@@ -13,6 +13,17 @@ if type(Widget) ~= "table" or Widget._autopilotSpeechCueExtensionInstalled == tr
     or type(Cues.GetActionCues) ~= "function"
 then return true end
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local SPEECH_HEIGHT, ROW_HEIGHT, GAP = 192, 16, 3
 local ERROR = {
     ["not-host-autopilot"] = "Talking Head cues are only available to the host during Autopilot.",
@@ -79,7 +90,7 @@ local function prettySpeaker(speaker)
         if icon ~= "" then parts[#parts + 1] = icon end
     end
     local id = math.floor(tonumber(speaker and speaker.eventId) or 0)
-    parts[#parts + 1] = tostring(speaker and speaker.name or "Unknown") .. (id > 0 and (" (#" .. id .. ")") or "")
+    parts[#parts + 1] = getEventUnitDisplayName(speaker) .. (id > 0 and (" (#" .. id .. ")") or "")
     return table.concat(parts, " ")
 end
 
@@ -414,7 +425,7 @@ function Widget:RefreshAutopilotSpeechCueUI()
             local unit = eventUnit(state, id)
             if unit then
                 self.autopilotSpeechSpeakersById[id] = {
-                    eventId = id, name = tostring(unit.name or ("Unit " .. id)), raidMarker = tonumber(unit.raidMarker) or 0,
+                    eventId = id, name = getEventUnitDisplayName(unit, "Unit " .. id), raidMarker = tonumber(unit.raidMarker) or 0,
                 }
             end
         end

@@ -6,6 +6,17 @@ local Client = Addon.Client
 local Planner = Client.AutopilotPlanner or {}
 local MovementSolver = Client.AutopilotMovementSolver or {}
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local EPSILON = 0.0001
 
 local function copyOptions(options)
@@ -63,7 +74,7 @@ local function getMemberNameByEventId(state, eventId)
         local member = state.members[index]
         local unit = type(member) == "table" and (member.unit or member.eventUnit) or nil
         if normalizeEventId(unit and unit.eventID) == wanted then
-            local name = tostring(unit and unit.name or "")
+            local name = getEventUnitDisplayName(unit, "")
             return name ~= "" and name or ("NPC " .. tostring(wanted))
         end
     end

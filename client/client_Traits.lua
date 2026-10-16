@@ -14,6 +14,19 @@ local Inventory = Addon.Client and Addon.Client.Inventory or {}
 local Conditions = Addon.Client and Addon.Client.Conditions or {}
 local CONSUMABLE_PROMPT_BATCH_SIZE = 8
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" then
+        if type(unit.GetDisplayName) == "function" then
+            return tostring(unit:GetDisplayName())
+        end
+        if tostring(unit.name or "") ~= "" then
+            return tostring(unit.name)
+        end
+    end
+
+    return fallback or "Unknown"
+end
+
 local function getTimings()
     return Addon.Debug and Addon.Debug.Timings or nil
 end
@@ -188,8 +201,8 @@ local function logTraitProcDebug(registeredEntry, ownerUnit, targetUnit, combatE
         "Trait proc: trait=%s source=%s owner=%s target=%s event=%s effect=%s chance=%.1f roll=%s outcome=%s applied=%s hit=%s amount=%d delta=%d",
         traitName,
         tostring(source and source.sourceType or "unknown"),
-        tostring(ownerUnit and ownerUnit.name or "unknown"),
-        tostring(targetUnit and targetUnit.name or "unknown"),
+        getEventUnitDisplayName(ownerUnit, "unknown"),
+        getEventUnitDisplayName(targetUnit, "unknown"),
         tostring(combatEventId or "unknown"),
         effectType,
         tonumber(chancePercent) or 0,
@@ -402,8 +415,8 @@ local function emitTriggeredDamageCombatLog(client, eventState, casterUnit, targ
         entryType = "damage",
         casterEventId = tonumber(casterUnit and casterUnit.eventID) or nil,
         meterAmount = amount,
-        casterDisplayName = tostring(casterUnit and casterUnit.name or "Unknown"),
-        targetDisplayName = tostring(targetUnit and targetUnit.name or "Unknown"),
+        casterDisplayName = getEventUnitDisplayName(casterUnit),
+        targetDisplayName = getEventUnitDisplayName(targetUnit),
         targetCount = 1,
         amountMin = amount,
         amountMax = amount,
@@ -2033,8 +2046,8 @@ function Client:HandleTraitCombatEvent(context)
             combatEventId = type(context) == "table" and context.combatEventId or nil,
             recipientEventId = recipientEventId,
             ownerEventId = cachedOwnerEventId,
-            eventSourceName = type(context) == "table" and type(context.eventSourceUnit) == "table" and context.eventSourceUnit.name or nil,
-            eventOtherName = type(context) == "table" and type(context.eventOtherUnit) == "table" and context.eventOtherUnit.name or nil,
+            eventSourceName = type(context) == "table" and getEventUnitDisplayName(context.eventSourceUnit, "") or nil,
+            eventOtherName = type(context) == "table" and getEventUnitDisplayName(context.eventOtherUnit, "") or nil,
             registrationCount = 0,
         })
         return false
@@ -2046,8 +2059,8 @@ function Client:HandleTraitCombatEvent(context)
             combatEventId = type(context) == "table" and context.combatEventId or nil,
             recipientEventId = recipientEventId,
             ownerEventId = ownerEventId,
-            eventSourceName = type(context) == "table" and type(context.eventSourceUnit) == "table" and context.eventSourceUnit.name or nil,
-            eventOtherName = type(context) == "table" and type(context.eventOtherUnit) == "table" and context.eventOtherUnit.name or nil,
+            eventSourceName = type(context) == "table" and getEventUnitDisplayName(context.eventSourceUnit, "") or nil,
+            eventOtherName = type(context) == "table" and getEventUnitDisplayName(context.eventOtherUnit, "") or nil,
             registrationCount = 0,
         })
         return false
@@ -2074,8 +2087,8 @@ function Client:HandleTraitCombatEvent(context)
             combatEventId = combatEventId,
             recipientEventId = recipientEventId,
             ownerEventId = ownerEventId,
-            eventSourceName = type(context) == "table" and type(context.eventSourceUnit) == "table" and context.eventSourceUnit.name or nil,
-            eventOtherName = type(context) == "table" and type(context.eventOtherUnit) == "table" and context.eventOtherUnit.name or nil,
+            eventSourceName = type(context) == "table" and getEventUnitDisplayName(context.eventSourceUnit, "") or nil,
+            eventOtherName = type(context) == "table" and getEventUnitDisplayName(context.eventOtherUnit, "") or nil,
             registrationCount = 0,
         })
     else
@@ -2083,8 +2096,8 @@ function Client:HandleTraitCombatEvent(context)
             combatEventId = combatEventId,
             recipientEventId = recipientEventId,
             ownerEventId = ownerEventId,
-            eventSourceName = type(context) == "table" and type(context.eventSourceUnit) == "table" and context.eventSourceUnit.name or nil,
-            eventOtherName = type(context) == "table" and type(context.eventOtherUnit) == "table" and context.eventOtherUnit.name or nil,
+            eventSourceName = type(context) == "table" and getEventUnitDisplayName(context.eventSourceUnit, "") or nil,
+            eventOtherName = type(context) == "table" and getEventUnitDisplayName(context.eventOtherUnit, "") or nil,
             registrationCount = registrationCount,
         })
     end

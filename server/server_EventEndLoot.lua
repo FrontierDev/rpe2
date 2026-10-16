@@ -61,8 +61,10 @@ local function cloneGrants(values)
                     type = source.reward.type,
                     ref = source.reward.ref,
                     amount = source.reward.amount,
+                    itemTier = source.reward.itemTier,
                 }
             end
+            copy.itemTier = source.itemTier
             cloned[#cloned + 1] = copy
         end
     end

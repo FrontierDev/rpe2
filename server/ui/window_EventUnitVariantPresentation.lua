@@ -76,6 +76,13 @@ local function resolvePresetName(runtimeUnit, presetIndex)
 end
 
 local function resolveRuntimeName(runtimeUnit)
+    if type(runtimeUnit) == "table" and type(runtimeUnit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(runtimeUnit.GetDisplayName, runtimeUnit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
     local runtimeName = tostring(runtimeUnit and runtimeUnit.name or "")
     if runtimeName ~= "" then
         return runtimeName

@@ -191,7 +191,9 @@ local function buildControlLabel(controlledUnit)
     local raidMarker = tonumber(controlledUnit.raidMarker) or 0
     local raidMarkerText = raidMarker > 0 and type(Inline.RaidMarker) == "function" and Inline:RaidMarker(raidMarker, 12, 12) or ""
     local raidMarkerPrefix = raidMarkerText ~= "" and (raidMarkerText .. " ") or ""
-    local unitName = tostring(controlledUnit.name or "Unnamed Unit")
+    local unitName = type(controlledUnit.GetDisplayName) == "function"
+        and tostring(controlledUnit:GetDisplayName())
+        or tostring(controlledUnit.name or "Unnamed Unit")
     local eventId = tonumber(controlledUnit.eventID) or 0
     if eventId <= 0 then
         return ""
@@ -208,7 +210,9 @@ local function buildSpeakSpeakerLabel(controlledUnit)
     local raidMarker = tonumber(controlledUnit.raidMarker) or 0
     local raidMarkerText = raidMarker > 0 and type(Inline.RaidMarker) == "function" and Inline:RaidMarker(raidMarker, 12, 12) or ""
     local raidMarkerPrefix = raidMarkerText ~= "" and (raidMarkerText .. " ") or ""
-    local unitName = tostring(controlledUnit.name or "Unnamed Unit")
+    local unitName = type(controlledUnit.GetDisplayName) == "function"
+        and tostring(controlledUnit:GetDisplayName())
+        or tostring(controlledUnit.name or "Unnamed Unit")
     local eventId = tonumber(controlledUnit.eventID) or 0
     if eventId <= 0 then
         return ""

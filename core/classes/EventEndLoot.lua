@@ -7,6 +7,7 @@ Addon.Utils = Addon.Utils or {}
 
 local Event = Addon.Internal.Database.Classes.Event
 local Common = Addon.Utils.Common or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 
 if type(Event) ~= "table" or Event._endLootExtensionInstalled == true then
     return
@@ -92,10 +93,14 @@ local function cloneReward(reward)
     if type(reward) ~= "table" then
         return nil
     end
+    local rewardType = normalizeToken(reward.type)
     return {
-        type = normalizeToken(reward.type),
+        type = rewardType,
         ref = reward.ref == nil and "" or tostring(reward.ref),
         amount = reward.amount,
+        itemTier = rewardType == "item"
+            and (ItemTier.Normalize and (ItemTier.Normalize(reward.itemTier) or "normal") or (reward.itemTier or "normal"))
+            or nil,
     }
 end
 
@@ -118,6 +123,9 @@ local function cloneEndLootGrant(grant)
     end
     if grant.reward ~= nil then
         copy.reward = cloneReward(grant.reward)
+    end
+    if grant.itemTier ~= nil or copy.sourceType == "loot_table" then
+        copy.itemTier = ItemTier.Normalize and (ItemTier.Normalize(grant.itemTier) or "normal") or (grant.itemTier or "normal")
     end
     if grant._invalidValue ~= nil then
         copy._invalidValue = grant._invalidValue
@@ -183,6 +191,9 @@ local function serializeEndLootGrants(values)
             encodeField(reward and reward.ref or ""),
             encodeField(reward and reward.amount or ""),
             encodeField(grant.lootRef or ""),
+            encodeField(reward and reward.type == "item" and reward.itemTier
+                or grant.sourceType == "loot_table" and (grant.itemTier or "normal")
+                or ""),
         }, END_LOOT_FIELD_SEPARATOR)
     end
     return table.concat(records, END_LOOT_RECORD_SEPARATOR)
@@ -214,6 +225,20 @@ local function deserializeEndLootGrants(text)
                 local rewardRef = decoded[4] or ""
                 local rewardAmountText = decoded[5] or ""
                 local lootRef = decoded[6] or ""
+                local itemTier = "normal"
+                local tierBearing = rewardType == "item" or sourceType == "loot_table"
+                if #fields >= 7 and tierBearing then
+                    if type(ItemTier.Validate) == "function" then
+                        itemTier = select(1, ItemTier.Validate(decoded[7]))
+                    else
+                        itemTier = decoded[7]
+                    end
+                    if not itemTier then
+                        valid = false
+                    end
+                elseif #fields >= 7 and decoded[7] ~= "" then
+                    valid = false
+                end
                 local grant = {
                     sourceType = sourceType,
                     distribution = distribution,
@@ -221,12 +246,16 @@ local function deserializeEndLootGrants(text)
                 if lootRef ~= "" or sourceType == "loot_table" then
                     grant.lootRef = lootRef
                 end
+                if sourceType == "loot_table" then
+                    grant.itemTier = itemTier or "normal"
+                end
                 if rewardType ~= "" or rewardRef ~= "" or rewardAmountText ~= "" or sourceType == "direct" then
                     local amount = tonumber(rewardAmountText)
                     grant.reward = {
                         type = rewardType,
                         ref = rewardRef,
                         amount = amount ~= nil and amount or rewardAmountText,
+                        itemTier = rewardType == "item" and (itemTier or "normal") or nil,
                     }
                 end
                 grants[#grants + 1] = grant

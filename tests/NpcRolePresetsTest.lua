@@ -688,6 +688,26 @@ assertEqual(naga.presets[5].name, "Sea Witch", "Naga Sea Witch preset")
 assertEqual(naga.presets[6].name, "Myrmidon", "Naga Myrmidon preset")
 assertEqual(naga.presets[5].challengeLevel, "elite", "Naga Sea Witch challenge level")
 assertEqual(naga.presets[6].challengeLevel, "elite", "Naga Myrmidon challenge level")
+local expectedNagaAppearances = {
+    { presetIndex = 1, fileDataId = 120294, displayIds = { 4036, 4762, 4763, 4765 } },
+    { presetIndex = 2, fileDataId = 120263, displayIds = { 4972, 4973, 4974, 4975, 4976 } },
+    { presetIndex = 3, fileDataId = 120263, displayIds = { 4972, 4973, 4974, 4975, 4976 } },
+    { presetIndex = 4, fileDataId = 120263, displayIds = { 4972, 4973, 4974, 4975, 4976 } },
+    { presetIndex = 5, fileDataId = 120263, displayIds = { 17582, 18391, 18392 } },
+    { presetIndex = 6, fileDataId = 120294, displayIds = { 17581, 18387, 18388, 18389, 18398, 18394, 19364 } },
+}
+for _, expected in ipairs(expectedNagaAppearances) do
+    local appearances = Unit.ResolveEffectiveAppearances(naga, expected.presetIndex)
+    assertEqual(#appearances, #expected.displayIds, "Naga appearance count at preset " .. expected.presetIndex)
+    for appearanceIndex, expectedDisplayId in ipairs(expected.displayIds) do
+        local appearance = appearances[appearanceIndex]
+        assertEqual(appearance.displayId, expectedDisplayId, "Naga appearance display ID at preset " .. expected.presetIndex .. ", index " .. appearanceIndex)
+        assertEqual(appearance.fileDataId, expected.fileDataId, "Naga appearance file data ID at preset " .. expected.presetIndex .. ", index " .. appearanceIndex)
+        assertNear(appearance.cam, 0.45, "Naga appearance camera at preset " .. expected.presetIndex .. ", index " .. appearanceIndex)
+        assertNear(appearance.rot, 0.46, "Naga appearance rotation at preset " .. expected.presetIndex .. ", index " .. appearanceIndex)
+        assertNear(appearance.z, -0.43, "Naga appearance vertical offset at preset " .. expected.presetIndex .. ", index " .. appearanceIndex)
+    end
+end
 for index = 1, #(naga.spells or {}) do
     assert(entityRefs.spells[naga.spells[index]], "Naga spell ref resolves: " .. naga.spells[index])
 end
@@ -725,6 +745,7 @@ local expectedHumanPresetNames = {
     "Bandit",
     "Captain",
     "Paladin",
+    "Civilian",
 }
 assertEqual(#human.presets, #expectedHumanPresetNames, "Human preset count matches import")
 for index, expectedName in ipairs(expectedHumanPresetNames) do
@@ -814,6 +835,16 @@ assertEqual(Unit.ResolveEffectiveChallengeLevel(human, civilianIndex), "minor", 
 assertEqual(#Unit.ResolveEffectiveSpells(human, civilianIndex), 0, "Civilian has no inherited combat spells")
 assert(deepEqual(Unit.ResolveEffectiveEquipment(human, civilianIndex), {}), "Civilian has no inherited equipment")
 local civilianPreset = Unit.ResolvePreset(human, civilianIndex)
+local expectedCivilianDisplayIds = { 1288, 1289, 1290, 1291, 1292, 1293, 1357, 1361, 1439, 1440, 1441, 1442, 1443, 1444, 1445, 1446 }
+assertEqual(#(civilianPreset.appearances or {}), #expectedCivilianDisplayIds, "Civilian appearance count")
+for index, expectedDisplayId in ipairs(expectedCivilianDisplayIds) do
+    local appearance = civilianPreset.appearances[index]
+    assertEqual(appearance.displayId, expectedDisplayId, "Civilian appearance display ID at index " .. index)
+    assertEqual(appearance.fileDataId, 1011653, "Civilian appearance file data ID at index " .. index)
+    assertNear(appearance.cam, 0.45, "Civilian appearance camera at index " .. index)
+    assertNear(appearance.rot, -0.09, "Civilian appearance rotation at index " .. index)
+    assertNear(appearance.z, -0.54, "Civilian appearance vertical offset at index " .. index)
+end
 for _, level in ipairs({ 1, 60 }) do
     local baseResources = Unit.ResolveResourceValues(human, level)
     local civilianResources = Unit.ApplyResourceModifiers(baseResources, civilianPreset)
@@ -822,7 +853,7 @@ for _, level in ipairs({ 1, 60 }) do
     local healthRef = "f82db71a:q2ktkztt"
     local armorRef = "f82db71a:v42albuv"
     assertNear(findRow(civilianResources, "resourceRef", healthRef).value,
-        findRow(baseResources, "resourceRef", healthRef).value * 0.2, "Civilian health at level " .. level)
+        findRow(baseResources, "resourceRef", healthRef).value * 0.8, "Civilian health at level " .. level)
     assertNear(findRow(civilianStats, "statRef", armorRef).value,
         findRow(baseStats, "statRef", armorRef).value * 0.25, "Civilian armor at level " .. level)
     for _, ref in ipairs({ "f82db71a:4c8mfm99", "f82db71a:c3gaf7dd", "f82db71a:e2tfklq7" }) do

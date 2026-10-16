@@ -200,6 +200,7 @@ local function coerceEventUnitBoolean(value, defaultValue)
 end
 
 Client.EventState = Client.EventState or nil
+Client.PendingEventUnitDisplayNameUpdates = Client.PendingEventUnitDisplayNameUpdates or {}
 Client.EventTransition = Client.EventTransition or nil
 Client.EventTransitionGeneration = tonumber(Client.EventTransitionGeneration) or 0
 Client.LastEventEndReason = Client.LastEventEndReason or nil
@@ -2557,6 +2558,7 @@ local function clearEventStateNow(client, state, reason, options)
     client.PendingStartupActionBarRefresh = false
     client.PendingStartupActionBarRefreshReason = nil
     client.EventUnitInteractionMarkers = {}
+    client.PendingEventUnitDisplayNameUpdates = {}
     client.LastLocalInteractionMarker = nil
 
     local combatLogTimer = startTiming("Event end teardown: combat-log", 8, reason or "ended")
@@ -2731,6 +2733,7 @@ local function runEventEndStep(targetClient, work, deadlineMs)
         targetClient.PendingStartupActionBarRefresh = false
         targetClient.PendingStartupActionBarRefreshReason = nil
         targetClient.EventUnitInteractionMarkers = {}
+        targetClient.PendingEventUnitDisplayNameUpdates = {}
         targetClient.LastLocalInteractionMarker = nil
         if targetClient.CancelSpellTargeting then
             targetClient:CancelSpellTargeting("")
@@ -2957,6 +2960,7 @@ function Client:HandleEventStart(arguments, sender)
     nextState.unitsReady = false
     nextState.unitsChunkReceived = 0
     nextState.unitsChunkExpected = 0
+    self.PendingEventUnitDisplayNameUpdates = {}
 
     if type(self.EventState) == "table" then
         clearEventStateNow(self, self.EventState, "event-replaced", {
@@ -3180,6 +3184,37 @@ function Client:HandleEventUnits(arguments)
     applyLocalProfileResourcesToEventUnits(sessionState, units)
     appendTimingPart(timingParts, "apply-resources", resourcesStartTime, 10)
 
+    -- A legacy/partial snapshot has no field 35. Preserve a newer local
+    -- override in that case, while allowing a new-format explicit clear to
+    -- remain authoritative.
+    local previousUnitsByEventId = {}
+    for index = 1, #((eventState.units) or {}) do
+        local previousUnit = eventState.units[index]
+        local previousEventId = tonumber(previousUnit and previousUnit.eventID) or 0
+        if previousEventId > 0 then
+            previousUnitsByEventId[previousEventId] = previousUnit
+        end
+    end
+    for index = 1, #units do
+        local incomingUnit = units[index]
+        local incomingEventId = tonumber(incomingUnit and incomingUnit.eventID) or 0
+        local pendingUpdate = self.PendingEventUnitDisplayNameUpdates[incomingEventId]
+        if incomingUnit and pendingUpdate and pendingUpdate.present == true then
+            incomingUnit.displayNameOverride = pendingUpdate.value
+            incomingUnit._networkDisplayNameOverridePresent = true
+        else
+            local previousUnit = previousUnitsByEventId[incomingEventId]
+            if incomingUnit
+                and incomingUnit._networkDisplayNameOverridePresent ~= true
+                and previousUnit
+                and previousUnit.displayNameOverride ~= nil
+            then
+                incomingUnit.displayNameOverride = previousUnit.displayNameOverride
+            end
+        end
+    end
+    self.PendingEventUnitDisplayNameUpdates = {}
+
     local readinessStartTime = timingParts and getTimingNowMilliseconds() or nil
     eventState.units = units
     eventState.rosterReady = true
@@ -3266,14 +3301,24 @@ function Client:HandleEventUnitDeltaBatch(arguments)
     end
 
     local wasLocalTurn = self.IsLocalTurnActive and self:IsLocalTurnActive(eventState) or false
+    local snapshotHydrationInProgress = eventState.rosterReady ~= true
     eventState.units = eventState.units or {}
     local changed = false
     for index = 1, #entries do
         local entry = entries[index]
         if entry.operation == "remove" then
             changed = removeEventUnitById(eventState.units, entry.eventID) ~= nil or changed
+            self.PendingEventUnitDisplayNameUpdates[tonumber(entry.eventID) or 0] = nil
         elseif entry.operation == "upsert" and entry.unit then
-            changed = upsertAppendedEventUnit(eventState.units, hydrateInboundEventUnit(entry.unit, eventState)) or changed
+            local inboundUnit = hydrateInboundEventUnit(entry.unit, eventState)
+            local applied = upsertAppendedEventUnit(eventState.units, inboundUnit)
+            changed = applied or changed
+            if applied and snapshotHydrationInProgress and inboundUnit._networkDisplayNameOverridePresent == true then
+                self.PendingEventUnitDisplayNameUpdates[tonumber(inboundUnit.eventID) or 0] = {
+                    present = true,
+                    value = inboundUnit.displayNameOverride,
+                }
+            end
         end
     end
 

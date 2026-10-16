@@ -33,6 +33,19 @@ local normalizeToken = Normalization.NormalizeToken or function(value)
     return token
 end
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" then
+        if type(unit.GetDisplayName) == "function" then
+            return tostring(unit:GetDisplayName())
+        end
+        if tostring(unit.name or "") ~= "" then
+            return tostring(unit.name)
+        end
+    end
+
+    return fallback or "Unknown"
+end
+
 local function normalizeColorHex(value)
     local normalized = tostring(value or "")
     normalized = normalized:gsub("^|c", ""):gsub("|r", ""):gsub("#", "")
@@ -189,8 +202,8 @@ local function emitSingleTargetDamageCombatLog(entry, damageResult)
         entryType = "damage",
         casterEventId = tonumber(entry.attackerUnit and entry.attackerUnit.eventID) or nil,
         meterAmount = amount,
-        casterDisplayName = tostring(entry.attackerUnit and entry.attackerUnit.name or "Unknown"),
-        targetDisplayName = tostring(entry.defenderUnit and entry.defenderUnit.name or "Unknown"),
+        casterDisplayName = getEventUnitDisplayName(entry.attackerUnit),
+        targetDisplayName = getEventUnitDisplayName(entry.defenderUnit),
         targetCount = 1,
         amountMin = amount,
         amountMax = amount,
@@ -1140,7 +1153,7 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
             eventId = tostring(type(entry) == "table" and ((entry.eventState and entry.eventState.id) or entry.eventId) or ""),
             entryType = "damage",
             casterEventId = tonumber(type(entry) == "table" and entry.attackerUnit and entry.attackerUnit.eventID) or nil,
-            casterDisplayName = tostring(type(entry) == "table" and entry.attackerUnit and entry.attackerUnit.name or "Unknown"),
+            casterDisplayName = getEventUnitDisplayName(type(entry) == "table" and entry.attackerUnit or nil),
             targetCount = 0,
             targetDisplayName = "Unknown",
             amountMin = nil,
@@ -1169,7 +1182,7 @@ function Combat:RegisterActionDamageCombatLog(entry, damageResult)
 
     aggregate.targetCount = math.max(0, math.floor(tonumber(aggregate.targetCount) or 0)) + 1
     if aggregate.targetCount == 1 then
-        aggregate.targetDisplayName = tostring(type(entry) == "table" and entry.defenderUnit and entry.defenderUnit.name or "Unknown")
+        aggregate.targetDisplayName = getEventUnitDisplayName(type(entry) == "table" and entry.defenderUnit or nil)
     else
         aggregate.targetDisplayName = ("%d targets"):format(aggregate.targetCount)
     end

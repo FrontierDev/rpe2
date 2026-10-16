@@ -66,7 +66,15 @@ local Addon = {
             end,
         },
     },
-    Utils = { Common = { SplitPreservingEmpty = splitPreservingEmpty } },
+    Utils = { Common = {
+        SplitPreservingEmpty = splitPreservingEmpty,
+        NormalizeName = function(value)
+            return tostring(value or ""):lower():gsub("^%s+", ""):gsub("%s+$", "")
+        end,
+        GetPlayerName = function()
+            return "Host"
+        end,
+    } },
     Server = {},
 }
 
@@ -86,6 +94,7 @@ loadAddonFile("core/classes/EventVariantNetwork.lua")
 loadAddonFile("core/classes/EventVariantSpellEquipmentNetwork.lua")
 loadAddonFile("core/internal/comms/PrimaryResourceSync.lua")
 loadAddonFile("core/internal/comms/SelectedPetSync.lua")
+loadAddonFile("core/internal/comms/EventUnitDisplayNameSync.lua")
 
 local Classes = Addon.Internal.Database.Classes
 local Unit = Classes.Unit
@@ -199,6 +208,171 @@ local baseRoundTrip = Event.DeserializeUnitsFromNetwork(untouchedPayload, {
 assertStatsEqual(baseRoundTrip[3].stats, baseAt60.stats, "base NPC stats round trip")
 assertClose(findRow(baseRoundTrip[3].resources, "resourceRef", "test:health").maxValue,
     findRow(baseAt60.resources, "resourceRef", "test:health").maxValue, "base NPC health maximum round trip")
+
+local renamedNpc = materializeNpc(5, 60, 0)
+renamedNpc.displayNameOverride = "  Elmsport   Citizen  "
+local renamedEvent = buildEvent(60, renamedNpc)
+local renamedPayload = renamedEvent:SerializeUnitsForNetwork()
+local renamedFields = networkFields(renamedPayload)
+assertEqual(renamedNpc.name, "Progressing NPC", "display override does not replace the canonical unit name")
+assertEqual(renamedNpc:GetResolvedVariantName(), "Progressing NPC", "display override does not replace the resolved variant name")
+assertEqual(renamedNpc:GetDisplayName(), "Elmsport Citizen", "display accessor normalizes the override")
+assertEqual(renamedFields[34], "0", "display override leaves the existing pet-role field intact")
+assertEqual(renamedFields[35], "1:Elmsport Citizen", "display override is appended as network field 35")
+local renamedSnapshot = Event.DeserializeUnitsFromNetwork(renamedPayload, {
+    level = 60,
+    difficulty = "normal",
+    playerCount = 2,
+})
+assertEqual(renamedSnapshot[3].displayNameOverride, "Elmsport Citizen", "snapshot preserves the display override")
+assertEqual(renamedSnapshot[3]._networkDisplayNameOverridePresent, true, "snapshot records the explicit display override field")
+local invalidOverrideUnit = EventUnit:New({
+    eventID = 5,
+    registryID = "test:npc",
+    name = "Progressing NPC",
+    displayNameOverride = "Existing Name",
+})
+invalidOverrideUnit:Merge({ displayNameOverride = "|cffff0000Unsafe|r" })
+assertEqual(invalidOverrideUnit.displayNameOverride, "Existing Name", "invalid direct overrides do not clear an existing display name")
+
+local legacyFields = splitPreservingEmpty(splitPreservingEmpty(renamedPayload, string.char(30))[3], string.char(29))
+local legacyPayload = table.concat({ unpack(legacyFields, 1, 34) }, string.char(29))
+local legacySnapshot = Event.DeserializeUnitsFromNetwork(legacyPayload, {
+    level = 60,
+    difficulty = "normal",
+    playerCount = 2,
+})
+assertEqual(legacySnapshot[1].displayNameOverride, nil, "old 34-field snapshots do not invent an override")
+assertEqual(legacySnapshot[1]._networkDisplayNameOverridePresent, nil, "old 34-field snapshots remain distinguishable from an explicit clear")
+
+local clearIncoming = EventUnit:New({
+    eventID = 5,
+    registryID = "test:npc",
+    name = "Progressing NPC",
+})
+local liveRenamed = EventUnit:New({
+    eventID = 5,
+    registryID = "test:npc",
+    name = "Progressing NPC",
+    displayNameOverride = "Elmsport Citizen",
+})
+assertEqual(liveRenamed:MergeLiveNetworkUpdate(clearIncoming), true, "legacy incomplete updates remain mergeable")
+assertEqual(liveRenamed.displayNameOverride, "Elmsport Citizen", "legacy incomplete updates preserve the existing display override")
+clearIncoming.displayNameOverride = nil
+clearIncoming._networkDisplayNameOverridePresent = true
+assertEqual(liveRenamed:MergeLiveNetworkUpdate(clearIncoming), true, "explicit display override clears remain mergeable")
+assertEqual(liveRenamed.displayNameOverride, nil, "explicit display override clears erase the existing override")
+
+renamedNpc.displayNameOverride = nil
+local clearedPayload = renamedEvent:SerializeUnitsForNetwork()
+local clearedFields = networkFields(clearedPayload)
+assertEqual(clearedFields[34], "0", "display override clear does not alter the pet-role field")
+assertEqual(clearedFields[35], "0", "display override clear is explicit on field 35")
+local clearedSnapshot = Event.DeserializeUnitsFromNetwork(clearedPayload, {
+    level = 60,
+    difficulty = "normal",
+    playerCount = 2,
+})
+assertEqual(clearedSnapshot[3].displayNameOverride, nil, "snapshot explicit clear removes the display override")
+assertEqual(clearedSnapshot[3]._networkDisplayNameOverridePresent, true, "snapshot records an explicit display override clear")
+
+local renamedDeltaUnit = materializeNpc(5, 60, 0)
+renamedDeltaUnit.displayNameOverride = "Delta Citizen"
+local renamedDelta = Event.SerializeUnitDeltaBatchForNetwork({
+    { operation = "upsert", eventID = 5, unit = renamedDeltaUnit },
+})
+local renamedDeltaFields = splitPreservingEmpty(splitPreservingEmpty(renamedDelta, string.char(23))[1], string.char(22))
+local renamedDeltaUnitFields = splitPreservingEmpty(renamedDeltaFields[3], string.char(29))
+assertEqual(renamedDeltaUnitFields[35], "1:Delta Citizen", "display override is appended to live upserts")
+local renamedDeltaEntries = Event.DeserializeUnitDeltaBatchFromNetwork(renamedDelta)
+assertEqual(renamedDeltaEntries[1].unit.displayNameOverride, "Delta Citizen", "live upsert preserves the display override")
+local legacyDeltaUnit = table.concat({ unpack(renamedDeltaUnitFields, 1, 34) }, string.char(29))
+local legacyDeltaPayload = table.concat({ "upsert", "5", legacyDeltaUnit }, string.char(22))
+local legacyDeltaEntries = Event.DeserializeUnitDeltaBatchFromNetwork(legacyDeltaPayload)
+assertEqual(legacyDeltaEntries[1].unit.displayNameOverride, nil, "old 34-field deltas do not invent an override")
+assertEqual(legacyDeltaEntries[1].unit._networkDisplayNameOverridePresent, nil, "old 34-field deltas preserve legacy merge semantics")
+
+loadAddonFile("server/server_EventUnitNames.lua")
+local nameMutationEvent = Event:New({
+    id = "display-name-mutation-event",
+    active = true,
+    hostName = "Host",
+    units = {
+        EventUnit:New({ eventID = 1, isPlayer = true, name = "Host" }),
+        EventUnit:New({ eventID = 2, registryID = "test:npc", name = "Progressing NPC" }),
+        EventUnit:New({
+            eventID = 4,
+            registryID = "test:npc",
+            name = "Progressing NPC",
+            ownerID = "Host",
+            controllerID = "Host",
+            presetIndex = 1,
+            team = 2,
+            initiative = 17,
+            resources = { { resourceRef = "test:health", currentValue = 80, maxValue = 100 } },
+            stats = { { statRef = "test:power", value = 42 } },
+        }),
+        EventUnit:New({ eventID = 5, registryID = "test:npc", name = "Progressing NPC" }),
+        EventUnit:New({ eventID = 6, registryID = "test:npc", name = "Progressing NPC" }),
+    },
+})
+local broadcastEntries
+local broadcastIncludeState
+Addon.Server.GetEditableEventState = function()
+    return nameMutationEvent
+end
+Addon.Server.BroadcastEventDeltaBatch = function(_, entries, includeState)
+    broadcastEntries = entries
+    broadcastIncludeState = includeState
+    return true
+end
+Addon.Server.CopyLiveEventToDraftState = function()
+    nameMutationEvent.draftCopied = true
+end
+local mutationOk, changedNameIds = Addon.Server:SetEventUnitDisplayNameOverrides({ 2, 4, 5, 6 }, "  Guard   Captain  ")
+assertEqual(mutationOk, true, "host display-name mutation succeeds")
+assert(type(changedNameIds) == "table", "host display-name mutation returns changed IDs")
+assertEqual(#changedNameIds, 4, "host display-name mutation reports every changed NPC")
+assertEqual(broadcastIncludeState, false, "display-name mutation broadcasts a delta without a full state")
+assertEqual(#broadcastEntries, 4, "display-name mutation broadcasts only changed units")
+assertEqual(nameMutationEvent.units[2]:GetDisplayName(), "Guard Captain", "host mutation applies the normalized display name")
+assertEqual(nameMutationEvent.units[5].name, "Progressing NPC", "host mutation preserves the canonical name")
+assertEqual(nameMutationEvent.units[4].registryID, "test:npc", "host mutation preserves registry identity")
+assertEqual(nameMutationEvent.units[4].ownerID, "Host", "host mutation preserves owner identity")
+assertEqual(nameMutationEvent.units[4].controllerID, "Host", "host mutation preserves controller identity")
+assertEqual(nameMutationEvent.units[4].presetIndex, 1, "host mutation preserves preset identity")
+assertEqual(nameMutationEvent.units[4].team, 2, "host mutation preserves team state")
+assertEqual(nameMutationEvent.units[4].initiative, 17, "host mutation preserves initiative state")
+assertEqual(nameMutationEvent.units[4].resources[1].currentValue, 80, "host mutation preserves resource state")
+assertEqual(nameMutationEvent.units[4].stats[1].value, 42, "host mutation preserves stat state")
+assertEqual(nameMutationEvent.units[1].displayNameOverride, nil, "host mutation leaves player units untouched")
+assertEqual(nameMutationEvent.draftCopied, true, "active display-name mutation refreshes the draft copy")
+local reassigned = Addon.Server:SetEventUnitDisplayNameOverrides({ 2, 4, 5 }, "Leader", {
+    previousEventIds = { 2, 4, 5, 6 },
+    previousDisplayName = "Guard Captain",
+})
+assertEqual(reassigned, true, "host reassignment succeeds")
+assertEqual(nameMutationEvent.units[6].displayNameOverride, nil, "reassignment clears removed NPCs from the previous group")
+assertEqual(nameMutationEvent.units[2].displayNameOverride, "Leader", "reassignment applies the new group name")
+assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 1 }, "Invalid"), false, "players cannot receive display overrides")
+assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 2, 2 }, "Invalid"), false, "duplicate event IDs are rejected")
+assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 2 }, nil, { reset = true }), true, "host reset succeeds")
+assertEqual(nameMutationEvent.units[2].displayNameOverride, nil, "host reset clears the display override")
+assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 4, 5 }, "|cffff0000Unsafe|r"), false, "WoW markup is rejected")
+assertEqual(nameMutationEvent.units[4].displayNameOverride, "Leader", "invalid names do not partially mutate the roster")
+assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 4 }, string.rep("A", 81)), false, "overlong display names are rejected")
+assertEqual(nameMutationEvent.units[4].displayNameOverride, "Leader", "overlong names do not partially mutate the roster")
+assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 4 }, "Next", {
+    previousEventIds = { 4, 5 },
+    previousDisplayName = "|cffff0000Unsafe|r",
+}), false, "invalid stale editor names are rejected")
+assertEqual(nameMutationEvent.units[4].displayNameOverride, "Leader", "invalid stale editor names do not bypass assignment guards")
+local originalGetPlayerName = Addon.Utils.Common.GetPlayerName
+Addon.Utils.Common.GetPlayerName = function()
+    return "Guest"
+end
+assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 4 }, "Guest View"), false, "non-host display-name mutations are rejected")
+Addon.Utils.Common.GetPlayerName = originalGetPlayerName
 
 local heroicNpc = materializeNpc(3, 60, 0, "heroic")
 local heroicPayload = buildEvent(60, heroicNpc, "heroic"):SerializeUnitsForNetwork()

@@ -51,6 +51,16 @@ local function findUnit(state, eventId)
         if type(unit) == "table" and math.floor(tonumber(unit.eventID) or 0) == id then return unit end
     end
 end
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
 local function clientState() return type(Client.GetState) == "function" and Client:GetState() or Client.State end
 local function clientEvent() return type(Client.GetEventState) == "function" and Client:GetEventState() or Client.EventState end
 local function serverEvent() return type(Server.GetEventState) == "function" and Server:GetEventState() or Server.EventState end
@@ -134,7 +144,7 @@ function Server:CanUseEventManagerActions() local ctx, reason = actionContext();
 function Server:GetEventManagerHealthState(eventId)
     local su, cu, ctx, reason = actionUnit(eventId); if not su then return nil, reason end
     local hs, why = healthState(su, cu, ctx); if not hs then return nil, why end
-    hs.eventId = math.floor(tonumber(su.eventID) or 0); hs.unitName = tostring(su.name or cu.name or "Unknown"); return hs
+    hs.eventId = math.floor(tonumber(su.eventID) or 0); hs.unitName = getEventUnitDisplayName(su, getEventUnitDisplayName(cu, "Unknown")); return hs
 end
 function Server:ApplyEventManagerHealthAction(eventId, action, amount)
     local su, cu, ctx, reason = actionUnit(eventId); if not su then return false, reason end

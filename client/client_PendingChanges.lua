@@ -6,6 +6,17 @@ local Client = Addon.Client
 local Lookup = Addon.Utils and Addon.Utils.Lookup or {}
 local ResourceSync = Addon.Internal and Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local function enqueuePendingRefresh(fn, ...)
     local tasks = Addon.Internal and Addon.Internal.Tasks or nil
     if tasks and type(tasks.Enqueue) == "function" then
@@ -46,7 +57,7 @@ end
 
 local function getUnitName(eventState, eventId)
     local unit = getUnitByEventId(eventState, eventId)
-    return unit and tostring(unit.name or ("Unit #" .. tostring(eventId))) or ("Unit #" .. tostring(eventId or 0))
+    return unit and getEventUnitDisplayName(unit, "Unit #" .. tostring(eventId)) or ("Unit #" .. tostring(eventId or 0))
 end
 
 local function getResourceName(resourceRef)

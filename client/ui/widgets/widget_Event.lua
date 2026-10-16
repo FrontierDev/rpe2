@@ -33,6 +33,16 @@ local function getEventClass()
     return Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Event or nil
 end
 
+local function getEventUnitDisplayName(eventUnit, fallback)
+    if type(eventUnit) == "table" and type(eventUnit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(eventUnit.GetDisplayName, eventUnit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+    return tostring(eventUnit and eventUnit.name or fallback or "")
+end
+
 local function isNpcEventMode(state)
     local eventClass = getEventClass()
     return eventClass
@@ -413,7 +423,7 @@ local function buildPortraitVisualKey(eventState, eventUnit)
     return table.concat({
         tostring(eventState and eventState.id or ""),
         tostring(eventUnit.eventID or 0),
-        tostring(eventUnit.name or ""),
+        getEventUnitDisplayName(eventUnit),
         tostring(eventUnit.description or ""),
         tostring(tonumber(eventUnit.team) or 0),
         tostring(tonumber(eventUnit.raidMarker) or 0),
@@ -958,7 +968,7 @@ local function appendPlayerPetTooltipLines(tooltip, ownerEventUnit, eventState, 
         local petUnit = pets[index]
         local healthState, primaryState = buildPortraitResourceStates(actionBarWidget, petUnit, eventState, resourceContext)
         tooltip.lines[#tooltip.lines + 1] = {
-            text = ("Pet: %s"):format(tostring(petUnit.name or "Pet")),
+            text = ("Pet: %s"):format(getEventUnitDisplayName(petUnit, "Pet")),
             colorToken = "text.secondary",
         }
 
@@ -1003,7 +1013,7 @@ local function buildEventPortraitTooltip(eventUnit, eventState, healthState, pri
 
     local tooltip = {
         type = "custom",
-        title = tostring(eventUnit.name or ""),
+        title = getEventUnitDisplayName(eventUnit),
         titleFontSize = 12,
         titleColor = getTeamColor(eventState, eventUnit and eventUnit.team),
         titleRight = tonumber(eventUnit.eventID) and tonumber(eventUnit.eventID) > 0 and ("#%d"):format(tonumber(eventUnit.eventID)) or "",
@@ -1978,7 +1988,7 @@ function EventWidget:RenderNPCSpeech(entry)
     local red = math.floor(math.max(0, math.min(1, tonumber(teamColor.r) or 1)) * 255 + 0.5)
     local green = math.floor(math.max(0, math.min(1, tonumber(teamColor.g) or 1)) * 255 + 0.5)
     local blue = math.floor(math.max(0, math.min(1, tonumber(teamColor.b) or 1)) * 255 + 0.5)
-    local displayName = tostring(displayUnit and displayUnit.name or UNKNOWN_UNIT_NAME):gsub("|", "||")
+    local displayName = getEventUnitDisplayName(displayUnit, UNKNOWN_UNIT_NAME):gsub("|", "||")
     local displayId = math.max(1, math.floor(tonumber(displayUnit and displayUnit.eventID) or speakerEventId))
     local inline = Addon.UI and Addon.UI.Inline or nil
     local markerNumber = math.floor(tonumber(displayUnit and displayUnit.raidMarker) or 0)

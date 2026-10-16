@@ -50,6 +50,17 @@ local METER_SCOPE_LABELS = {
     turn = "Per Turn",
 }
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local function getFrame(element)
     if type(element) == "table" and type(element.GetFrame) == "function" then
         return element:GetFrame()
@@ -204,7 +215,7 @@ local function buildThreatTargets(eventState)
         if type(unit) == "table" and unit.isPlayer ~= true and isUnitActive(unit) then
             targets[#targets + 1] = {
                 eventId = tonumber(unit.eventID) or 0,
-                name = tostring(unit.name or "Unknown"),
+                name = getEventUnitDisplayName(unit),
                 boss = isUnitBoss(unit),
                 hasThreat = hasPositiveThreat(unit.threatTable),
                 order = index,
@@ -241,7 +252,7 @@ local function buildAuthoritativeThreatRows(eventState, targetEventId)
         if numericSourceEventId > 0 and amount > 0 and type(sourceUnit) == "table" then
             rows[#rows + 1] = {
                 eventId = numericSourceEventId,
-                name = tostring(sourceUnit.name or "Unknown"),
+                name = getEventUnitDisplayName(sourceUnit),
                 team = tonumber(sourceUnit.team) or 0,
                 amount = amount,
             }

@@ -21,6 +21,7 @@ local Common = Addon.Utils and Addon.Utils.Common or nil
 local TraitClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Trait or nil
 local Conditions = Addon.Client and Addon.Client.Conditions or {}
 local DescriptionBuilder = Spellcasting.DescriptionBuilder or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 
 local ItemTooltip = Tooltips.Item or {}
 Tooltips.Item = ItemTooltip
@@ -278,6 +279,7 @@ local function getTooltipVariantKey(item, values, runtimeRevisionKey)
         tostring(values.soulbound == true),
         tostring(values.quantity or values.stackCount or item.quantity or item.stackCount or ""),
         tostring(values.stackIdentity or item.stackIdentity or ""),
+        tostring(ItemTier.Normalize(values.itemTier ~= nil and values.itemTier or item.itemTier) or "normal"),
         tostring(item),
         stableSerialize(modifications or {}),
     }, "\31")
@@ -303,6 +305,7 @@ local function getStaticTooltipVariantKey(item, values)
         tostring(values.soulbound == true),
         tostring(values.quantity or values.stackCount or item.quantity or item.stackCount or ""),
         tostring(values.stackIdentity or item.stackIdentity or ""),
+        tostring(ItemTier.Normalize(values.itemTier ~= nil and values.itemTier or item.itemTier) or "normal"),
         tostring(item),
         stableSerialize(modifications or {}),
     }, "\31")
@@ -409,6 +412,71 @@ end
 
 local function getQualityColor(quality)
     return QUALITY_COLORS[tostring(quality or "common")] or QUALITY_COLORS.common
+end
+
+local function getItemTierStatOptions()
+    local activeRuleset = type(Ruleset.GetActiveRuleset) == "function" and Ruleset.GetActiveRuleset() or nil
+    if type(Ruleset.GetRulesetRuleValueByKey) ~= "function" then
+        return nil
+    end
+    return {
+        heroicBonusPercent = Ruleset.GetRulesetRuleValueByKey(activeRuleset, "equipment", "heroic_item_stat_bonus_percent", 10),
+        mythicBonusPercent = Ruleset.GetRulesetRuleValueByKey(activeRuleset, "equipment", "mythic_item_stat_bonus_percent", 20),
+    }
+end
+
+local function buildEffectiveItem(item, itemTier)
+    local normalizedTier = ItemTier.Normalize(itemTier) or "normal"
+    if normalizedTier == "normal" or type(item) ~= "table" or type(item.stats) ~= "table" then
+        return item
+    end
+
+    local effective = {}
+    for key, value in pairs(item) do
+        effective[key] = value
+    end
+    effective.quality = ItemTier.GetEffectiveQuality(item.quality, normalizedTier)
+    effective.stats = {}
+    local statOptions = getItemTierStatOptions()
+    for index = 1, #item.stats do
+        local source = item.stats[index]
+        local stat = {}
+        if type(source) == "table" then
+            for key, value in pairs(source) do
+                stat[key] = value
+            end
+            local statDefinition = nil
+            local datasetId, statId
+            if type(Dependencies) == "table" and type(Dependencies.ParseSourceStatRef) == "function" then
+                datasetId, statId = Dependencies.ParseSourceStatRef(source.sourceStatRef)
+            end
+            local datasetIndex = datasetId and getDatasetIndex(datasetId) or nil
+            if type(datasetIndex) == "table" and type(datasetIndex.statsById) == "table" then
+                statDefinition = datasetIndex.statsById[tostring(statId or "")]
+            end
+            if type(ItemTier.ResolveAuthoredStatValue) == "function" then
+                stat.value = ItemTier.ResolveAuthoredStatValue(source, normalizedTier, statOptions, statDefinition)
+            end
+        else
+            stat = source
+        end
+        effective.stats[index] = stat
+    end
+    return effective
+end
+
+local function buildItemTierLine(itemTier)
+    local normalizedTier = ItemTier.Normalize(itemTier) or "normal"
+    if normalizedTier == "normal" then
+        return nil
+    end
+    return {
+        text = ItemTier.DisplayName(normalizedTier),
+        r = 0.12,
+        g = 1.0,
+        b = 0.0,
+        wrap = false,
+    }
 end
 
 local function getWeaponTypeLabel(weaponType)
@@ -1793,20 +1861,24 @@ end
 local function buildInactiveTooltip(item, options)
     local values = options or {}
     local warningText = values.isMissing and "This item could not be resolved." or "This item is not part of your active data."
+    local lines = {}
+    local tierLine = buildItemTierLine(values.itemTier ~= nil and values.itemTier or item and item.itemTier)
+    if tierLine then
+        lines[#lines + 1] = tierLine
+    end
+    lines[#lines + 1] = {
+        text = warningText,
+        r = 1,
+        g = 0.25,
+        b = 0.25,
+        wrap = false,
+    }
 
     return {
         type = "game",
         title = ensureString(item and item.name, values.itemId or "Unknown Item"),
         titleColor = { r = 0.7, g = 0.7, b = 0.7 },
-        lines = {
-            {
-                text = warningText,
-                r = 1,
-                g = 0.25,
-                b = 0.25,
-                wrap = false,
-            },
-        },
+        lines = lines,
     }
 end
 
@@ -1900,6 +1972,12 @@ function ItemTooltip:Build(item, options)
     end
 
     local lines = {}
+    local itemTier = ItemTier.Normalize(values.itemTier ~= nil and values.itemTier or item.itemTier) or "normal"
+    item = buildEffectiveItem(item, itemTier)
+    local tierLine = buildItemTierLine(itemTier)
+    if tierLine then
+        lines[#lines + 1] = tierLine
+    end
     local itemType = tostring(item.itemType or "none")
     local modificationKind = type(ModificationService.GetModificationKind) == "function" and ModificationService.GetModificationKind(item) or "generic"
 

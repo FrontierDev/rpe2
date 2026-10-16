@@ -26,6 +26,16 @@ local function markerId(value)
     local marker = math.floor(tonumber(value) or 0)
     return marker >= 1 and marker <= 8 and marker or 0
 end
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
 local function turnMode(value)
     if type(Event) == "table" and type(Event.NormalizeTurnMode) == "function" then
         return Event.NormalizeTurnMode(value)
@@ -60,7 +70,8 @@ local function unit(eventState, id)
 end
 local function unitName(eventState, id)
     local found = unit(eventState, id)
-    if type(found) == "table" and tostring(found.name or "") ~= "" then return tostring(found.name) end
+    local displayName = getEventUnitDisplayName(found, "")
+    if displayName ~= "" then return displayName end
     id = eventId(id)
     return id > 0 and ("Unit %d"):format(id) or "Unknown"
 end

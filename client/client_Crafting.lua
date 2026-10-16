@@ -5,6 +5,7 @@ Addon.Client.Crafting = Addon.Client.Crafting or {}
 
 local Crafting = Addon.Client.Crafting
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Tasks = Addon.Internal and Addon.Internal.Tasks or {}
@@ -373,7 +374,18 @@ getQualityColor = function(item)
     return lookup[qualityKey] or lookup.common
 end
 
-local function countInventoryItem(itemRef)
+local function normalizeRecipeItemTier(value)
+    if type(ItemTier.Validate) == "function" then
+        return ItemTier.Validate(value)
+    end
+    return value or "normal"
+end
+
+local function inventoryCountKey(itemRef, itemTier)
+    return tostring(itemRef or "") .. "\0" .. tostring(normalizeRecipeItemTier(itemTier) or "normal")
+end
+
+local function countInventoryItem(itemRef, itemTier)
     local datasetId, itemId = parseItemRef(itemRef)
     if datasetId == nil or itemId == nil then
         return 0
@@ -383,7 +395,9 @@ local function countInventoryItem(itemRef)
     local items = Inventory.GetItems and Inventory.GetItems() or {}
     for index = 1, #items do
         local record = items[index]
-        if tostring(record and record.dataset or "") == datasetId and tostring(record and record.id or "") == itemId then
+        if tostring(record and record.dataset or "") == datasetId and tostring(record and record.id or "") == itemId
+            and normalizeRecipeItemTier(record and record.itemTier) == normalizeRecipeItemTier(itemTier)
+        then
             total = total + math.max(1, tonumber(record and record.quantity) or 1)
         end
     end
@@ -391,7 +405,7 @@ local function countInventoryItem(itemRef)
     return total
 end
 
-local function findInventorySlotForItemRef(itemRef)
+local function findInventorySlotForItemRef(itemRef, itemTier)
     local datasetId, itemId = parseItemRef(itemRef)
     if datasetId == nil or itemId == nil then
         return nil, nil
@@ -400,7 +414,9 @@ local function findInventorySlotForItemRef(itemRef)
     local items = Inventory.GetItems and Inventory.GetItems() or {}
     for index = 1, #items do
         local record = items[index]
-        if tostring(record and record.dataset or "") == datasetId and tostring(record and record.id or "") == itemId then
+        if tostring(record and record.dataset or "") == datasetId and tostring(record and record.id or "") == itemId
+            and normalizeRecipeItemTier(record and record.itemTier) == normalizeRecipeItemTier(itemTier)
+        then
             return index, record
         end
     end
@@ -408,10 +424,10 @@ local function findInventorySlotForItemRef(itemRef)
     return nil, nil
 end
 
-local function removeInventoryItemCount(itemRef, quantity)
+local function removeInventoryItemCount(itemRef, quantity, itemTier)
     local remaining = math.max(1, tonumber(quantity) or 1)
     while remaining > 0 do
-        local slotIndex, record = findInventorySlotForItemRef(itemRef)
+        local slotIndex, record = findInventorySlotForItemRef(itemRef, itemTier)
         if not slotIndex or not record or not Inventory.RemoveItem then
             return false
         end
@@ -1137,7 +1153,9 @@ function Crafting:BuildInventoryCountCache()
         local itemId = tostring(record and record.id or "")
         if datasetId ~= "" and itemId ~= "" then
             local itemRef = ("%s:%s"):format(datasetId, itemId)
-            counts[itemRef] = math.max(0, tonumber(counts[itemRef]) or 0) + math.max(1, tonumber(record and record.quantity) or 1)
+            local itemTier = normalizeRecipeItemTier(record and record.itemTier)
+            local key = inventoryCountKey(itemRef, itemTier)
+            counts[key] = math.max(0, tonumber(counts[key]) or 0) + math.max(1, tonumber(record and record.quantity) or 1)
         end
     end
 
@@ -1151,6 +1169,7 @@ function Crafting:BuildRecipeRequirementRows(recipe)
     local inventoryCounts = self:BuildInventoryCountCache()
     for index = 1, #(recipe and recipe.inputs or {}) do
         local input = recipe.inputs[index]
+        local itemTier = normalizeRecipeItemTier(input and input.itemTier)
         local item = resolveItemDefinition(input.itemRef)
         local row = {
             kind = input.kind,
@@ -1158,7 +1177,8 @@ function Crafting:BuildRecipeRequirementRows(recipe)
             item = item,
             name = resolveItemName(input.itemRef),
             quantity = math.max(1, tonumber(input.quantity) or 1),
-            owned = math.max(0, tonumber(inventoryCounts[input.itemRef]) or 0),
+            itemTier = itemTier,
+            owned = math.max(0, tonumber(inventoryCounts[inventoryCountKey(input.itemRef, itemTier)]) or 0),
             qualityColor = getQualityColor(item),
         }
         row.hasEnough = row.owned >= row.quantity
@@ -1583,7 +1603,7 @@ function Crafting:ConsumeRecipeInputsOnce(detail)
 
     for index = 1, #(detail.materials or {}) do
         local row = detail.materials[index]
-        if not removeInventoryItemCount(row.itemRef, row.quantity) then
+        if not removeInventoryItemCount(row.itemRef, row.quantity, row.itemTier) then
             self.State.lastError = "Failed to consume required materials."
             return false
         end
@@ -1610,6 +1630,7 @@ function Crafting:GrantRecipeOutputOnce(detail)
     Inventory.AddItem({
         dataset = datasetId,
         id = itemId,
+        itemTier = detail.output.itemTier,
         quantity = quantity,
     })
     logCraftingInfo("Crafted %s.", formatQuantityLabel(quantity, detail.output.name or detail.name))

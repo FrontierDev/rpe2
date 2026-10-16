@@ -7,6 +7,7 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 local InspectorShared = DataEditor.ItemInspectorShared
 local GuildSettingClass = Addon.Internal
     and Addon.Internal.Database
@@ -800,6 +801,7 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
             selected.requisitions[#selected.requisitions + 1] = {
                 id = buildUniqueStableId(selected.requisitions, nil, "", "requisition"),
                 itemRef = "",
+                itemTier = "normal",
                 quantity = 1,
                 characterLimit = 1,
                 costs = {},
@@ -890,6 +892,23 @@ function DataEditor:BuildGuildSettingInspectorRequisitionsPage(parent)
         end,
     })
     requisitionItemGroup:AddChild(self.GuildSettingInspectorRequisitionItemDropdown)
+
+    local requisitionItemTierGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorRequisitionItemTierGroup", "Item Tier")
+    self.GuildSettingInspectorRequisitionItemTierDropdown = UI.CreateDropdown(requisitionItemTierGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionItemTierDropdown", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT,
+        items = ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } },
+        selectedValue = "normal",
+        onValueChanged = function(value)
+            if self._refreshingGuildSettingInspector then return end
+            local _, _, selectedIndex = getSelectedRequisition(self)
+            self:CommitSelectedGuildSetting(function(guildSetting)
+                local requisition = guildSetting.requisitions and guildSetting.requisitions[selectedIndex]
+                if requisition then requisition.itemTier = value or "normal" end
+            end)
+            self:RefreshGuildSettingRequisitionsPage()
+        end,
+    })
+    requisitionItemTierGroup:AddChild(self.GuildSettingInspectorRequisitionItemTierDropdown)
 
     local numberLabels = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEDataEditorGuildSettingInspectorRequisitionNumberLabels", {
         spacing = 2, height = 12, fitChildrenWidth = true, fitChildrenHeight = false,
@@ -1085,6 +1104,7 @@ function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
                 id = buildUniqueStableId(selected.dailyRewards, nil, "", "daily_reward"),
                 type = "item",
                 ref = "",
+                itemTier = "normal",
                 amount = 1,
             }
         end)
@@ -1209,6 +1229,23 @@ function DataEditor:BuildGuildSettingInspectorDailyRewardsPage(parent)
     self.GuildSettingInspectorDailyRewardItemGroup = dailyRewardItemGroup
     self.GuildSettingInspectorDailyRewardCurrencyGroup = dailyRewardCurrencyGroup
 
+    local dailyRewardItemTierGroup = createFieldGroup(root, "RPEDataEditorGuildSettingInspectorDailyRewardItemTierGroup", "Item Tier")
+    self.GuildSettingInspectorDailyRewardItemTierDropdown = UI.CreateDropdown(dailyRewardItemTierGroup:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardItemTierDropdown", {
+        width = FIELD_WIDTH, height = CONTROL_HEIGHT,
+        items = ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } },
+        selectedValue = "normal",
+        onValueChanged = function(value)
+            if self._refreshingGuildSettingInspector then return end
+            local _, _, selectedIndex = getSelectedDailyReward(self)
+            self:CommitSelectedGuildSetting(function(guildSetting)
+                local reward = guildSetting.dailyRewards and guildSetting.dailyRewards[selectedIndex]
+                if reward then reward.itemTier = value or "normal" end
+            end)
+            self:RefreshGuildSettingDailyRewardsPage()
+        end,
+    })
+    dailyRewardItemTierGroup:AddChild(self.GuildSettingInspectorDailyRewardItemTierDropdown)
+
     root:AddChild(createLabel(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardAmountLabel", "Amount"))
     self.GuildSettingInspectorDailyRewardAmountInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorGuildSettingInspectorDailyRewardAmountInput", {
         width = FIELD_WIDTH, height = 18, text = "1", borderColor = UI.ResolveColor(nil, "panel.border"),
@@ -1309,6 +1346,11 @@ function DataEditor:RefreshGuildSettingRequisitionsPage()
         self.GuildSettingInspectorRequisitionItemDropdown:SetSelectedValue(requisitionItemRef, true)
         setDropdownEnabled(self.GuildSettingInspectorRequisitionItemDropdown, requisition ~= nil and requisitionItemDatasetId ~= "")
     end
+    if self.GuildSettingInspectorRequisitionItemTierDropdown then
+        self.GuildSettingInspectorRequisitionItemTierDropdown:SetItems(ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } })
+        self.GuildSettingInspectorRequisitionItemTierDropdown:SetSelectedValue(ItemTier.Normalize and (ItemTier.Normalize(requisition and requisition.itemTier) or "normal") or "normal", true)
+        setDropdownEnabled(self.GuildSettingInspectorRequisitionItemTierDropdown, requisition ~= nil)
+    end
     if self.GuildSettingInspectorRequisitionQuantityInput then
         self.GuildSettingInspectorRequisitionQuantityInput:SetText(tostring(normalizeInteger(requisition and requisition.quantity, 1, 1)))
         setTextElementEnabled(self.GuildSettingInspectorRequisitionQuantityInput, requisition ~= nil)
@@ -1395,6 +1437,14 @@ function DataEditor:RefreshGuildSettingDailyRewardsPage()
         self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetItems(currencyItems)
         self.GuildSettingInspectorDailyRewardCurrencyDropdown:SetSelectedValue(getGuildSettingCurrencySelectionValue(currencyItems, currencyRef), true)
         setDropdownEnabled(self.GuildSettingInspectorDailyRewardCurrencyDropdown, reward ~= nil and rewardType == "currency")
+    end
+    if self.GuildSettingInspectorDailyRewardItemTierDropdown then
+        self.GuildSettingInspectorDailyRewardItemTierDropdown:SetItems(ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } })
+        self.GuildSettingInspectorDailyRewardItemTierDropdown:SetSelectedValue(ItemTier.Normalize and (ItemTier.Normalize(reward and reward.itemTier) or "normal") or "normal", true)
+        setDropdownEnabled(
+            self.GuildSettingInspectorDailyRewardItemTierDropdown,
+            reward ~= nil and (rewardType == "item" or rewardType == "loot_table")
+        )
     end
     setElementGroupVisible(self.GuildSettingInspectorDailyRewardItemDatasetGroup, reward ~= nil and rewardType == "item")
     setElementGroupVisible(self.GuildSettingInspectorDailyRewardItemGroup, reward ~= nil and rewardType == "item")

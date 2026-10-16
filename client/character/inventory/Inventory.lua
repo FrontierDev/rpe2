@@ -8,6 +8,7 @@ local Database = Addon.Internal and Addon.Internal.Database or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local ModificationService = Profile and Profile.Modifications or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -120,9 +121,20 @@ function Inventory.NormalizeInventoryItem(record)
         return nil
     end
 
+    local itemTier, tierReason
+    if type(ItemTier.Validate) == "function" then
+        itemTier, tierReason = ItemTier.Validate(record.itemTier)
+    else
+        itemTier = record.itemTier or "normal"
+    end
+    if not itemTier then
+        return nil, tierReason or "invalid-item-tier"
+    end
+
     return {
         dataset = datasetId,
         id = itemId,
+        itemTier = itemTier,
         modifications = deepCopy(ensureTable(record.modifications)),
         soulbound = record.soulbound == true,
         quantity = math.max(1, math.floor(tonumber(record.quantity or record.count) or 1)),
@@ -245,6 +257,7 @@ local function getStackIdentity(record, modificationSignature)
     local signature = modificationSignature or getModificationSignature(record)
     return table.concat({
         getItemRef(record and record.dataset, record and record.id),
+        ItemTier.Normalize(record and record.itemTier) or "normal",
         record and record.soulbound == true and "true" or "false",
         signature,
     }, "|")
@@ -258,6 +271,7 @@ local function copyCanonicalRecord(record)
     return {
         dataset = record.dataset,
         id = record.id,
+        itemTier = ItemTier.Normalize(record.itemTier) or "normal",
         modifications = deepCopy(record.modifications or {}),
         soulbound = record.soulbound == true,
         quantity = math.max(1, math.floor(tonumber(record.quantity) or 1)),
@@ -713,7 +727,8 @@ local function buildNormalizedSearchText(dataset, item, record)
     appendSearchValue(values, dataset and dataset.id or record and record.dataset)
     appendSearchValue(values, dataset and Database.GetDatasetDisplayName and Database.GetDatasetDisplayName(dataset) or nil)
     appendSearchValue(values, item and getItemTypeLabel(item.itemType) or nil)
-    appendSearchValue(values, item and getQualityLabel(item.quality) or nil)
+    appendSearchValue(values, item and getQualityLabel(ItemTier.GetEffectiveQuality(item.quality, record and record.itemTier)) or nil)
+    appendSearchValue(values, ItemTier.DisplayName(record and record.itemTier))
     appendSearchValues(values, item and item.tags or nil)
     return table.concat(values, "\n")
 end
@@ -746,7 +761,7 @@ local function buildDisplayEntry(record, sourceIndex, stackIdentity, knownDatase
             and Database.IsDatasetActivated(dataset.id) == true
             or false
     end
-    local quality = item and tostring(item.quality or "common") or "common"
+    local quality = item and ItemTier.GetEffectiveQuality(item.quality, record and record.itemTier) or "common"
     local itemType = item and tostring(item.itemType or "none") or "none"
 
     return {
@@ -755,6 +770,7 @@ local function buildDisplayEntry(record, sourceIndex, stackIdentity, knownDatase
         record = record,
         datasetId = record.dataset,
         itemId = record.id,
+        itemTier = ItemTier.Normalize(record.itemTier) or "normal",
         dataset = dataset,
         item = item,
         isActive = isActive,
@@ -1050,6 +1066,7 @@ local function addItemInternal(normalized, itemDefinition, options)
         dataset = normalized.dataset,
         itemId = normalized.id,
         itemRef = getItemRef(normalized.dataset, normalized.id),
+        itemTier = normalized.itemTier,
         stackKey = stackKey,
         quantity = actualAddedQuantity,
         actualAddedQuantity = actualAddedQuantity,
@@ -1072,9 +1089,9 @@ local function addItemInternal(normalized, itemDefinition, options)
 end
 
 function Inventory.AddItem(itemRecord, options)
-    local normalized = Inventory.NormalizeInventoryItem(itemRecord)
+    local normalized, normalizeReason = Inventory.NormalizeInventoryItem(itemRecord)
     if not normalized then
-        return nil
+        return nil, normalizeReason or "invalid-item"
     end
 
     local _, itemDefinition = resolveCanonicalItemDefinition(normalized)
@@ -1098,6 +1115,7 @@ function Inventory.AddResolvedRecord(resolved)
         id = resolved.itemId or (resolved.record and resolved.record.id) or "",
         modifications = deepCopy(resolved.modifications or (resolved.record and resolved.record.modifications) or {}),
         soulbound = resolved.soulbound == true or (resolved.record and resolved.record.soulbound == true),
+        itemTier = resolved.itemTier or (resolved.record and resolved.record.itemTier),
         quantity = resolved.quantity,
     })
 end
@@ -1614,6 +1632,7 @@ dispatchInventoryPayload = function(changeSet, summary)
                     id = itemId,
                     itemId = itemId,
                     itemRef = itemRef,
+                    itemTier = mutation.itemTier or "normal",
                     quantity = amount,
                     actualAddedQuantity = amount,
                 }

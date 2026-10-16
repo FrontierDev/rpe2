@@ -308,7 +308,8 @@ local function commitEquipmentUse(token)
             entry.itemRef,
             entry.modifications,
             entry.slotRef,
-            true
+            true,
+            entry.itemTier
         )
         if not rebound then
             return false, "stale-source"

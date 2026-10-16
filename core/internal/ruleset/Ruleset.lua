@@ -131,6 +131,16 @@ local function normalizeRulesetRuleValue(ruleDefinition, value)
         return normalizeSpellRankEffectGainPercent(value, ruleDefinition.default)
     end
 
+    if type(ruleDefinition) == "table"
+        and (ruleDefinition.key == "heroic_item_stat_bonus_percent" or ruleDefinition.key == "mythic_item_stat_bonus_percent")
+    then
+        local numeric = tonumber(value)
+        if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+            numeric = tonumber(ruleDefinition.default) or 0
+        end
+        return tostring(math.max(0, math.min(10000, numeric)))
+    end
+
     return value
 end
 
@@ -399,6 +409,17 @@ function Ruleset.SetRulesetRuleValue(rulesetId, categoryKey, ruleDefinition, val
     local ruleset = Ruleset.GetRulesetByID(rulesetId)
     if not ruleset or not ruleDefinition then
         return nil
+    end
+
+    if ruleDefinition.key == "heroic_item_stat_bonus_percent"
+        or ruleDefinition.key == "mythic_item_stat_bonus_percent"
+    then
+        local numeric = tonumber(value)
+        if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge
+            or numeric < 0 or numeric > 10000
+        then
+            return nil, "invalid-item-tier-stat-bonus"
+        end
     end
 
     ruleset.rules = type(ruleset.rules) == "table" and ruleset.rules or {}

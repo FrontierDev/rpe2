@@ -11,6 +11,17 @@ Client.AutopilotSpeechCues = SpeechCues
 
 local MAX_TEXT_LENGTH = 500
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local function state(override)
     if type(override) == "table" then return override end
     if type(Client.GetEventState) == "function" then return Client:GetEventState() end
@@ -119,7 +130,7 @@ local function speakersFor(action, eventState)
         if unit then
             result[#result + 1] = {
                 eventId = id,
-                name = tostring(unit.name or ("Unit " .. tostring(id))),
+                name = getEventUnitDisplayName(unit, "Unit " .. tostring(id)),
                 raidMarker = tonumber(unit.raidMarker) or 0,
             }
         end

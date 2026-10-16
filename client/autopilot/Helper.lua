@@ -18,6 +18,17 @@ local Combat = Client.Combat or {}
 Client.AutopilotHelper = Client.AutopilotHelper or {}
 local Helper = Client.AutopilotHelper
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local REASON_TEXT = {
     ["step-advanced"] = "This action belongs to the previous event step.",
     ["event-changed"] = "The active event changed after this action was planned.",
@@ -102,8 +113,9 @@ end
 
 local function unitName(eventState, eventId)
     local unit = findUnit(eventState, eventId)
-    if type(unit) == "table" and tostring(unit.name or "") ~= "" then
-        return tostring(unit.name)
+    local displayName = getEventUnitDisplayName(unit, "")
+    if displayName ~= "" then
+        return displayName
     end
     local numeric = normalizeEventId(eventId)
     return numeric > 0 and ("Unit %d"):format(numeric) or "Unknown"

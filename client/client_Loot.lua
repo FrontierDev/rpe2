@@ -7,6 +7,7 @@ Addon.Internal.Comms = Addon.Internal.Comms or {}
 local Client = Addon.Client
 local Common = Addon.Utils and Addon.Utils.Common or {}
 local Profile = Addon.Internal.Profile or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 local Registry = Addon.Internal.Registry or {}
 local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
@@ -123,9 +124,19 @@ local function normalizeInventoryRecord(record)
     if datasetId == "" or itemId == "" then
         return nil
     end
+    local itemTier
+    if type(ItemTier.Normalize) == "function" then
+        itemTier = ItemTier.Normalize(record.itemTier)
+    else
+        itemTier = record.itemTier or "normal"
+    end
+    if not itemTier then
+        return nil
+    end
     return {
         dataset = datasetId,
         id = itemId,
+        itemTier = itemTier,
         modifications = deepCopy(type(record.modifications) == "table" and record.modifications or {}),
         soulbound = record.soulbound == true,
         quantity = math.max(1, math.floor(tonumber(record.quantity or record.count) or 1)),
@@ -137,6 +148,7 @@ local function sameInventoryVariant(left, right)
         and type(right) == "table"
         and tostring(left.dataset or "") == tostring(right.dataset or "")
         and tostring(left.id or "") == tostring(right.id or "")
+        and tostring(left.itemTier or "normal") == tostring(right.itemTier or "normal")
         and left.soulbound == right.soulbound
         and deepEqual(left.modifications or {}, right.modifications or {})
 end
@@ -320,9 +332,19 @@ local function buildRewardPlan(rewards)
             if datasetId == "" or itemId == "" then
                 return nil, "unknown-item", { rewardIndex = index, ref = rewardRef }
             end
+            local itemTier, tierReason
+            if type(ItemTier.Validate) == "function" then
+                itemTier, tierReason = ItemTier.Validate(reward.itemTier)
+            else
+                itemTier = reward.itemTier or "normal"
+            end
+            if not itemTier then
+                return nil, tierReason or "invalid-item-tier", { rewardIndex = index, ref = rewardRef }
+            end
             plan.rewards[#plan.rewards + 1] = {
                 type = "item",
                 ref = ("%s:%s"):format(datasetId, itemId),
+                itemTier = itemTier,
                 requestedAmount = amount,
                 datasetId = datasetId,
                 itemId = itemId,
@@ -518,6 +540,7 @@ local function executeDeliveryPlan(payload, hostName, requestFingerprint, plan, 
             local addOk, addedRecord = pcall(inventory.AddItem, {
                 dataset = reward.datasetId,
                 id = reward.itemId,
+                itemTier = reward.itemTier,
                 quantity = reward.requestedAmount,
             })
             local addedVariant = normalizeInventoryRecord(addedRecord)
@@ -543,6 +566,7 @@ local function executeDeliveryPlan(payload, hostName, requestFingerprint, plan, 
             resultRewards[#resultRewards + 1] = {
                 type = "item",
                 ref = reward.ref,
+                itemTier = reward.itemTier,
                 requestedAmount = reward.requestedAmount,
                 appliedAmount = actualAdded,
             }

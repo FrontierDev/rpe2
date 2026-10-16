@@ -20,6 +20,19 @@ local SPELLCAST_INTERRUPT_OPCODE = Operations:GetOpcode("SPELLCAST_INTERRUPT")
 local SPELLCAST_SLOW_TOTAL_MS = 100
 local SPELLCAST_SLOW_HELPER_MS = 25
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" then
+        if type(unit.GetDisplayName) == "function" then
+            return tostring(unit:GetDisplayName())
+        end
+        if tostring(unit.name or "") ~= "" then
+            return tostring(unit.name)
+        end
+    end
+
+    return fallback or "Unknown"
+end
+
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
     if timings and type(timings.Start) == "function" then
@@ -456,8 +469,8 @@ local function emitSpellcastStartCombatLog(client, eventState, casterUnit, spell
         entryType = "status",
         logKind = "spellcast_start",
         spellRef = spellRef,
-        casterDisplayName = tostring(casterUnit.name or "Unknown"),
-        targetDisplayName = tostring(casterUnit.name or "Unknown"),
+        casterDisplayName = getEventUnitDisplayName(casterUnit),
+        targetDisplayName = getEventUnitDisplayName(casterUnit),
         targetCount = 1,
         labelText = spellName,
         detailText = ("Begins casting %s."):format(spellName),
@@ -523,7 +536,7 @@ function Client:HandleSpellcastStart(arguments, sender)
     Spellcasting.SetCastEntry(self, payload.eventId, payload.casterEventId, entry)
 
     if not suppressLog then
-        Spellcasting.LogLifecycle("start", payload.authorityType, payload.casterUnit.name, Spellcasting.ResolveSpellName(payload.spellRef), payload.castTurns)
+        Spellcasting.LogLifecycle("start", payload.authorityType, getEventUnitDisplayName(payload.casterUnit), Spellcasting.ResolveSpellName(payload.spellRef), payload.castTurns)
         refreshSpellcastVisualState("spellcast-start", payload.casterEventId)
     end
     return true
@@ -552,7 +565,7 @@ function Client:HandleSpellcastComplete(arguments, sender)
         Spellcasting.LogLifecycle(
             "complete",
             payload.authorityType,
-            payload.casterUnit.name,
+            getEventUnitDisplayName(payload.casterUnit),
             (previous and previous.spellName) or Spellcasting.ResolveSpellName(payload.spellRef)
         )
         refreshSpellcastVisualState("spellcast-complete", payload.casterEventId)
@@ -577,7 +590,7 @@ function Client:HandleSpellcastInterrupt(arguments, sender)
         Spellcasting.LogLifecycle(
             "interrupt",
             payload.authorityType,
-            payload.casterUnit.name,
+            getEventUnitDisplayName(payload.casterUnit),
             (previous and previous.spellName) or Spellcasting.ResolveSpellName(payload.spellRef)
         )
         refreshSpellcastVisualState("spellcast-interrupt", payload.casterEventId)
@@ -753,7 +766,7 @@ function Client:OnSpellcastStart(spellRef, castTime, activationSnapshot)
     attachSpellRankContext(entry, rankContext)
 
     Spellcasting.SetCastEntry(self, eventState.id, casterUnit.eventID, entry)
-    Spellcasting.LogLifecycle("start", casterUnit.isPlayer == true and "player" or "npc", casterUnit.name, Spellcasting.ResolveSpellName(spellRef), numericCastTime)
+    Spellcasting.LogLifecycle("start", casterUnit.isPlayer == true and "player" or "npc", getEventUnitDisplayName(casterUnit), Spellcasting.ResolveSpellName(spellRef), numericCastTime)
     emitSpellcastStartCombatLog(self, eventState, casterUnit, spell, spellRef)
     if timingEnabled then
         appendTimingPhase(timingPhases, "state", getNowMilliseconds() - stateStartTime, SPELLCAST_SLOW_HELPER_MS)
@@ -923,7 +936,7 @@ function Client:OnSpellcastComplete(spellRef, castEntryOverride)
     if timingEnabled then
         appendTimingPhase(timingPhases, "components", getNowMilliseconds() - componentStartTime, SPELLCAST_SLOW_TOTAL_MS)
     end
-    Spellcasting.LogLifecycle("complete", casterUnit.isPlayer == true and "player" or "npc", casterUnit.name, (previous and previous.spellName) or Spellcasting.ResolveSpellName(spellRef))
+    Spellcasting.LogLifecycle("complete", casterUnit.isPlayer == true and "player" or "npc", getEventUnitDisplayName(casterUnit), (previous and previous.spellName) or Spellcasting.ResolveSpellName(spellRef))
 
     local visualStartTime = timingEnabled and getNowMilliseconds() or nil
     refreshSpellcastVisualState("spellcast-complete-local", casterUnit.eventID)
@@ -1025,7 +1038,7 @@ function Client:OnSpellcastInterrupted(spellRef, castEntryOverride)
     end
 
     local previous = Spellcasting.RemoveCastEntry(self, eventState.id, casterUnit.eventID)
-    Spellcasting.LogLifecycle("interrupt", casterUnit.isPlayer == true and "player" or "npc", casterUnit.name, (previous and previous.spellName) or Spellcasting.ResolveSpellName(spellRef))
+    Spellcasting.LogLifecycle("interrupt", casterUnit.isPlayer == true and "player" or "npc", getEventUnitDisplayName(casterUnit), (previous and previous.spellName) or Spellcasting.ResolveSpellName(spellRef))
     refreshSpellcastVisualState("spellcast-interrupt-local", casterUnit.eventID)
 
     return sendSpellcastPacket(channelId, SPELLCAST_INTERRUPT_OPCODE, {
@@ -1056,6 +1069,6 @@ function Client:OnSpellcastChannelTick(spellRef)
         return false
     end
 
-    Spellcasting.LogLifecycle("channel-tick", casterUnit.isPlayer == true and "player" or "npc", casterUnit.name, Spellcasting.ResolveSpellName(spellRef))
+    Spellcasting.LogLifecycle("channel-tick", casterUnit.isPlayer == true and "player" or "npc", getEventUnitDisplayName(casterUnit), Spellcasting.ResolveSpellName(spellRef))
     return true
 end

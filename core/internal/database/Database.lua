@@ -913,10 +913,17 @@ local function normalizeProfileEquipmentEntry(record)
         itemRef = ("%s:%s"):format(datasetId, itemId)
     end
 
+    local itemTier = Addon.Internal and Addon.Internal.ItemTier
+    local normalizedTier = itemTier and itemTier.Normalize and itemTier.Normalize(data.itemTier) or (data.itemTier or "normal")
+    if not normalizedTier then
+        normalizedTier = "normal"
+    end
+
     return {
         datasetId = datasetId,
         itemId = itemId,
         itemRef = itemRef,
+        itemTier = normalizedTier,
         slotRef = ensureString(data.slotRef, ""),
         modifications = deepCopy(ensureTable(data.modifications)),
         soulbound = data.soulbound == true,

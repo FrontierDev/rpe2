@@ -37,6 +37,7 @@ local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Loot = Addon.Internal and Addon.Internal.Loot or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 local DEFAULT_LOOT_ICON = "Interface\\Icons\\INV_Misc_Chest_04"
 local unpackValues = table.unpack or unpack
 
@@ -126,21 +127,30 @@ local function parseItemRef(reference)
     return trim(datasetId), trim(itemId)
 end
 
-local function inventoryQuantity(inventory, datasetId, itemId)
+local function normalizeItemTier(value)
+    if type(ItemTier.Validate) == "function" then
+        return ItemTier.Validate(value)
+    end
+    return value or "normal"
+end
+
+local function inventoryQuantity(inventory, datasetId, itemId, itemTier)
     if type(inventory.GetItems) ~= "function" then return nil end
     local ok, items = pcall(inventory.GetItems)
     if not ok or type(items) ~= "table" then return nil end
     local total = 0
     for index = 1, #items do
         local item = items[index]
-        if tostring(item and item.dataset or "") == datasetId and tostring(item and item.id or "") == itemId then
+        if tostring(item and item.dataset or "") == datasetId and tostring(item and item.id or "") == itemId
+            and normalizeItemTier(item and item.itemTier) == itemTier
+        then
             total = total + math.max(0, math.floor(tonumber(item.quantity or item.count) or 0))
         end
     end
     return total
 end
 
-local function removeInventoryQuantity(inventory, datasetId, itemId, amount)
+local function removeInventoryQuantity(inventory, datasetId, itemId, amount, itemTier)
     local remaining = math.max(0, math.floor(tonumber(amount) or 0))
     if remaining == 0 then return true end
     if type(inventory.GetItems) ~= "function" or type(inventory.RemoveItem) ~= "function" then return false end
@@ -148,7 +158,9 @@ local function removeInventoryQuantity(inventory, datasetId, itemId, amount)
     if not ok or type(items) ~= "table" then return false end
     for index = #items, 1, -1 do
         local item = items[index]
-        if tostring(item and item.dataset or "") == datasetId and tostring(item and item.id or "") == itemId then
+        if tostring(item and item.dataset or "") == datasetId and tostring(item and item.id or "") == itemId
+            and normalizeItemTier(item and item.itemTier) == itemTier
+        then
             local available = math.max(1, math.floor(tonumber(item.quantity or item.count) or 1))
             local take = math.min(available, remaining)
             local removed, result = pcall(inventory.RemoveItem, index, take)
@@ -180,7 +192,7 @@ local function newRewardTransaction()
         local inventory = inventoryService()
         for index = #self.itemAwards, 1, -1 do
             local award = self.itemAwards[index]
-            if not removeInventoryQuantity(inventory, award.datasetId, award.itemId, award.amount) then restored = false end
+            if not removeInventoryQuantity(inventory, award.datasetId, award.itemId, award.amount, award.itemTier) then restored = false end
         end
         if not restoreCurrencies(self.currencySnapshots) then restored = false end
         return restored
@@ -211,13 +223,14 @@ local function awardConcreteRewards(rewards)
             if not datasetId or not itemId or type(inventory.AddItem) ~= "function" then
                 return false, transaction:Rollback() and "inventory-api-unavailable" or "rollback-failed", transaction
             end
-            local before = inventoryQuantity(inventory, datasetId, itemId)
-            local ok, record = pcall(inventory.AddItem, { dataset = datasetId, id = itemId, quantity = reward.amount })
-            local after = inventoryQuantity(inventory, datasetId, itemId)
+            local itemTier = normalizeItemTier(reward.itemTier)
+            local before = inventoryQuantity(inventory, datasetId, itemId, itemTier)
+            local ok, record = pcall(inventory.AddItem, { dataset = datasetId, id = itemId, itemTier = itemTier, quantity = reward.amount })
+            local after = inventoryQuantity(inventory, datasetId, itemId, itemTier)
             local measured = before ~= nil and after ~= nil
             local awarded = measured and math.max(0, after - before) or reward.amount
             if awarded > 0 and ((ok and record) or measured) then
-                transaction.itemAwards[#transaction.itemAwards + 1] = { datasetId = datasetId, itemId = itemId, amount = awarded }
+                transaction.itemAwards[#transaction.itemAwards + 1] = { datasetId = datasetId, itemId = itemId, itemTier = itemTier, amount = awarded }
             end
             if not ok or not record or (measured and awarded < reward.amount) then
                 return false, transaction:Rollback() and "item-award-failed" or "rollback-failed", transaction
@@ -237,7 +250,18 @@ local function awardConcreteRewards(rewards)
     return true, "ok", transaction
 end
 
-local function resolveLootRolls(validatedLoot, count)
+local function applyRewardItemTier(rewards, itemTier)
+    local normalizedTier = normalizeItemTier(itemTier)
+    if not normalizedTier then return nil, "invalid-item-tier" end
+    for index = 1, #(rewards or {}) do
+        if rewards[index].type == "item" then
+            rewards[index].itemTier = normalizedTier
+        end
+    end
+    return rewards
+end
+
+local function resolveLootRolls(validatedLoot, count, itemTier)
     if type(Loot.ResolveValidatedLootTable) ~= "function" or type(Loot.MergeConcreteRewards) ~= "function" then
         return nil, "loot-api-unavailable"
     end
@@ -251,7 +275,9 @@ local function resolveLootRolls(validatedLoot, count)
         end
         for index = 1, #resolved do rewards[#rewards + 1] = resolved[index] end
     end
-    return Loot.MergeConcreteRewards(rewards)
+    local tiered, tierReason = applyRewardItemTier(rewards, itemTier)
+    if not tiered then return nil, tierReason end
+    return Loot.MergeConcreteRewards(tiered)
 end
 
 local function validateLootRewardCapabilities(validatedLoot)
@@ -311,6 +337,8 @@ function Guild:GetRequisitionEligibility(guildSettingRef, requisitionId)
 
     if type(Loot.ResolveLootReference) ~= "function" then return false, "loot-api-unavailable", { lootRef = trim(requisition.lootRef) } end
     local lootRef = trim(requisition.lootRef)
+    local itemTier, tierReason = normalizeItemTier(requisition.itemTier)
+    if not itemTier then return false, tierReason or "invalid-item-tier", { requisitionId = requisition.id } end
     local validatedLoot, lootReason, lootDetail = Loot.ResolveLootReference(lootRef)
     if not validatedLoot then return false, lootReason or "loot-table-unavailable", lootDetail or { lootRef = lootRef } end
     local capabilitiesOk, capabilityReason = validateLootRewardCapabilities(validatedLoot)
@@ -347,6 +375,7 @@ function Guild:GetRequisitionEligibility(guildSettingRef, requisitionId)
         lootRef = lootRef,
         lootTable = validatedLoot,
         rollCount = positiveInteger(requisition.quantity, 1),
+        itemTier = itemTier,
         costs = costs,
         usage = usage,
         characterLimit = limit,
@@ -387,7 +416,7 @@ function Guild:TryRequisition(guildSettingRef, requisitionId)
 
     local eligible, reason, detail = self:GetRequisitionEligibility(guildSettingRef, requisitionId)
     if not eligible then return false, reason, detail end
-    local rewards, resolveReason, resolveDetail = resolveLootRolls(detail.lootTable, detail.rollCount)
+    local rewards, resolveReason, resolveDetail = resolveLootRolls(detail.lootTable, detail.rollCount, detail.itemTier)
     if not rewards then return false, resolveReason or "loot-resolution-failed", resolveDetail end
     local spent, costSnapshots, spendReason = spendCosts(detail.costs)
     if not spent then return false, spendReason, detail end
@@ -445,6 +474,10 @@ local function validateDailyLootTables(setting)
     for index = 1, #(setting and setting.dailyRewards or {}) do
         local reward = setting.dailyRewards[index]
         if isLootDailyReward(reward) then
+            local itemTier, tierReason = normalizeItemTier(reward.itemTier)
+            if not itemTier then
+                return nil, tierReason or "invalid-item-tier", { rewardIndex = index, rewardId = trim(reward.id) }
+            end
             local lootRef = trim(reward.ref)
             local lootTable, reason, detail = Loot.ResolveLootReference(lootRef)
             if not lootTable then
@@ -457,7 +490,7 @@ local function validateDailyLootTables(setting)
             if not capabilitiesOk then
                 return nil, capabilityReason, { rewardIndex = index, rewardId = trim(reward.id), ref = lootRef }
             end
-            validated[index] = lootTable
+            validated[index] = { loot = lootTable, itemTier = itemTier }
         end
     end
     return validated
@@ -526,11 +559,17 @@ local function resolveDailyRewards(setting, selectedRewards)
         local reward = setting.dailyRewards[index]
         if selectedById[tostring(reward and reward.id or "")] then
         if isLootDailyReward(reward) then
-            local rolled, rollReason, rollDetail = resolveLootRolls(validated[index], positiveInteger(reward.amount, 1))
+            local validatedReward = validated[index]
+            local rolled, rollReason, rollDetail = resolveLootRolls(validatedReward.loot, positiveInteger(reward.amount, 1), validatedReward.itemTier)
             if not rolled then return nil, rollReason, rollDetail end
             for rewardIndex = 1, #rolled do concreteRewards[#concreteRewards + 1] = rolled[rewardIndex] end
         else
-            local concrete, concreteReason, concreteDetail = Loot.ValidateConcreteReward({ type = reward.type, ref = reward.ref, amount = reward.amount })
+            local concrete, concreteReason, concreteDetail = Loot.ValidateConcreteReward({
+                type = reward.type,
+                ref = reward.ref,
+                amount = reward.amount,
+                itemTier = reward.itemTier,
+            })
             if not concrete then
                 concreteDetail = type(concreteDetail) == "table" and concreteDetail or {}
                 concreteDetail.rewardIndex = index
@@ -569,6 +608,7 @@ function Guild:ProcessDailyRewards()
             type = reward.type,
             ref = reward.ref,
             amount = reward.amount,
+            itemTier = reward.itemTier,
             roleIds = eligibleRoleIds,
         }
     end

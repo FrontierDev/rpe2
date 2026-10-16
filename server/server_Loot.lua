@@ -10,6 +10,7 @@ local Server = Addon.Server
 local Client = Addon.Client
 local Common = Addon.Utils.Common or {}
 local LootLogic = Addon.Internal.Loot or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 local Protocol = Comms.LootProtocol or {}
@@ -161,11 +162,15 @@ local function resolvePlayerUnitName(unit)
 end
 
 local function copyConcreteReward(reward)
-    return {
+    local copy = {
         type = tostring(reward and reward.type or ""),
         ref = tostring(reward and reward.ref or ""),
         amount = math.floor(tonumber(reward and reward.amount) or 0),
     }
+    if copy.type == "item" then
+        copy.itemTier = ItemTier.Normalize(reward and reward.itemTier) or "normal"
+    end
+    return copy
 end
 
 local function touchSession(eventSessionId)
@@ -396,13 +401,26 @@ local function normalizeGrantContract(grant)
         if type(grant.reward) ~= "table" then
             return nil, nil, "invalid-reward", { reason = "reward-not-table" }
         end
+        local reward = deepCopy(grant.reward)
+        if tostring(reward.type or ""):lower() == "item" then
+            local itemTier, tierReason
+            if type(ItemTier.Validate) == "function" then
+                itemTier, tierReason = ItemTier.Validate(reward.itemTier)
+            else
+                itemTier = reward.itemTier or "normal"
+            end
+            if not itemTier then
+                return nil, nil, tierReason or "invalid-item-tier", { field = "itemTier", value = reward.itemTier }
+            end
+            reward.itemTier = itemTier
+        end
         local source = {
             type = "direct",
-            reward = deepCopy(grant.reward),
+            reward = reward,
         }
         local snapshot = {
             sourceType = "direct",
-            reward = deepCopy(grant.reward),
+            reward = deepCopy(reward),
             distribution = distribution,
         }
         return source, snapshot
@@ -421,7 +439,16 @@ local function normalizeGrantContract(grant)
             sourceType = "loot_table",
             lootRef = lootRef,
             distribution = distribution,
+            itemTier = ItemTier.Normalize(grant.itemTier) or "normal",
         }
+        if type(ItemTier.Validate) == "function" then
+            local itemTier, tierReason = ItemTier.Validate(grant.itemTier)
+            if not itemTier then
+                return nil, nil, tierReason or "invalid-item-tier", { field = "itemTier", value = grant.itemTier }
+            end
+            source.itemTier = itemTier
+            snapshot.itemTier = itemTier
+        end
         return source, snapshot
     end
 
@@ -436,12 +463,14 @@ local function buildRequestFingerprint(eventSessionId, hostName, sourceName, gra
         tostring(grantSnapshot and grantSnapshot.sourceType or ""),
         tostring(grantSnapshot and grantSnapshot.distribution or ""),
         tostring(grantSnapshot and grantSnapshot.lootRef or ""),
+        tostring(grantSnapshot and grantSnapshot.itemTier or "normal"),
     }
     local reward = grantSnapshot and grantSnapshot.reward or nil
     if type(reward) == "table" then
         parts[#parts + 1] = tostring(reward.type or "")
         parts[#parts + 1] = tostring(reward.ref or "")
         parts[#parts + 1] = tostring(reward.amount or "")
+        parts[#parts + 1] = tostring(reward.itemTier or "normal")
     end
     for index = 1, #(eligiblePlayers or {}) do
         parts[#parts + 1] = tostring(eligiblePlayers[index])
@@ -732,6 +761,7 @@ local function buildSummaryRewards(delivery)
         rewards[#rewards + 1] = {
             type = reward.type,
             ref = reward.ref,
+            itemTier = reward.type == "item" and (reward.itemTier or "normal") or nil,
             requestedAmount = reward.amount,
             appliedAmount = nil,
             reason = delivery.failureReason,
@@ -918,9 +948,11 @@ local function validateSuccessResponse(delivery, response)
     for index = 1, #delivery.rewards do
         local expected = delivery.rewards[index]
         local actual = response.rewards[index]
+        local actualTier = expected.type == "item" and select(1, ItemTier.Validate(actual and actual.itemTier)) or nil
         if type(actual) ~= "table"
             or string.lower(trim(actual.type)) ~= tostring(expected.type or "")
             or trim(actual.ref) ~= tostring(expected.ref or "")
+            or (expected.type == "item" and (not actualTier or actualTier ~= (expected.itemTier or "normal")))
         then
             return nil, "invalid-response", { rewardIndex = index, reason = "reward-identity" }
         end
@@ -944,6 +976,7 @@ local function validateSuccessResponse(delivery, response)
         normalized[#normalized + 1] = {
             type = expected.type,
             ref = expected.ref,
+            itemTier = expected.type == "item" and (expected.itemTier or "normal") or nil,
             requestedAmount = requested,
             appliedAmount = applied,
             reason = responseReason ~= "" and responseReason or nil,

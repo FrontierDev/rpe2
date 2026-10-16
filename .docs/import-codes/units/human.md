@@ -31,7 +31,7 @@ The Human base resource list includes Rage, Mana and Energy so presets can suppo
 **Equipment:** None  
 **Spells:** None
 
-Uses 20% of base Health, 25% of base Armor and Melee/Ranged Attack Power, and no Mana, Energy, Rage, Spell Power or Healing Power. The explicit empty spell/equipment overrides prevent inheritance of the Human base weapon and attacks.
+Uses 80% of base Health, 25% of base Armor and Melee/Ranged Attack Power, and no Mana, Energy, Rage, Spell Power or Healing Power. The explicit empty spell/equipment overrides prevent inheritance of the Human base weapon and attacks.
 
 ## Additional role variants
 
@@ -364,8 +364,26 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Civilian",
                 challengeLevel = "minor",
+                appearances = {
+                    { displayId = 1288, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1289, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1290, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1291, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1292, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1293, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1357, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1361, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1439, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1440, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1441, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1442, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1443, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1444, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1445, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1446, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                },
                 resourceModifiers = {
-                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -80, flatBonus = 0 },
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -20, flatBonus = 0 },
                     { resourceRef = "f82db71a:4c8mfm99", percentBonus = -100, flatBonus = 0 },
                     { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
                     { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },

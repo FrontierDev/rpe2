@@ -6,6 +6,17 @@ local Client = Addon.Client
 local EventMeters = Client.EventMeters or {}
 local METER_TYPES = { "damage", "healing", "threat" }
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local function normalizeEventId(value)
     local eventId = tostring(value or "")
     return eventId ~= "" and eventId or nil
@@ -153,7 +164,7 @@ end
 local function addRow(rows, sourceUnit, sourceEventId, amount)
     local row = rows[sourceEventId]
     if type(row) ~= "table" then row = { eventId = sourceEventId, name = "Unknown", team = 0, amount = 0 }; rows[sourceEventId] = row end
-    local name = tostring(sourceUnit and sourceUnit.name or "")
+    local name = getEventUnitDisplayName(sourceUnit, "")
     if name ~= "" then row.name = name end
     local team = tonumber(sourceUnit and sourceUnit.team)
     if team then row.team = math.floor(team) end

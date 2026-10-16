@@ -211,7 +211,8 @@ function EventManage:BuildUnitRows()
             teamName = Event and Event.GetTeamName and Event.GetTeamName(eventState, unit and unit.team or 0) or ("Team %d"):format(tonumber(unit and unit.team) or 0),
             eventID = unit and unit.eventID or nil,
             boss = EventUnit and EventUnit.IsBoss and EventUnit.IsBoss(unit) or coerceEventUnitBoolean(unit and unit.boss, false),
-            name = unit and unit.name or "",
+            name = unit and EventUnit and type(EventUnit.GetDisplayName) == "function" and unit:GetDisplayName() or unit and unit.name or "",
+            derivedName = unit and EventUnit and type(EventUnit.GetResolvedVariantName) == "function" and unit:GetResolvedVariantName() or unit and unit.name or "",
             registryID = unit and unit.registryID or "",
             isPlayer = unit and unit.isPlayer == true or false,
             active = EventUnit and EventUnit.IsActive and EventUnit.IsActive(unit) or (unit and (unit.isPlayer == true or coerceEventUnitBoolean(unit.active, true)) or false),
@@ -296,6 +297,7 @@ function EventManage:BuildUnitTooltip(rowData)
     end
 
     local unitName = rowData.name ~= nil and rowData.name ~= "" and tostring(rowData.name) or "Unnamed Unit"
+    local derivedName = rowData.derivedName ~= nil and rowData.derivedName ~= "" and tostring(rowData.derivedName) or unitName
     local registryID = rowData.registryID ~= nil and rowData.registryID ~= "" and tostring(rowData.registryID) or "-"
     local eventID = rowData.eventID ~= nil and tostring(rowData.eventID) or "-"
     local team = tonumber(rowData.team) or 0
@@ -307,6 +309,7 @@ function EventManage:BuildUnitTooltip(rowData)
         title = unitName,
         lines = {
             ("Event ID: %s"):format(eventID),
+            ("Derived Name: %s"):format(derivedName),
             ("Registry ID: %s"):format(registryID),
             ("Team: %s"):format(teamName ~= "" and ("%s (%d)"):format(teamName, team) or tostring(team)),
             ("Raid Marker: %s"):format(raidMarker > 0 and tostring(raidMarker) or "-"),

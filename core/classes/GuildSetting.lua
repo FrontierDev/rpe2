@@ -3,6 +3,7 @@ local _, Addon = ...
 Addon.Internal = Addon.Internal or {}
 Addon.Internal.Database = Addon.Internal.Database or {}
 Addon.Internal.Database.Classes = Addon.Internal.Database.Classes or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 
 local GuildSetting = {}
 GuildSetting.__index = GuildSetting
@@ -283,6 +284,7 @@ local function normalizeRequisition(value, index, usedIds, legacyRoleId)
         itemRef = normalizeReference(source.itemRef),
         lootRef = normalizeReference(source.lootRef),
         quantity = normalizeInteger(source.quantity, 1, 1),
+        itemTier = ItemTier.Normalize(source.itemTier) or "normal",
         costs = normalizeCosts(source.costs),
         characterLimit = normalizeCharacterLimit(source.characterLimit),
         roleIds = roleIds,
@@ -316,6 +318,7 @@ local function normalizeDailyReward(value, index, usedIds)
         type = rewardType,
         ref = normalizeReference(source.ref),
         amount = normalizeInteger(source.amount, 1, 1),
+        itemTier = ItemTier.Normalize(source.itemTier) or "normal",
         roleIds = normalizeRoleIds(source.roleIds),
     }
 end

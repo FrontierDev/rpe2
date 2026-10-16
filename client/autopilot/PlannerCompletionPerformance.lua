@@ -12,6 +12,17 @@ local Event = Addon.Internal and Addon.Internal.Database and Addon.Internal.Data
     and Addon.Internal.Database.Classes.Event or nil
 local unpackValues = unpack or table.unpack
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 if type(Planner) ~= "table" or Planner._performanceBoundedPlannerInstalled == true then return end
 local Performance = Planner.Performance or {}
 if type(Performance.StepTargets) ~= "function" or type(Performance.StepSolveActors) ~= "function" then return end
@@ -80,7 +91,7 @@ end
 local function snapshotUnitSummary(unit, spellRefs, movementSnapshot)
     return {
         eventID = normalizeEventId(unit and unit.eventID),
-        name = tostring(unit and unit.name or ""),
+        name = getEventUnitDisplayName(unit, ""),
         active = isUnitActive(unit),
         dead = unit and unit.dead == true or false,
         team = tonumber(unit and unit.team) or 0,

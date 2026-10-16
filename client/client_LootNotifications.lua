@@ -6,6 +6,7 @@ Addon.Client = Addon.Client or {}
 local Client = Addon.Client
 local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
 
@@ -47,12 +48,16 @@ local function colorItemName(name, quality)
     return ("|cff%s[%s]|r"):format(color, name)
 end
 
-local function formatItemLink(itemRef, name, quality)
+local function formatItemLink(itemRef, name, quality, itemTier)
     local reference = trimText(itemRef)
     if reference == "" or reference:find("|", 1, true) then
         return colorItemName(name, quality)
     end
 
+    local normalizedTier = ItemTier.Normalize(itemTier) or "normal"
+    if normalizedTier ~= "normal" then
+        reference = reference .. "?tier=" .. normalizedTier
+    end
     local color = QUALITY_COLORS[string.lower(trimText(quality))] or QUALITY_COLORS.common
     return ("|Hrpitem:%s|h|cff%s[%s]|r|h"):format(reference, color, name)
 end
@@ -125,16 +130,17 @@ local function emitChatMessage(message)
     return true
 end
 
-function LootNotifications:NotifyItemGain(itemRef, amount)
+function LootNotifications:NotifyItemGain(itemRef, amount, itemTier)
     local quantity = normalizeQuantity(amount)
     local _, name, quality = resolveItem(itemRef)
     if quantity <= 0 or not name then
         return false
     end
 
+    quality = ItemTier.GetEffectiveQuality(quality, itemTier)
     local body = quantity == 1
-        and ITEM_RECEIVED:format(formatItemLink(itemRef, name, quality))
-        or ITEM_RECEIVED_MULTIPLE:format(formatItemLink(itemRef, name, quality), quantity)
+        and ITEM_RECEIVED:format(formatItemLink(itemRef, name, quality, itemTier))
+        or ITEM_RECEIVED_MULTIPLE:format(formatItemLink(itemRef, name, quality, itemTier), quantity)
     local coloredBody = body:gsub("|r", "|r|cff" .. LOOT_TEXT_COLOR)
     local message = ("|cff%s%s|r"):format(
         LOOT_TEXT_COLOR,
@@ -143,7 +149,7 @@ function LootNotifications:NotifyItemGain(itemRef, amount)
     return emitChatMessage(message)
 end
 
-function LootNotifications:ShowItemTooltip(itemRef, owner)
+function LootNotifications:ShowItemTooltip(itemRef, owner, itemTier)
     local item = select(1, resolveItem(itemRef))
     local clientUI = Addon.Client and Addon.Client.UI or nil
     local itemTooltip = clientUI and clientUI.Tooltips and clientUI.Tooltips.Item or nil
@@ -161,6 +167,7 @@ function LootNotifications:ShowItemTooltip(itemRef, owner)
     local tooltip = itemTooltip:Build(item, {
         itemId = item.id,
         isActive = true,
+        itemTier = itemTier,
     })
     if type(tooltip) ~= "table" then
         return false
@@ -285,7 +292,7 @@ local function registerItemGainNotifications()
         end
 
         Runtime:QueueAfterCommit(function()
-            LootNotifications:NotifyItemGain(itemRef, quantity)
+            LootNotifications:NotifyItemGain(itemRef, quantity, mutation.itemTier)
         end)
     end)
 end
@@ -297,8 +304,14 @@ local function installItemLinkHandler()
 
     local baseSetItemRef = SetItemRef
     SetItemRef = function(link, text, button, chatFrame, ...)
-        local itemRef = type(link) == "string" and link:match("^rpitem:(.+)$") or nil
-        if itemRef and LootNotifications:ShowItemTooltip(itemRef, chatFrame) then
+        local itemRef, itemTier
+        if type(link) == "string" then
+            itemRef, itemTier = link:match("^rpitem:(.-)%?tier=(normal|heroic|mythic)$")
+            if not itemRef then
+                itemRef = link:match("^rpitem:(.+)$")
+            end
+        end
+        if itemRef and LootNotifications:ShowItemTooltip(itemRef, chatFrame, itemTier) then
             return
         end
         local achievementRef = type(link) == "string" and link:match("^rpachievement:(.+)$") or nil

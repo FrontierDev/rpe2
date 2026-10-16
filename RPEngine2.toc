@@ -1,7 +1,7 @@
 ## Interface: 120100
-## Title: RPEngine 2.0.alpha26
+## Title: RPEngine 2.0.alpha27
 ## Notes: Fully-integrated roll system and associated RP tools.
-## Version: 2.0.alpha26
+## Version: 2.0.alpha27
 ## Author: Ortellus @ Argent Dawn (Discord: ortellus)
 ## SavedVariables: RPEngineProfilesDB, RPEngineRulesetDB, RPEngineDatasetDB, RPEngineGlobalSettingsDB, RPEngineInventoryDB, RPEngineManagerDB
 
@@ -51,6 +51,7 @@ data/default/professions/engineering.lua
 utils/Common.lua
 utils/Dice.lua
 utils/Lookup.lua
+core/internal/ItemTier.lua
 core/internal/comms/Diagnostics.lua
 core/internal/tasks/TaskQueue.lua
 core/internal/comms/MessageQueue.lua
@@ -181,6 +182,7 @@ client/client_CombatLogTurnIdentity.lua
 client/client_Skills.lua
 client/client_SkillProgression.lua
 server/server_Event.lua
+server/server_EventUnitNames.lua
 server/server_EventNpcMode.lua
 server/server_EventUnitHidden.lua
 server/server_EventUnitTaunt.lua
@@ -273,6 +275,7 @@ server/server_Spellcasting.lua
 server/server_EventRejoinState.lua
 core/internal/comms/PrimaryResourceSync.lua
 core/internal/comms/SelectedPetSync.lua
+core/internal/comms/EventUnitDisplayNameSync.lua
 
 core/Sound.lua
 api/UI.lua
@@ -397,6 +400,7 @@ server/ui/eventmanage/page_EventManageActionsLootRecentEvent.lua
 server/ui/eventmanage/page_EventManageSettings.lua
 server/ui/eventmanage/page_EventManageSettingsOwnership.lua
 server/ui/eventmanage/page_EventManageSettingsLoot.lua
+server/ui/eventmanage/page_EventManageSettingsUnitNames.lua
 server/ui/eventmanage/page_EventManageAutopilot.lua
 server/ui/window_EventManage.lua
 client/ui/editor/pages/page_Datasets.lua

@@ -7,6 +7,17 @@ local Client = Addon.Client
 local Spellcasting = Client.Spellcasting
 local Lookup = Addon.Utils and Addon.Utils.Lookup or {}
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
     if timings and type(timings.Start) == "function" then
@@ -161,7 +172,7 @@ function Client:AdvanceSpellcastState(previousTurnNumber, previousTickNumber)
                 Spellcasting.LogLifecycle(
                     "complete",
                     (previous and previous.authorityType) or "player",
-                    casterUnit and casterUnit.name or "unknown",
+                    getEventUnitDisplayName(casterUnit, "unknown"),
                     (previous and previous.spellName) or (Spellcasting.ResolveSpellName and Spellcasting.ResolveSpellName(existing.spellRef) or existing.spellRef)
                 )
             end

@@ -15,6 +15,17 @@ local EventUnit = (Database.Classes or {}).EventUnit
 local Dice = Addon.Utils.Dice or {}
 local Common = Addon.Utils.Common or {}
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local DEFAULT_SKILL_ROLL_DICE = "1d20"
 local DEFAULT_SKILL_ICON = "Interface\\Icons\\Ability_Hunter_FocusedAim"
 local Operations = Comms.Operations or {}
@@ -271,7 +282,7 @@ local function resolveSkillModifier(skillRef, skill, eventState, eventUnit)
 end
 
 local function resolveUnitName(eventUnit)
-    local name = tostring(eventUnit and eventUnit.name or "")
+    local name = getEventUnitDisplayName(eventUnit, "")
     if name ~= "" then
         return name
     end

@@ -1228,7 +1228,7 @@ local function buildSummonPetSentence(detail, component)
         pet, selectedUnit = resolveSelectedPetForTooltip(detail)
     end
     unit = unit or selectedUnit
-    local unitName = trimText(unit and unit.name)
+    local unitName = trimText(type(unit) == "table" and type(unit.GetDisplayName) == "function" and unit:GetDisplayName() or unit and unit.name)
     if unitName == "" and type(pet) == "table" then
         unitName = trimText(pet.name)
     end
@@ -1255,7 +1255,7 @@ local function buildSummonUnitSentence(detail, component)
 
     local unitRef = trimText(effect.unitRef)
     local unit = unitRef ~= "" and resolveSummonUnitDefinition(unitRef) or nil
-    local unitName = trimText(unit and unit.name)
+    local unitName = trimText(type(unit) == "table" and type(unit.GetDisplayName) == "function" and unit:GetDisplayName() or unit and unit.name)
     local sentence
     if unitName ~= "" then
         sentence = ("Summon %s as a controlled unit."):format(unitName)

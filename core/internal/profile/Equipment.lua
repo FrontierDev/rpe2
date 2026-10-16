@@ -10,6 +10,7 @@ Profile.Equipment = Equipment
 local Database = Addon.Internal.Database or {}
 local Definitions = Profile.Definitions or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 
 local function ensureTable(value)
     if type(value) == "table" then
@@ -452,10 +453,20 @@ function Equipment.FindBestSlotForItem(item, layout)
     return Equipment.FindBestSlotForItemInScope(item, layout, "character")
 end
 
-function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slotRef, soulbound)
+function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slotRef, soulbound, itemTier)
     local normalizedSlotKey = Equipment.NormalizeSlotKey(slotKey)
     if normalizedSlotKey == "" or type(itemRef) ~= "string" or itemRef == "" then
         return nil, "invalid"
+    end
+
+    local normalizedTier, tierReason
+    if type(ItemTier.Validate) == "function" then
+        normalizedTier, tierReason = ItemTier.Validate(itemTier)
+    else
+        normalizedTier = itemTier or "normal"
+    end
+    if not normalizedTier then
+        return nil, tierReason or "invalid-item-tier"
     end
 
     local item, dataset = Equipment.ResolveItemDefinition(itemRef)
@@ -499,6 +510,7 @@ function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slot
             datasetId = dataset and dataset.id or "",
             itemId = item.id,
             itemRef = itemRef,
+            itemTier = normalizedTier,
             slotRef = finalSlotRef,
             modifications = ensureTable(modifications),
             soulbound = soulbound == true,
@@ -525,12 +537,12 @@ function Equipment.EquipItemInScope(scope, slotKey, itemRef, modifications, slot
     )
 end
 
-function Equipment.EquipItem(slotKey, itemRef, modifications, slotRef, soulbound)
-    return Equipment.EquipItemInScope("character", slotKey, itemRef, modifications, slotRef, soulbound)
+function Equipment.EquipItem(slotKey, itemRef, modifications, slotRef, soulbound, itemTier)
+    return Equipment.EquipItemInScope("character", slotKey, itemRef, modifications, slotRef, soulbound, itemTier)
 end
 
-function Equipment.EquipMountItem(slotKey, itemRef, modifications, slotRef, soulbound)
-    return Equipment.EquipItemInScope("mount", slotKey, itemRef, modifications, slotRef, soulbound)
+function Equipment.EquipMountItem(slotKey, itemRef, modifications, slotRef, soulbound, itemTier)
+    return Equipment.EquipItemInScope("mount", slotKey, itemRef, modifications, slotRef, soulbound, itemTier)
 end
 
 function Equipment.UnequipItemInScope(scope, slotKey)

@@ -10,6 +10,7 @@ local UI = Addon.UI or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 
 local AdminPage = GuildUI.AdminPage or {}
 GuildUI.AdminPage = AdminPage
@@ -276,6 +277,7 @@ function AdminPage:Build(parent, owner)
     self.SelectedAchievementRef = ""
     self.SelectedSkillRef = ""
     self.SelectedItemRef = ""
+    self.SelectedItemTier = "normal"
     self.frame = CreateFrame("Frame", "RPEGuildAdminPage", parent)
     self.frame:SetAllPoints(parent)
 
@@ -605,6 +607,18 @@ function AdminPage:Build(parent, owner)
         end,
     })
     self.ItemActionLayout:AddChild(self.ItemDropdown)
+    self.ItemTierDropdown = UI.CreateDropdown(self.ItemActionLayout:GetFrame(), "RPEGuildAdminItemTierDropdown", {
+        width = 70,
+        height = 18,
+        items = ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } },
+        selectedValue = "normal",
+        tooltip = "Item tier.",
+        onValueChanged = function(value)
+            self.SelectedItemTier = tostring(value or "normal")
+            self:RefreshActionControls()
+        end,
+    })
+    self.ItemActionLayout:AddChild(self.ItemTierDropdown)
     self.ItemQuantityInput = UI.CreateTextInput(self.ItemActionLayout:GetFrame(), "RPEGuildAdminItemQuantityInput", {
         width = 62,
         height = 18,
@@ -737,6 +751,9 @@ function AdminPage:RefreshActionControls()
     end
     if self.ItemDropdown then
         self.ItemDropdown:SetEnabled(canUseAdminControls)
+    end
+    if self.ItemTierDropdown then
+        self.ItemTierDropdown:SetEnabled(canUseAdminControls)
     end
     if self.ItemQuantityInput then
         self.ItemQuantityInput:SetEnabled(canUseAdminControls)
@@ -903,7 +920,7 @@ function AdminPage:GiveSelectedItem()
         return false
     end
 
-    return Guild:GiveItemToMember(selectedMember.name, itemRef, quantity, finish) == true
+    return Guild:GiveItemToMember(selectedMember.name, itemRef, quantity, finish, self.SelectedItemTier) == true
 end
 
 function AdminPage:SetSelectedGuildRank()
@@ -1101,6 +1118,12 @@ function AdminPage:Refresh()
             self.SelectedItemRef = ""
         end
         self.ItemDropdown:SetSelectedValue(self.SelectedItemRef, true)
+    end
+    if self.ItemTierDropdown then
+        local itemTierItems = ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } }
+        self.SelectedItemTier = ItemTier.Validate and (ItemTier.Validate(self.SelectedItemTier) or "normal") or (self.SelectedItemTier or "normal")
+        self.ItemTierDropdown:SetItems(itemTierItems)
+        self.ItemTierDropdown:SetSelectedValue(self.SelectedItemTier, true)
     end
 
     if self.AchievementStateText then

@@ -8,8 +8,9 @@ local Comms = Addon.Internal.Comms
 local Operations = Comms.Operations or {}
 local Protocol = Comms.LootProtocol
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 
-Protocol.Version = 1
+Protocol.Version = 2
 Protocol.DeliveryOpcode = 29
 Protocol.ResponseOpcode = 30
 Protocol.FieldSeparator = string.char(29)
@@ -137,23 +138,137 @@ local function deserializeRows(text, fieldNames)
     return rows
 end
 
-local DELIVERY_REWARD_FIELDS = { "type", "ref", "amount" }
-local RESPONSE_REWARD_FIELDS = { "type", "ref", "requestedAmount", "appliedAmount", "reason" }
+local DELIVERY_REWARD_FIELDS = { "type", "ref", "amount", "itemTier" }
+local RESPONSE_REWARD_FIELDS = { "type", "ref", "requestedAmount", "appliedAmount", "reason", "itemTier" }
 
 function Protocol.SerializeRewards(rewards)
-    return serializeRows(rewards, DELIVERY_REWARD_FIELDS)
+    local normalized = {}
+    for index = 1, #(rewards or {}) do
+        local reward = rewards[index]
+        if type(reward) ~= "table" then
+            return nil, "invalid-payload", { rowIndex = index }
+        end
+        local copy = {}
+        for key, value in pairs(reward) do
+            copy[key] = value
+        end
+        if tostring(copy.type or "") == "item" then
+            local itemTier, tierReason = ItemTier.Validate(copy.itemTier)
+            if not itemTier then
+                return nil, tierReason or "invalid-item-tier", { rowIndex = index, field = "itemTier" }
+            end
+            copy.itemTier = itemTier
+        elseif copy.itemTier ~= nil and tostring(copy.itemTier) ~= "" then
+            return nil, "invalid-item-tier", { rowIndex = index, field = "itemTier", reason = "currency-tierless" }
+        end
+        normalized[index] = copy
+    end
+    return serializeRows(normalized, DELIVERY_REWARD_FIELDS)
 end
 
 function Protocol.DeserializeRewards(text)
-    return deserializeRows(text, DELIVERY_REWARD_FIELDS)
+    local source = tostring(text or "")
+    if source == "" then
+        return {}
+    end
+    local rows = {}
+    for index, record in ipairs(splitPreservingEmpty(source, Protocol.RecordSeparator)) do
+        local fields = splitPreservingEmpty(record, Protocol.FieldSeparator)
+        if #fields ~= 3 and #fields ~= 4 then
+            return nil, "invalid-payload", { rowIndex = index, reason = "field-count" }
+        end
+        local row = {}
+        for fieldIndex = 1, 3 do
+            local decoded, reason = decodeField(fields[fieldIndex])
+            if decoded == nil then
+                return nil, reason or "invalid-payload", { rowIndex = index, field = DELIVERY_REWARD_FIELDS[fieldIndex] }
+            end
+            row[DELIVERY_REWARD_FIELDS[fieldIndex]] = decoded
+        end
+        local tier = "normal"
+        if #fields == 4 then
+            tier = decodeField(fields[4])
+        end
+        if tier == nil then
+            return nil, "invalid-payload", { rowIndex = index, field = "itemTier" }
+        end
+        if row.type == "item" then
+            local normalized, tierReason = ItemTier.Validate(tier)
+            if not normalized then
+                return nil, tierReason or "invalid-item-tier", { rowIndex = index, field = "itemTier" }
+            end
+            row.itemTier = normalized
+        elseif #fields == 4 and tier ~= "" then
+            return nil, "invalid-item-tier", { rowIndex = index, field = "itemTier", reason = "currency-tierless" }
+        end
+        rows[#rows + 1] = row
+    end
+    return rows
 end
 
 function Protocol.SerializeResultRewards(rewards)
-    return serializeRows(rewards, RESPONSE_REWARD_FIELDS)
+    local normalized = {}
+    for index = 1, #(rewards or {}) do
+        local reward = rewards[index]
+        if type(reward) ~= "table" then
+            return nil, "invalid-payload", { rowIndex = index }
+        end
+        local copy = {}
+        for key, value in pairs(reward) do
+            copy[key] = value
+        end
+        if tostring(copy.type or "") == "item" then
+            local itemTier, tierReason = ItemTier.Validate(copy.itemTier)
+            if not itemTier then
+                return nil, tierReason or "invalid-item-tier", { rowIndex = index, field = "itemTier" }
+            end
+            copy.itemTier = itemTier
+        elseif copy.itemTier ~= nil and tostring(copy.itemTier) ~= "" then
+            return nil, "invalid-item-tier", { rowIndex = index, field = "itemTier", reason = "currency-tierless" }
+        end
+        normalized[index] = copy
+    end
+    return serializeRows(normalized, RESPONSE_REWARD_FIELDS)
 end
 
 function Protocol.DeserializeResultRewards(text)
-    return deserializeRows(text, RESPONSE_REWARD_FIELDS)
+    local source = tostring(text or "")
+    if source == "" then
+        return {}
+    end
+    local rows = {}
+    for index, record in ipairs(splitPreservingEmpty(source, Protocol.RecordSeparator)) do
+        local fields = splitPreservingEmpty(record, Protocol.FieldSeparator)
+        if #fields ~= 5 and #fields ~= 6 then
+            return nil, "invalid-payload", { rowIndex = index, reason = "field-count" }
+        end
+        local row = {}
+        for fieldIndex = 1, 5 do
+            local decoded, reason = decodeField(fields[fieldIndex])
+            if decoded == nil then
+                return nil, reason or "invalid-payload", { rowIndex = index, field = RESPONSE_REWARD_FIELDS[fieldIndex] }
+            end
+            row[RESPONSE_REWARD_FIELDS[fieldIndex]] = decoded
+        end
+        local tier = "normal"
+        if #fields == 6 then
+            tier = decodeField(fields[6])
+        end
+        if tier == nil then
+            return nil, "invalid-payload", { rowIndex = index, field = "itemTier" }
+        end
+        if row.type == "item" then
+            local normalized, tierReason = ItemTier.Validate(tier)
+            if not normalized then
+                return nil, tierReason or "invalid-item-tier", { rowIndex = index, field = "itemTier" }
+            end
+            row.itemTier = normalized
+        elseif #fields == 6 and tier ~= "" then
+            return nil, "invalid-item-tier", { rowIndex = index, field = "itemTier", reason = "currency-tierless" }
+        end
+        rows[#rows + 1] = row
+    end
+    return rows
 end
 
 function Protocol.BuildDeliveryArguments(payload)

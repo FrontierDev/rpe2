@@ -15,6 +15,7 @@ local Common = Addon.Utils.Common or {}
 local UI = Addon.UI or {}
 local C = UI.Constants or {}
 local Loot = Server.Loot or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 
 if type(EventManage) ~= "table" or EventManage._actionsLootInstalled == true then
     return
@@ -519,6 +520,17 @@ function EventManage:BuildActionLootGrant()
         if not amount then
             return nil, "invalid-amount"
         end
+        local itemTier = "normal"
+        if rewardType == "item" then
+            if type(ItemTier.Validate) == "function" then
+                itemTier = ItemTier.Validate(self.ActionsLootItemTier)
+            else
+                itemTier = self.ActionsLootItemTier or "normal"
+            end
+            if not itemTier then
+                return nil, "invalid-item-tier"
+            end
+        end
         if rewardType == "item" then
             if not resolveActiveItem(ref) then
                 return nil, "unknown-item"
@@ -537,11 +549,21 @@ function EventManage:BuildActionLootGrant()
                 type = rewardType,
                 ref = ref,
                 amount = amount,
+                itemTier = rewardType == "item" and itemTier or nil,
             },
         }
     end
 
     if sourceType == "loot_table" then
+        local itemTier
+        if type(ItemTier.Validate) == "function" then
+            itemTier = ItemTier.Validate(self.ActionsLootItemTier)
+        else
+            itemTier = self.ActionsLootItemTier or "normal"
+        end
+        if not itemTier then
+            return nil, "invalid-item-tier"
+        end
         local lootRef = trim(self.ActionsLootRef)
         if not resolveActiveLoot(lootRef) then
             return nil, "unknown-loot-table"
@@ -550,6 +572,7 @@ function EventManage:BuildActionLootGrant()
             sourceType = "loot_table",
             distribution = distribution,
             lootRef = lootRef,
+            itemTier = itemTier,
         }
     end
 
@@ -739,6 +762,8 @@ function EventManage:RefreshActionLootSection()
     self.ActionsLootSourceType = syncDropdown(self.ActionsLootSourceDropdown, SOURCE_ITEMS, self.ActionsLootSourceType, "direct")
     self.ActionsLootDistribution = syncDropdown(self.ActionsLootDistributionDropdown, DISTRIBUTION_ITEMS, self.ActionsLootDistribution, "personal")
     self.ActionsLootRewardType = syncDropdown(self.ActionsLootRewardTypeDropdown, REWARD_TYPE_ITEMS, self.ActionsLootRewardType, "item")
+    local itemTierItems = ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } }
+    self.ActionsLootItemTier = syncDropdown(self.ActionsLootItemTierDropdown, itemTierItems, self.ActionsLootItemTier, "normal")
 
     local collectionKey = self.ActionsLootSourceType == "loot_table" and "loot"
         or self.ActionsLootRewardType == "item" and "items"
@@ -778,6 +803,7 @@ function EventManage:RefreshActionLootSection()
     setEnabled(self.ActionsLootSourceDropdown, ready == true)
     setEnabled(self.ActionsLootDistributionDropdown, ready == true)
     setEnabled(self.ActionsLootRewardTypeDropdown, ready == true and self.ActionsLootSourceType == "direct")
+    setEnabled(self.ActionsLootItemTierDropdown, ready == true and (self.ActionsLootSourceType == "loot_table" or self.ActionsLootRewardType == "item"))
     setEnabled(self.ActionsLootQuantityInput, ready == true and self.ActionsLootSourceType == "direct")
     setEnabled(self.ActionsLootDatasetDropdown, ready == true and collectionKey ~= nil)
     setEnabled(self.ActionsLootRefDropdown, ready == true)
@@ -920,7 +946,7 @@ function EventManage:BuildActionLootSection(root)
 
     local sourceRow = createRow(root:GetFrame(), "RPEServerEventManageActionsLootSourceRow")
     self.ActionsLootDatasetDropdown = UI.CreateDropdown(sourceRow:GetFrame(), "RPEServerEventManageActionsLootDatasetDropdown", {
-        width = 125,
+        width = 110,
         height = DROPDOWN_HEIGHT,
         items = {},
         selectedValue = "",
@@ -933,7 +959,7 @@ function EventManage:BuildActionLootSection(root)
     sourceRow:AddChild(self.ActionsLootDatasetDropdown)
 
     self.ActionsLootRefDropdown = UI.CreateDropdown(sourceRow:GetFrame(), "RPEServerEventManageActionsLootRefDropdown", {
-        width = 190,
+        width = 165,
         height = DROPDOWN_HEIGHT,
         items = {},
         selectedValue = "",
@@ -944,8 +970,21 @@ function EventManage:BuildActionLootSection(root)
     })
     sourceRow:AddChild(self.ActionsLootRefDropdown)
 
+    self.ActionsLootItemTierDropdown = UI.CreateDropdown(sourceRow:GetFrame(), "RPEServerEventManageActionsLootItemTierDropdown", {
+        width = 70,
+        height = DROPDOWN_HEIGHT,
+        items = ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } },
+        selectedValue = "normal",
+        tooltip = "Item tier. Currency rewards are always tierless.",
+        onValueChanged = function(value)
+            self.ActionsLootItemTier = tostring(value or "normal")
+            self:RefreshActionLootSection()
+        end,
+    })
+    sourceRow:AddChild(self.ActionsLootItemTierDropdown)
+
     self.ActionsLootTargetsDropdown = UI.CreateDropdown(sourceRow:GetFrame(), "RPEServerEventManageActionsLootTargetsDropdown", {
-        width = 155,
+        width = 100,
         height = DROPDOWN_HEIGHT,
         items = {},
         multiSelect = true,
@@ -985,6 +1024,7 @@ function EventManage:BuildActionLootSection(root)
     self.ActionsLootSourceType = self.ActionsLootSourceType or "direct"
     self.ActionsLootDistribution = self.ActionsLootDistribution or "personal"
     self.ActionsLootRewardType = self.ActionsLootRewardType or "item"
+    self.ActionsLootItemTier = self.ActionsLootItemTier or "normal"
     self.ActionsLootQuantity = self.ActionsLootQuantity or "1"
     self.ActionsLootDatasetId = self.ActionsLootDatasetId or ""
     self.ActionsLootRef = self.ActionsLootRef or ""

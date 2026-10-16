@@ -10,6 +10,7 @@ local TraitClass = Database.Classes and Database.Classes.Trait or {}
 local Equipment = Profile.Equipment or {}
 local Resolver = Profile.Resolver or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 local RECIPE_PROFILE_INTERNAL_TRACE = false
 
 Profile._skillChangeListeners = Profile._skillChangeListeners or {}
@@ -2252,6 +2253,7 @@ function Profile.GetEquippedItemByScope(scope, slotKey)
         datasetId = entry.datasetId,
         itemId = entry.itemId,
         itemRef = entry.itemRef,
+        itemTier = ItemTier.Normalize(entry.itemTier) or "normal",
         slotRef = entry.slotRef,
         modifications = entry.modifications,
         soulbound = entry.soulbound == true,
@@ -2268,8 +2270,8 @@ function Profile.GetEquippedItem(slotKey)
     return Profile.GetEquippedItemByScope("character", slotKey)
 end
 
-function Profile.EquipItem(slotKey, itemRef, modifications, slotRef, soulbound)
-    return Equipment.EquipItem and Equipment.EquipItem(slotKey, itemRef, modifications, slotRef, soulbound) or nil
+function Profile.EquipItem(slotKey, itemRef, modifications, slotRef, soulbound, itemTier)
+    return Equipment.EquipItem and Equipment.EquipItem(slotKey, itemRef, modifications, slotRef, soulbound, itemTier) or nil
 end
 
 local function getActiveEquipmentScope()
@@ -2412,6 +2414,7 @@ function Profile.EquipInventoryItem(slotIndex, record, options)
                 Inventory.AddItem({
                     dataset = previousEntry.datasetId,
                     id = previousEntry.itemId,
+                    itemTier = previousEntry.itemTier,
                     modifications = previousEntry.modifications,
                     soulbound = previousEntry.soulbound == true,
                 }, { suppressLootNotification = true })
@@ -2420,6 +2423,7 @@ function Profile.EquipInventoryItem(slotIndex, record, options)
                 Inventory.AddItem({
                     dataset = offHandEntry.datasetId,
                     id = offHandEntry.itemId,
+                    itemTier = offHandEntry.itemTier,
                     modifications = offHandEntry.modifications,
                     soulbound = offHandEntry.soulbound == true,
                 }, { suppressLootNotification = true })
@@ -2428,7 +2432,7 @@ function Profile.EquipInventoryItem(slotIndex, record, options)
             local itemClass = getItemClass()
             local equippedSoulbound = inventoryRecord.soulbound == true
                 or (itemClass and itemClass.IsBindOnEquip and itemClass.IsBindOnEquip(item) or false)
-            local equipped = Equipment.EquipItemInScope and Equipment.EquipItemInScope(equipmentScope, slotKey, itemRef, inventoryRecord.modifications, slotRef, equippedSoulbound) or nil
+            local equipped = Equipment.EquipItemInScope and Equipment.EquipItemInScope(equipmentScope, slotKey, itemRef, inventoryRecord.modifications, slotRef, equippedSoulbound, inventoryRecord.itemTier) or nil
             if not equipped then
                 return nil, "equip-failed"
             end
@@ -2460,6 +2464,7 @@ function Profile.UnequipSlotToInventoryByScope(scope, slotKey)
                 Inventory.AddItem({
                     dataset = equippedEntry.datasetId,
                     id = equippedEntry.itemId,
+                    itemTier = equippedEntry.itemTier,
                     modifications = equippedEntry.modifications,
                     soulbound = equippedEntry.soulbound == true,
                 }, { suppressLootNotification = true })
@@ -4551,7 +4556,7 @@ function Profile.GetEquippedMountItem(slotKey)
     return Profile.GetEquippedItemByScope("mount", slotKey)
 end
 
-function Profile.EquipMountItem(slotKey, itemRef, modifications, slotRef, soulbound)
+function Profile.EquipMountItem(slotKey, itemRef, modifications, slotRef, soulbound, itemTier)
     local layout = Profile.GetEquipmentLayoutByScope and Profile.GetEquipmentLayoutByScope("mount") or Profile.GetMountLayout()
     local normalizedSlotKey = Equipment.NormalizeSlotKey and Equipment.NormalizeSlotKey(slotKey) or ensureString(slotKey)
     local allowed = false
@@ -4569,7 +4574,7 @@ function Profile.EquipMountItem(slotKey, itemRef, modifications, slotRef, soulbo
         return nil, "invalid-slot"
     end
 
-    return Equipment.EquipItemInScope and Equipment.EquipItemInScope("mount", slotKey, itemRef, modifications, slotRef, soulbound) or nil
+    return Equipment.EquipItemInScope and Equipment.EquipItemInScope("mount", slotKey, itemRef, modifications, slotRef, soulbound, itemTier) or nil
 end
 
 function Profile.UnequipMountItem(slotKey)
@@ -4588,7 +4593,7 @@ function Profile.GetEquippedPetItem(slotKey)
     return Profile.GetEquippedItemByScope("pet", slotKey)
 end
 
-function Profile.EquipPetItem(slotKey, itemRef, modifications, slotRef, soulbound)
+function Profile.EquipPetItem(slotKey, itemRef, modifications, slotRef, soulbound, itemTier)
     local layout = Profile.GetPetLayout and Profile.GetPetLayout() or buildSlotLayoutFromRefs({})
     local normalizedSlotKey = Equipment.NormalizeSlotKey and Equipment.NormalizeSlotKey(slotKey) or ensureString(slotKey)
     local allowed = false
@@ -4606,7 +4611,7 @@ function Profile.EquipPetItem(slotKey, itemRef, modifications, slotRef, soulboun
         return nil, "invalid-slot"
     end
 
-    return Equipment.EquipItemInScope and Equipment.EquipItemInScope("pet", slotKey, itemRef, modifications, slotRef, soulbound) or nil
+    return Equipment.EquipItemInScope and Equipment.EquipItemInScope("pet", slotKey, itemRef, modifications, slotRef, soulbound, itemTier) or nil
 end
 
 function Profile.UnequipPetItem(slotKey)

@@ -63,6 +63,16 @@ local function normalizeMarker(marker)
     return value >= 1 and value <= 8 and value or 0
 end
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+    return tostring(unit and unit.name or fallback or "")
+end
+
 local function getTeamName(eventState, team)
     if type(EventClass) == "table" and type(EventClass.GetTeamName) == "function" then
         return tostring(EventClass.GetTeamName(eventState, team) or "")
@@ -268,7 +278,7 @@ function EventWidget:BuildAllUnitsPresentationSignature(eventState)
             tostring(active and normalizeMarker(displayUnit and displayUnit.raidMarker) or 0),
             tostring(active and 1 or 0),
             tostring(concealed and 1 or 0),
-            tostring(active and displayUnit and displayUnit.name or ""),
+            tostring(active and getEventUnitDisplayName(sourceUnit or displayUnit) or ""),
             tostring(healthState and healthState.resourceRef or ""),
             tostring(healthState and healthState.currentValue or ""),
             tostring(healthState and healthState.maxValue or ""),
@@ -450,7 +460,7 @@ local function renderAllUnitsRow(row, item)
     local markerText = Inline and type(Inline.RaidMarker) == "function"
         and Inline:RaidMarker(marker, 14, 14)
         or ""
-    local name = tostring(unit.name or "Unknown Unit")
+    local name = getEventUnitDisplayName(unit, "Unknown Unit")
     local nameText = item.attackedLastTurn == true and "|cffffff00" .. name .. "|r" or name
     local eventIdText = item.eventID > 0 and ("  [#" .. tostring(item.eventID) .. "]") or ""
     elements.label:SetText(markerText .. (markerText ~= "" and " " or "") .. nameText .. eventIdText)

@@ -19,6 +19,19 @@ local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 local AuraClass = Database.Classes and Database.Classes.Aura or nil
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" then
+        if type(unit.GetDisplayName) == "function" then
+            return tostring(unit:GetDisplayName())
+        end
+        if tostring(unit.name or "") ~= "" then
+            return tostring(unit.name)
+        end
+    end
+
+    return fallback or "Unknown"
+end
+
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
     if timings and type(timings.Start) == "function" then
@@ -158,8 +171,8 @@ local function emitTriggeredDamageCombatLog(client, eventState, casterUnit, targ
         entryType = "damage",
         casterEventId = tonumber(casterUnit and casterUnit.eventID) or nil,
         meterAmount = amount,
-        casterDisplayName = tostring(casterUnit and casterUnit.name or "Unknown"),
-        targetDisplayName = tostring(targetUnit and targetUnit.name or "Unknown"),
+        casterDisplayName = getEventUnitDisplayName(casterUnit),
+        targetDisplayName = getEventUnitDisplayName(targetUnit),
         targetCount = 1,
         amountMin = amount,
         amountMax = amount,
@@ -784,8 +797,8 @@ local function logAuraProcDebug(auraEntry, auraDefinition, casterUnit, targetUni
     return Debug.Internal(
         "Aura proc: aura=%s caster=%s target=%s event=%s effect=%s chance=%.1f roll=%s outcome=%s applied=%s hit=%s amount=%d delta=%d",
         auraName,
-        tostring(casterUnit and casterUnit.name or "unknown"),
-        tostring(targetUnit and targetUnit.name or "unknown"),
+        getEventUnitDisplayName(casterUnit, "unknown"),
+        getEventUnitDisplayName(targetUnit, "unknown"),
         tostring(combatEventId or "unknown"),
         effectType,
         tonumber(chancePercent) or 0,
@@ -2135,8 +2148,8 @@ local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry
     return publish(client, {
         eventId = tostring(eventState and eventState.id or ""),
         entryType = "status",
-        casterDisplayName = tostring(casterUnit and casterUnit.name or "Unknown"),
-        targetDisplayName = tostring(targetUnit and targetUnit.name or "Unknown"),
+        casterDisplayName = getEventUnitDisplayName(casterUnit),
+        targetDisplayName = getEventUnitDisplayName(targetUnit),
         targetCount = 1,
         spellIconTexture = auraIcon,
         detailText = detailText,
@@ -4800,9 +4813,9 @@ function AuraManager:HandleLocalAuraTickResult(client, context, result)
             "Aura tick: %s [%s] %s (%s) -> %s (%s), stacks=%d, turns=%d, power=%d, amount=%d, appliedDelta=%d, applied=%s.",
             auraLabel,
             tostring(auraEntry.auraRef or "unknown"),
-            tostring(casterUnit and casterUnit.name or "unknown"),
+            getEventUnitDisplayName(casterUnit, "unknown"),
             tostring(tonumber(auraEntry.casterEventId) or 0),
-            tostring(targetUnit and targetUnit.name or "unknown"),
+            getEventUnitDisplayName(targetUnit, "unknown"),
             tostring(tonumber(auraEntry.targetEventId) or 0),
             math.max(0, math.floor(tonumber(auraEntry.stacks) or 0)),
             math.max(0, math.floor(tonumber(auraEntry.turnsRemaining) or 0)),
@@ -4911,9 +4924,9 @@ function AuraManager:HandleLocalAuraTriggeredResult(client, context, result, com
             auraLabel,
             tostring(auraEntry.auraRef or "unknown"),
             tostring(combatEventId or "unknown"),
-            tostring(casterUnit and casterUnit.name or "unknown"),
+            getEventUnitDisplayName(casterUnit, "unknown"),
             tostring(tonumber(auraEntry.casterEventId) or 0),
-            tostring(targetUnit and targetUnit.name or "unknown"),
+            getEventUnitDisplayName(targetUnit, "unknown"),
             tostring(targetUnit and targetUnit.eventID or "unknown"),
             effectType,
             amount,
@@ -5033,8 +5046,8 @@ function AuraManager:TickAura(client, eventState, entry, casterUnit, targetUnit)
                     "Aura effect resolved without application: aura=%s effectType=%s caster=%s target=%s.",
                     tostring(entry and entry.auraRef or "unknown"),
                     tostring(effect and effect.type or "unknown"),
-                    tostring(casterUnit and casterUnit.name or "unknown"),
-                    tostring(targetUnit and targetUnit.name or "unknown")
+                    getEventUnitDisplayName(casterUnit, "unknown"),
+                    getEventUnitDisplayName(targetUnit, "unknown")
                 )
             end
             self:HandleLocalAuraTickResult(client, {
@@ -5237,8 +5250,8 @@ function AuraManager:HandleCombatEvent(client, context)
                 "Trait handoff: event=%s recipient=%s source=%s other=%s",
                 tostring(combatEventId or ""),
                 tostring(recipientEventId or 0),
-                tostring(eventSourceUnit and eventSourceUnit.name or ""),
-                tostring(eventOtherUnit and eventOtherUnit.name or "")
+                getEventUnitDisplayName(eventSourceUnit, ""),
+                getEventUnitDisplayName(eventOtherUnit, "")
             )
         end
         local ok, traitChangedOrError = xpcall(function()

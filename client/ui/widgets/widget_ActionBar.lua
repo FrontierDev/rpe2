@@ -923,7 +923,8 @@ local function getPetButtonTooltipText(widget, petUnit)
         return "Release control to switch to a pet."
     end
     if type(petUnit) == "table" then
-        return ("Control pet %s"):format(tostring(petUnit.name or "pet"))
+        local name = type(petUnit.GetDisplayName) == "function" and petUnit:GetDisplayName() or petUnit.name
+        return ("Control pet %s"):format(tostring(name or "pet"))
     end
     if Profile.IsPetSelectionValid and Profile.IsPetSelectionValid() ~= true then
         return "Select an active pet first."

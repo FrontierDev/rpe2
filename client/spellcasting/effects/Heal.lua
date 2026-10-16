@@ -8,6 +8,17 @@ local AuraManager = Spellcasting.AuraManager or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
 local Debug = Addon.Debug or {}
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local function getCombat()
     return Addon.Client and Addon.Client.Combat or nil
 end
@@ -33,7 +44,7 @@ AuraManager:RegisterEffect({
             if Debug.AuraTracing == true and type(Debug.Info) == "function" then
                 Debug.Info(
                     "Aura heal skipped: target=%s healthResourceRef=%s combat=%s.",
-                    tostring(targetUnit and targetUnit.name or "unknown"),
+                    getEventUnitDisplayName(targetUnit, "unknown"),
                     tostring(healthResourceRef or "nil"),
                     tostring(Combat ~= nil)
                 )
@@ -54,7 +65,7 @@ AuraManager:RegisterEffect({
         if not applied and Debug.AuraTracing == true and type(Debug.Info) == "function" then
             Debug.Info(
                 "Aura heal applied no delta: target=%s healthResourceRef=%s amount=%d resourceFound=%s.",
-                tostring(targetUnit and targetUnit.name or "unknown"),
+                getEventUnitDisplayName(targetUnit, "unknown"),
                 tostring(healthResourceRef or "nil"),
                 amount,
                 tostring(resourceEntry ~= nil)

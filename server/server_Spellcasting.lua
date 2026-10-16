@@ -24,6 +24,17 @@ local SPELLCAST_INTERRUPT_OPCODE = Operations:GetOpcode("SPELLCAST_INTERRUPT")
 
 Server.ActiveSpellcastsByEventId = Server.ActiveSpellcastsByEventId or {}
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local function normalizeName(name)
     if Common.NormalizeName then
         return Common.NormalizeName(name)
@@ -478,7 +489,7 @@ function Server:HandleSpellcastStart(arguments, sender)
         casterEventId = payload.casterEventId,
     })
     if not suppressLog then
-        logLifecycle("start", payload.authorityType, payload.casterUnit.name, resolveSpellName(payload.spellRef), payload.castTurns)
+        logLifecycle("start", payload.authorityType, getEventUnitDisplayName(payload.casterUnit), resolveSpellName(payload.spellRef), payload.castTurns)
     end
 
     return true
@@ -505,7 +516,7 @@ function Server:HandleSpellcastComplete(arguments, sender)
     local suppressLog = shouldSuppressLoopbackLog(self, payload.eventId, payload.casterEventId, payload.spellRef, payload.authorityType, payload.sender, "complete")
     local previous = removeCastEntry(self, payload.eventId, payload.casterEventId)
     if not suppressLog then
-        logLifecycle("complete", payload.authorityType, payload.casterUnit.name, (previous and previous.spellName) or resolveSpellName(payload.spellRef))
+        logLifecycle("complete", payload.authorityType, getEventUnitDisplayName(payload.casterUnit), (previous and previous.spellName) or resolveSpellName(payload.spellRef))
     end
 
     executeSummonComponents(self, payload)
@@ -526,7 +537,7 @@ function Server:HandleSpellcastInterrupt(arguments, sender)
     local suppressLog = shouldSuppressLoopbackLog(self, payload.eventId, payload.casterEventId, payload.spellRef, payload.authorityType, payload.sender, "interrupt")
     local previous = removeCastEntry(self, payload.eventId, payload.casterEventId)
     if not suppressLog then
-        logLifecycle("interrupt", payload.authorityType, payload.casterUnit.name, (previous and previous.spellName) or resolveSpellName(payload.spellRef))
+        logLifecycle("interrupt", payload.authorityType, getEventUnitDisplayName(payload.casterUnit), (previous and previous.spellName) or resolveSpellName(payload.spellRef))
     end
 
     return true
@@ -565,7 +576,7 @@ function Server:OnSpellcastStart(casterEventId, spellRef, castTime)
         authorityType = "npc",
         casterEventId = casterUnit.eventID,
     })
-    logLifecycle("start", "npc", casterUnit.name, resolveSpellName(spellRef), numericCastTime)
+    logLifecycle("start", "npc", getEventUnitDisplayName(casterUnit), resolveSpellName(spellRef), numericCastTime)
 
     return Comms:SendToChannel(channelId, SPELLCAST_START_OPCODE, {
         sessionState.channelName,
@@ -599,7 +610,7 @@ function Server:OnSpellcastComplete(casterEventId, spellRef)
     end
 
     local previous = removeCastEntry(self, eventState.id, casterUnit.eventID)
-    logLifecycle("complete", "npc", casterUnit.name, (previous and previous.spellName) or resolveSpellName(spellRef))
+    logLifecycle("complete", "npc", getEventUnitDisplayName(casterUnit), (previous and previous.spellName) or resolveSpellName(spellRef))
 
     return Comms:SendToChannel(channelId, SPELLCAST_COMPLETE_OPCODE, {
         sessionState.channelName,
@@ -632,7 +643,7 @@ function Server:OnSpellcastInterrupted(casterEventId, spellRef)
     end
 
     local previous = removeCastEntry(self, eventState.id, casterUnit.eventID)
-    logLifecycle("interrupt", "npc", casterUnit.name, (previous and previous.spellName) or resolveSpellName(spellRef))
+    logLifecycle("interrupt", "npc", getEventUnitDisplayName(casterUnit), (previous and previous.spellName) or resolveSpellName(spellRef))
 
     return Comms:SendToChannel(channelId, SPELLCAST_INTERRUPT_OPCODE, {
         sessionState.channelName,
@@ -654,6 +665,6 @@ function Server:OnSpellcastChannelTick(casterEventId, spellRef)
         return false
     end
 
-    logLifecycle("channel-tick", "npc", casterUnit.name, resolveSpellName(spellRef))
+    logLifecycle("channel-tick", "npc", getEventUnitDisplayName(casterUnit), resolveSpellName(spellRef))
     return true
 end

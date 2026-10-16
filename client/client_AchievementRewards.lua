@@ -6,6 +6,7 @@ Addon.Internal = Addon.Internal or {}
 local Client = Addon.Client
 local Profile = Addon.Internal.Profile or {}
 local Registry = Addon.Internal.Registry or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
 local Runtime = Addon.Internal.Runtime or {}
 
@@ -112,6 +113,7 @@ local function normalizeInventoryRecord(record)
     return {
         dataset = datasetId,
         id = itemId,
+        itemTier = ItemTier.Normalize and (ItemTier.Normalize(record.itemTier) or "normal") or (record.itemTier or "normal"),
         modifications = deepCopy(type(record.modifications) == "table" and record.modifications or {}),
         soulbound = record.soulbound == true,
         quantity = math.max(1, math.floor(tonumber(record.quantity or record.count) or 1)),
@@ -123,6 +125,8 @@ local function sameInventoryVariant(left, right)
         and type(right) == "table"
         and tostring(left.dataset or "") == tostring(right.dataset or "")
         and tostring(left.id or "") == tostring(right.id or "")
+        and (ItemTier.Normalize and (ItemTier.Normalize(left.itemTier) or "normal") or (left.itemTier or "normal"))
+            == (ItemTier.Normalize and (ItemTier.Normalize(right.itemTier) or "normal") or (right.itemTier or "normal"))
         and left.soulbound == right.soulbound
         and deepEqual(left.modifications or {}, right.modifications or {})
 end

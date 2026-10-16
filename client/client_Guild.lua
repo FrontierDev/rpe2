@@ -10,8 +10,12 @@ local Profile = Addon.Internal and Addon.Internal.Profile or {}
 local Comms = Addon.Internal and Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 
-local GUILD_ADMIN_PROTOCOL_VERSION = "2"
+-- Version 3 adds the optional-looking item-tier field to give-item requests.
+-- Keep this strict so an older client cannot silently award a Normal item when
+-- the sender requested Heroic or Mythic.
+local GUILD_ADMIN_PROTOCOL_VERSION = "3"
 local GUILD_ADMIN_REQUEST_TIMEOUT = 8
 local GUILD_ADMIN_QUERY_OPCODE = Operations.GetOpcode and Operations:GetOpcode("GUILD_ADMIN_QUERY") or nil
 local GUILD_ADMIN_QUERY_RESPONSE_OPCODE = Operations.GetOpcode and Operations:GetOpcode("GUILD_ADMIN_QUERY_RESPONSE") or nil
@@ -211,21 +215,23 @@ local function findRequisition(setting, requisitionId)
     return nil
 end
 
-local function getInventoryItemQuantity(inventory, datasetId, itemId)
+local function getInventoryItemQuantity(inventory, datasetId, itemId, itemTier)
     if type(inventory.GetItems) ~= "function" then return nil end
     local ok, items = pcall(inventory.GetItems)
     if not ok or type(items) ~= "table" then return nil end
     local quantity = 0
     for index = 1, #items do
         local item = items[index]
-        if tostring(item and item.dataset or "") == datasetId and tostring(item and item.id or "") == itemId then
+        if tostring(item and item.dataset or "") == datasetId and tostring(item and item.id or "") == itemId
+            and (itemTier == nil or (ItemTier.Normalize(item and item.itemTier) or "normal") == (ItemTier.Normalize(itemTier) or "normal"))
+        then
             quantity = quantity + math.max(0, math.floor(tonumber(item.quantity or item.count) or 0))
         end
     end
     return quantity
 end
 
-local function removeInventoryItemQuantity(inventory, datasetId, itemId, quantity)
+local function removeInventoryItemQuantity(inventory, datasetId, itemId, quantity, itemTier)
     local remaining = math.max(0, math.floor(tonumber(quantity) or 0))
     if remaining == 0 then return true end
     if type(inventory.GetItems) ~= "function" or type(inventory.RemoveItem) ~= "function" then return false end
@@ -233,7 +239,9 @@ local function removeInventoryItemQuantity(inventory, datasetId, itemId, quantit
     if not ok or type(items) ~= "table" then return false end
     for index = #items, 1, -1 do
         local item = items[index]
-        if tostring(item and item.dataset or "") == datasetId and tostring(item and item.id or "") == itemId then
+        if tostring(item and item.dataset or "") == datasetId and tostring(item and item.id or "") == itemId
+            and (itemTier == nil or (ItemTier.Normalize(item and item.itemTier) or "normal") == (ItemTier.Normalize(itemTier) or "normal"))
+        then
             local itemQuantity = math.max(1, math.floor(tonumber(item.quantity or item.count) or 1))
             local removeQuantity = math.min(itemQuantity, remaining)
             local removed, result = pcall(inventory.RemoveItem, index, removeQuantity)
@@ -468,6 +476,10 @@ function Guild:GetRequisitionEligibility(guildSettingRef, requisitionId)
     if not roleOk then return buildRequisitionFailure(roleReason, roleDetail) end
 
     local itemRef = trimText(requisition.itemRef)
+    local itemTier, tierReason = ItemTier.Validate(requisition.itemTier)
+    if not itemTier then
+        return buildRequisitionFailure(tierReason or "invalid-item-tier", { requisitionId = normalizedId })
+    end
     local itemDataset, item
     if type(Registry.ResolveItemReference) == "function" then
         local ok
@@ -513,6 +525,7 @@ function Guild:GetRequisitionEligibility(guildSettingRef, requisitionId)
         item = item,
         datasetId = datasetId,
         itemId = itemId,
+        itemTier = itemTier,
         quantity = math.max(1, math.floor(tonumber(requisition.quantity) or 1)),
         costs = costs,
         usage = usage,
@@ -547,14 +560,14 @@ function Guild:TryRequisition(guildSettingRef, requisitionId)
     end
 
     local inventory = getInventoryService()
-    local beforeQty = getInventoryItemQuantity(inventory, detail.datasetId, detail.itemId)
-    local added, record = pcall(inventory.AddItem, { dataset = detail.datasetId, id = detail.itemId, quantity = detail.quantity })
-    local afterQty = getInventoryItemQuantity(inventory, detail.datasetId, detail.itemId)
+    local beforeQty = getInventoryItemQuantity(inventory, detail.datasetId, detail.itemId, detail.itemTier)
+    local added, record = pcall(inventory.AddItem, { dataset = detail.datasetId, id = detail.itemId, itemTier = detail.itemTier, quantity = detail.quantity })
+    local afterQty = getInventoryItemQuantity(inventory, detail.datasetId, detail.itemId, detail.itemTier)
     local awarded = detail.quantity
     local measured = beforeQty ~= nil and afterQty ~= nil
     if measured then awarded = math.max(0, afterQty - beforeQty) end
     if not added or not record or (measured and awarded < detail.quantity) then
-        local itemRestored = not measured or awarded <= 0 or removeInventoryItemQuantity(inventory, detail.datasetId, detail.itemId, awarded)
+        local itemRestored = not measured or awarded <= 0 or removeInventoryItemQuantity(inventory, detail.datasetId, detail.itemId, awarded, detail.itemTier)
         local currenciesRestored = rollbackCurrencies()
         return false, (itemRestored and currenciesRestored) and "inventory-award-failed" or "rollback-failed", detail
     end
@@ -569,7 +582,7 @@ function Guild:TryRequisition(guildSettingRef, requisitionId)
             updatedUsage = nil
         end
         if updatedUsage ~= expectedUsage then
-            local itemRestored = removeInventoryItemQuantity(inventory, detail.datasetId, detail.itemId, awarded)
+            local itemRestored = removeInventoryItemQuantity(inventory, detail.datasetId, detail.itemId, awarded, detail.itemTier)
             local ledgerRestored = false
             if itemRestored and type(Profile.SetGuildRequisitionUsage) == "function" then
                 local ok, value = pcall(Profile.SetGuildRequisitionUsage, detail.guildKey, detail.settingRef, detail.requisitionId, detail.usage)
@@ -585,6 +598,7 @@ function Guild:TryRequisition(guildSettingRef, requisitionId)
         guildSettingRef = detail.settingRef,
         requisitionId = detail.requisitionId,
         itemRef = detail.itemRef,
+        itemTier = detail.itemTier,
         quantity = detail.quantity,
         usage = updatedUsage,
         characterLimit = detail.characterLimit,
@@ -610,7 +624,9 @@ local function buildDailyRewardPlan(setting, rewardList)
             if not ok or type(dataset) ~= "table" or type(item) ~= "table" or not datasetId or not itemId then
                 return nil, "item-unavailable", { rewardIndex = index, rewardId = rewardId, ref = rewardRef }
             end
-            plan[#plan + 1] = { id = rewardId, type = "item", ref = rewardRef, amount = amount, datasetId = datasetId, itemId = itemId }
+            local itemTier, tierReason = ItemTier.Validate(reward.itemTier)
+            if not itemTier then return nil, tierReason or "invalid-item-tier", { rewardIndex = index, rewardId = rewardId } end
+            plan[#plan + 1] = { id = rewardId, type = "item", ref = rewardRef, amount = amount, datasetId = datasetId, itemId = itemId, itemTier = itemTier }
             needsItem = true
         else
             if type(Profile.NormalizeCurrencyKey) ~= "function" or type(Profile.ResolveCurrencyDefinition) ~= "function" then return nil, "currency-api-unavailable" end
@@ -706,7 +722,7 @@ local function createDailyRewardTransaction()
         local restored, inventory = true, getInventoryService()
         for index = #self.itemAwards, 1, -1 do
             local award = self.itemAwards[index]
-            if not removeInventoryItemQuantity(inventory, award.datasetId, award.itemId, award.amount) then restored = false end
+            if not removeInventoryItemQuantity(inventory, award.datasetId, award.itemId, award.amount, award.itemTier) then restored = false end
         end
         if not restoreCurrencySnapshots(self.currencySnapshots) then restored = false end
         return restored
@@ -729,12 +745,12 @@ local function awardDailyRewardPlan(plan)
     for index = 1, #plan do
         local reward = plan[index]
         if reward.type == "item" then
-            local before = getInventoryItemQuantity(inventory, reward.datasetId, reward.itemId)
-            local ok, record = pcall(inventory.AddItem, { dataset = reward.datasetId, id = reward.itemId, quantity = reward.amount })
-            local after = getInventoryItemQuantity(inventory, reward.datasetId, reward.itemId)
+            local before = getInventoryItemQuantity(inventory, reward.datasetId, reward.itemId, reward.itemTier)
+            local ok, record = pcall(inventory.AddItem, { dataset = reward.datasetId, id = reward.itemId, itemTier = reward.itemTier, quantity = reward.amount })
+            local after = getInventoryItemQuantity(inventory, reward.datasetId, reward.itemId, reward.itemTier)
             local awarded = before ~= nil and after ~= nil and math.max(0, after - before) or reward.amount
             if awarded > 0 and (before ~= nil and after ~= nil or ok and record) then
-                tx.itemAwards[#tx.itemAwards + 1] = { datasetId = reward.datasetId, itemId = reward.itemId, amount = awarded }
+                tx.itemAwards[#tx.itemAwards + 1] = { datasetId = reward.datasetId, itemId = reward.itemId, itemTier = reward.itemTier, amount = awarded }
             end
             if not ok or not record or awarded < reward.amount then return false, tx:Rollback() and "item-award-failed" or "rollback-failed", tx end
         else
@@ -1060,11 +1076,15 @@ function Guild:RemoveGuildRoleForMember(targetName, settingRef, roleId, callback
     return sendRoleMutation(self, "remove_guild_role", targetName, settingRef, roleId, callback)
 end
 
-local function sendSimpleMutation(self, operation, targetName, ref, value, callback)
+local function sendSimpleMutation(self, operation, targetName, ref, value, callback, extension)
     local available, reason, member = self:IsGuildAdminTargetAvailable(targetName)
     if not available then invokeCallback({ callback = callback }, { success = false, operation = operation, reason = reason }) return false, reason end
     local requestId = getRequestId()
-    return sendRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, { requestId, GUILD_ADMIN_PROTOCOL_VERSION, operation, member.name, ref or "", value or "" }, { requestId = requestId, kind = "mutation", operation = operation, targetName = member.name, callback = callback })
+    local arguments = { requestId, GUILD_ADMIN_PROTOCOL_VERSION, operation, member.name, ref or "", value or "" }
+    if extension ~= nil then
+        arguments[#arguments + 1] = extension
+    end
+    return sendRequest(self, GUILD_ADMIN_MUTATION_OPCODE, member.name, arguments, { requestId = requestId, kind = "mutation", operation = operation, targetName = member.name, callback = callback })
 end
 
 function Guild:GrantAchievementForMember(targetName, achievementRef, callback)
@@ -1080,11 +1100,16 @@ function Guild:AdjustSkillForMember(targetName, skillRef, delta, callback)
     return sendSimpleMutation(self, "adjust_skill", targetName, ref, normalized, callback)
 end
 
-function Guild:GiveItemToMember(targetName, itemRef, quantity, callback)
+function Guild:GiveItemToMember(targetName, itemRef, quantity, callback, itemTier)
     local ref, normalized = trimText(itemRef), normalizeInteger(quantity, 1)
     if ref == "" then invokeCallback({ callback = callback }, { success = false, operation = "give_item", reason = "unknown-item" }) return false, "unknown-item" end
     if not normalized then invokeCallback({ callback = callback }, { success = false, operation = "give_item", reason = "invalid-quantity" }) return false, "invalid-quantity" end
-    return sendSimpleMutation(self, "give_item", targetName, ref, normalized, callback)
+    local normalizedTier, tierReason = ItemTier.Validate(itemTier)
+    if not normalizedTier then
+        invokeCallback({ callback = callback }, { success = false, operation = "give_item", reason = tierReason or "invalid-item-tier" })
+        return false, tierReason or "invalid-item-tier"
+    end
+    return sendSimpleMutation(self, "give_item", targetName, ref, normalized, callback, normalizedTier)
 end
 
 local function pendingResponse(self, arguments, sender, distribution)
@@ -1252,13 +1277,15 @@ function Guild:HandleGuildAdminMutation(arguments, sender, distribution)
 
     if operation == "give_item" then
         local ref, quantity = getArgument(arguments, 5), normalizeInteger(getArgument(arguments, 6), 1)
+        local itemTier, tierReason = ItemTier.Validate(getArgument(arguments, 7))
         local dataset, item = resolveItemReference(ref)
         local datasetId, itemId = parseItemReference(ref)
         if not dataset or not item or not datasetId or not itemId then reason = "unknown-item"
         elseif not quantity then reason = "invalid-quantity"
+        elseif not itemTier then reason = tierReason or "invalid-item-tier"
         elseif type(getInventoryService().AddItem) ~= "function" then reason = "inventory-api-unavailable"
         else
-            local ok, record = pcall(getInventoryService().AddItem, { dataset = datasetId, id = itemId, quantity = quantity })
+            local ok, record = pcall(getInventoryService().AddItem, { dataset = datasetId, id = itemId, itemTier = itemTier, quantity = quantity })
             if not ok or not record then reason = "item-award-failed"
             else self:RefreshWindow() return sendAdminMessage(GUILD_ADMIN_MUTATION_RESPONSE_OPCODE, sender, buildMutationResponse(requestId, operation, true, "ok", "", "", false, "item-awarded", quantity)) end
         end

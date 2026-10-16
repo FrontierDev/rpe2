@@ -810,8 +810,12 @@ local function buildCombatResult(entry, resultToken, resultType)
     }
 end
 
-local function getUnitDisplayName(unit)
-    return tostring(unit and unit.name or "Unknown")
+local function getUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        return tostring(unit:GetDisplayName())
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
 end
 
 local function getLocalEventUnitId(eventState)
@@ -1604,7 +1608,7 @@ function Client:GetReactionDisplayState()
     return {
         checkId = entry.checkId,
         attackerUnit = entry.attackerUnit,
-        attackerName = tostring(entry.attackerUnit and entry.attackerUnit.name or "Unknown Attacker"),
+        attackerName = getUnitDisplayName(entry.attackerUnit, "Unknown Attacker"),
         actions = Combat:BuildReactionActions(entry),
         failurePreviewText = failurePreviewText,
         failurePreviewIcon = failurePreviewIcon,

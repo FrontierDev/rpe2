@@ -68,6 +68,9 @@ function EventUnit:MergeLiveNetworkUpdate(incoming)
     end
 
     local incomingData = type(incoming.ToTable) == "function" and incoming:ToTable() or incoming
+    if incoming._networkDisplayNameOverridePresent == true then
+        incomingData._networkDisplayNameOverridePresent = true
+    end
     local candidate = type(EventUnit.FromTable) == "function" and EventUnit.FromTable(incomingData) or nil
     if type(candidate) ~= "table" then
         reportIdentityFailure("Cannot apply Event unit delta %s: incoming unit could not be materialized.", tostring(incoming.eventID or self.eventID or "unknown"))
@@ -79,6 +82,10 @@ function EventUnit:MergeLiveNetworkUpdate(incoming)
     if incoming._networkVariantIdentityPresent ~= true then
         candidate.presetIndex = self.presetIndex
         candidate.appearanceIndex = self.appearanceIndex
+    end
+    local hasDisplayNameUpdate = incoming._networkDisplayNameOverridePresent == true
+    if not hasDisplayNameUpdate then
+        candidate.displayNameOverride = self.displayNameOverride
     end
     if tostring(candidate.registryID or "") == "" then
         candidate.registryID = self.registryID
@@ -98,6 +105,12 @@ function EventUnit:MergeLiveNetworkUpdate(incoming)
     end
 
     self:Merge(candidate:ToTable())
+    if hasDisplayNameUpdate then
+        -- An explicit field-35 clear is represented by a nil override, which
+        -- is intentionally absent from ToTable(). Apply that clear after the
+        -- normal identity-preserving merge.
+        self.displayNameOverride = candidate.displayNameOverride
+    end
     return true
 end
 
@@ -126,6 +139,8 @@ function EventUnit:GetResolvedVariantName()
     return runtimeName
 end
 
+-- Presentation-only name. Keep the resolved variant name available to
+-- provenance/editor code while allowing an event-local NPC override.
 function EventUnit:GetResolvedAppearance()
     local Unit = Classes.Unit
     local unit = self.GetResolvedUnit and self:GetResolvedUnit() or nil

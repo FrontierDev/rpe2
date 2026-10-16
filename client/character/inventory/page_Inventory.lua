@@ -13,6 +13,7 @@ local Equipment = Profile.Equipment or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local UI = Addon.UI or {}
 local TooltipBuilders = Addon.Client.UI and Addon.Client.UI.Tooltips or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 
 local function startTiming(label, thresholdMs, context)
     local timings = Addon.Debug and Addon.Debug.Timings or nil
@@ -91,6 +92,7 @@ local function ensureSelectionBuckets()
         dataset = {},
         quality = {},
         itemType = {},
+        itemTier = {},
         tag = {},
     }
 end
@@ -263,6 +265,7 @@ local function buildTooltipText(resolved)
             datasetId = resolved.datasetId,
             datasetName = datasetName,
             itemId = resolved.itemId,
+            itemTier = resolved.itemTier,
             isActive = resolved.isActive,
             isMissing = resolved.isMissing,
             soulbound = resolved.soulbound == true,
@@ -441,6 +444,7 @@ function InventoryGridPage:BuildFilterItems(categoryItems)
     local datasetItems = {}
     local qualityItems = {}
     local itemTypeItems = {}
+    local itemTierItems = {}
     local tagItems = {}
 
     for index = 1, #resolvedItems do
@@ -460,6 +464,11 @@ function InventoryGridPage:BuildFilterItems(categoryItems)
         end
 
         if resolved and resolved.item then
+            local itemTier = ItemTier.Normalize(resolved.itemTier) or "normal"
+            itemTierItems[itemTier] = {
+                label = ItemTier.DisplayName(itemTier),
+                value = "itemTier:" .. itemTier,
+            }
             qualityItems[tostring(resolved.quality or "common")] = {
                 label = getQualityLabel(resolved.quality),
                 value = "quality:" .. tostring(resolved.quality or "common"),
@@ -518,6 +527,15 @@ function InventoryGridPage:BuildFilterItems(categoryItems)
             label = "Type",
             value = "root:itemType",
             children = itemTypes,
+        }
+    end
+
+    local itemTiers = appendSortedItems(itemTierItems)
+    if #itemTiers > 0 then
+        items[#items + 1] = {
+            label = "Item Tier",
+            value = "root:itemTier",
+            children = itemTiers,
         }
     end
 
@@ -584,6 +602,13 @@ function InventoryGridPage:PassesFilters(resolved, selection)
     if selectionCount(selection.itemType) > 0 then
         local itemType = resolved.item and tostring(resolved.itemType or "none") or ""
         if not selection.itemType[itemType] then
+            return false
+        end
+    end
+
+    if selectionCount(selection.itemTier) > 0 then
+        local itemTier = resolved.item and (ItemTier.Normalize(resolved.itemTier) or "normal") or ""
+        if not selection.itemTier[itemTier] then
             return false
         end
     end

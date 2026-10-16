@@ -10,6 +10,7 @@ Item.__index = Item
 local TraitClass = Addon.Internal.Database.Classes.Trait or {}
 local ConditionClass = Addon.Internal.Database.Classes.Condition or {}
 local Registry = Addon.Internal.Registry or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 
 local AUTO_PRICE_QUALITY_MULTIPLIERS = {
     poor = 0.8,
@@ -650,6 +651,13 @@ function Item:Merge(data)
     end
 
     return self
+end
+
+function Item.ResolveEffectiveStatValue(statEntry, itemTier, options, statDefinition)
+    if type(ItemTier.ResolveAuthoredStatValue) == "function" then
+        return ItemTier.ResolveAuthoredStatValue(statEntry, itemTier, options, statDefinition)
+    end
+    return tonumber(type(statEntry) == "table" and statEntry.value) or 0
 end
 
 function Item:ToTable()

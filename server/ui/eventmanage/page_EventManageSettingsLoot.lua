@@ -12,6 +12,7 @@ local Registry = Addon.Internal.Registry or {}
 local Profile = Addon.Internal.Profile or {}
 local UI = Addon.UI or {}
 local C = UI.Constants or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 
 if type(EventManage) ~= "table" or type(EventClass) ~= "table" or EventManage._endLootSettingsInstalled == true then
     return
@@ -232,6 +233,15 @@ local function validateGrant(grant)
     end
 
     if sourceType == "loot_table" then
+        local itemTier
+        if type(ItemTier.Validate) == "function" then
+            itemTier = ItemTier.Validate(grant.itemTier)
+        else
+            itemTier = grant.itemTier or "normal"
+        end
+        if not itemTier then
+            return false, "invalid-item-tier", "Select a valid item tier."
+        end
         local lootRef = trim(grant.lootRef)
         if lootRef == "" then
             return false, "missing-loot-ref", "Select a Loot Table."
@@ -258,6 +268,15 @@ local function validateGrant(grant)
     end
 
     if rewardType == "item" then
+        local itemTier
+        if type(ItemTier.Validate) == "function" then
+            itemTier = ItemTier.Validate(reward and reward.itemTier)
+        else
+            itemTier = reward and reward.itemTier or "normal"
+        end
+        if not itemTier then
+            return false, "invalid-item-tier", "Select a valid item tier."
+        end
         local _, item = resolveActivatedEntry(ref, "items")
         if type(item) ~= "table" then
             return false, "missing-item", "Selected Item is unavailable."
@@ -278,14 +297,20 @@ local function canonicalizeDraft(draft)
     local sourceType = normalizeToken(draft and draft.sourceType)
     local distribution = normalizeToken(draft and draft.distribution)
     if sourceType == "loot_table" then
+        local draftTier = draft and draft.itemTier
+        local normalizedDraftTier = draftTier == nil and "normal" or (ItemTier.Normalize and ItemTier.Normalize(draftTier) or draftTier)
         return {
             sourceType = "loot_table",
             lootRef = trim(draft and draft.lootRef),
             distribution = distribution,
+            itemTier = normalizedDraftTier,
         }
     end
 
     local reward = type(draft) == "table" and draft.reward or nil
+    local rewardType = normalizeToken(reward and reward.type)
+    local rewardTier = reward and reward.itemTier
+    local normalizedRewardTier = rewardTier == nil and "normal" or (ItemTier.Normalize and ItemTier.Normalize(rewardTier) or rewardTier)
     return {
         sourceType = sourceType,
         distribution = distribution,
@@ -293,6 +318,9 @@ local function canonicalizeDraft(draft)
             type = normalizeToken(reward and reward.type),
             ref = trim(reward and reward.ref),
             amount = positiveInteger(reward and reward.amount) or (reward and reward.amount),
+            itemTier = rewardType == "item"
+                and normalizedRewardTier
+                or nil,
         },
     }
 end
@@ -357,6 +385,9 @@ local function buildLootRows(eventState)
             rowIndex = index,
             reward = displayName,
             type = typeLabel,
+            tier = (sourceType == "loot_table" or (sourceType == "direct" and normalizeToken(grant.reward and grant.reward.type) == "item"))
+                and (ItemTier.DisplayName and ItemTier.DisplayName(grant.itemTier or (grant.reward and grant.reward.itemTier)) or "Normal")
+                or "-",
             distribution = displayDistribution(grant and grant.distribution),
         }
     end
@@ -493,6 +524,7 @@ local function refreshDraftControls(self)
             self.EndLootTableRefDropdown:SetItems(buildEntryItems(datasetId, "loot", "Loot Table", lootRef))
         end
         syncDropdown(self.EndLootTableRefDropdown, lootRef)
+        syncDropdown(self.EndLootTableTierDropdown, ItemTier.Normalize and (ItemTier.Normalize(draft.itemTier) or "normal") or "normal")
     elseif directItemMode then
         local ref = trim(reward and reward.ref)
         local datasetId = select(1, parseDatasetQualifiedRef(ref))
@@ -510,6 +542,7 @@ local function refreshDraftControls(self)
             self.EndLootDirectItemRefDropdown:SetItems(buildEntryItems(datasetId, "items", "Item", ref))
         end
         syncDropdown(self.EndLootDirectItemRefDropdown, ref)
+        syncDropdown(self.EndLootDirectItemTierDropdown, ItemTier.Normalize and (ItemTier.Normalize(reward and reward.itemTier) or "normal") or "normal")
         syncInput(self.EndLootDirectItemAmountInput, reward and reward.amount or 1)
     elseif directCurrencyMode then
         local ref = trim(reward and reward.ref)
@@ -792,7 +825,7 @@ local function buildEditor(self)
     })
     self.EndLootTableModeRow:AddChild(self.EndLootTableDatasetDropdown)
     self.EndLootTableRefDropdown = UI.CreateDropdown(self.EndLootTableModeRow:GetFrame(), "RPEServerEventManageSettingsEndLootTableRefDropdown", {
-        width = 250, height = DROPDOWN_HEIGHT, items = {}, selectedValue = "",
+        width = 220, height = DROPDOWN_HEIGHT, items = {}, selectedValue = "",
         onValueChanged = function(value)
             local draft = self.EndLootGrantDraft or defaultDraft()
             draft.lootRef = trim(value)
@@ -801,6 +834,18 @@ local function buildEditor(self)
         end,
     })
     self.EndLootTableModeRow:AddChild(self.EndLootTableRefDropdown)
+    self.EndLootTableTierDropdown = UI.CreateDropdown(self.EndLootTableModeRow:GetFrame(), "RPEServerEventManageSettingsEndLootTableTierDropdown", {
+        width = 68, height = DROPDOWN_HEIGHT,
+        items = ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } },
+        selectedValue = "normal",
+        onValueChanged = function(value)
+            local draft = self.EndLootGrantDraft or defaultDraft()
+            draft.itemTier = ItemTier.Validate and ItemTier.Validate(value) or value
+            self.EndLootGrantDraft = draft
+            self:RefreshLootEditor()
+        end,
+    })
+    self.EndLootTableModeRow:AddChild(self.EndLootTableTierDropdown)
 
     self.EndLootDirectItemModeRow = createRow(modeParent, "RPEServerEventManageSettingsEndLootDirectItemModeRow", width)
     self.EndLootDirectItemModeRow:SetPoint("TOPLEFT", modeParent, "TOPLEFT", 0, 0)
@@ -838,7 +883,7 @@ local function buildEditor(self)
     })
     self.EndLootDirectItemModeRow:AddChild(self.EndLootDirectItemDatasetDropdown)
     self.EndLootDirectItemRefDropdown = UI.CreateDropdown(self.EndLootDirectItemModeRow:GetFrame(), "RPEServerEventManageSettingsEndLootDirectItemRefDropdown", {
-        width = 174, height = DROPDOWN_HEIGHT, items = {}, selectedValue = "",
+        width = 150, height = DROPDOWN_HEIGHT, items = {}, selectedValue = "",
         onValueChanged = function(value)
             local draft = self.EndLootGrantDraft or defaultDraft()
             draft.reward = type(draft.reward) == "table" and draft.reward or { type = "item", amount = 1 }
@@ -849,6 +894,19 @@ local function buildEditor(self)
         end,
     })
     self.EndLootDirectItemModeRow:AddChild(self.EndLootDirectItemRefDropdown)
+    self.EndLootDirectItemTierDropdown = UI.CreateDropdown(self.EndLootDirectItemModeRow:GetFrame(), "RPEServerEventManageSettingsEndLootDirectItemTierDropdown", {
+        width = 68, height = DROPDOWN_HEIGHT,
+        items = ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } },
+        selectedValue = "normal",
+        onValueChanged = function(value)
+            local draft = self.EndLootGrantDraft or defaultDraft()
+            draft.reward = type(draft.reward) == "table" and draft.reward or { type = "item", ref = "", amount = 1 }
+            draft.reward.itemTier = ItemTier.Validate and ItemTier.Validate(value) or value
+            self.EndLootGrantDraft = draft
+            self:RefreshLootEditor()
+        end,
+    })
+    self.EndLootDirectItemModeRow:AddChild(self.EndLootDirectItemTierDropdown)
     self.EndLootDirectItemAmountInput = UI.CreateTextInput(self.EndLootDirectItemModeRow:GetFrame(), "RPEServerEventManageSettingsEndLootDirectItemAmountInput", {
         width = 50, height = CONTROL_HEIGHT, text = "1", borderColor = UI.ResolveColor(nil, "panel.border"),
     })
@@ -925,6 +983,7 @@ local function buildEditor(self)
     self.SettingsLootColumns = {
         { key = "reward", label = "Source / Reward", width = 210, justifyH = "LEFT" },
         { key = "type", label = "Type", width = 104, justifyH = "LEFT" },
+        { key = "tier", label = "Tier", width = 58, justifyH = "LEFT" },
         { key = "distribution", label = "Distribution", width = 64, justifyH = "LEFT" },
     }
 

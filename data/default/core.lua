@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 84,
+    version = 87,
     dataset = {
         achievements = {},
         auras = {
@@ -9068,8 +9068,26 @@ units = {
             {
                 name = "Civilian",
                 challengeLevel = "minor",
+                appearances = {
+                    { displayId = 1288, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1289, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1290, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1291, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1292, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1293, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1357, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1361, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1439, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1440, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1441, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1442, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1443, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1444, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1445, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                    { displayId = 1446, fileDataId = 1011653, cam = 0.45, rot = -0.09, z = -0.54 },
+                },
                 resourceModifiers = {
-                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -80, flatBonus = 0 },
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -20, flatBonus = 0 },
                     { resourceRef = "f82db71a:4c8mfm99", percentBonus = -100, flatBonus = 0 },
                     { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
                     { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
@@ -12594,6 +12612,12 @@ units = {
                 {
                     name = "Tidehunter",
                     challengeLevel = "normal",
+                    appearances = {
+                        { displayId = 4036, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4762, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4763, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4765, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    },
                     resourceModifiers = { { resourceRef = "f82db71a:q2ktkztt", percentBonus = 66.666667, flatBonus = 0 } },
                     statModifiers = {
                         { statRef = "f82db71a:v42albuv", percentBonus = 90, flatBonus = 0 },
@@ -12608,6 +12632,13 @@ units = {
                 {
                     name = "Priestess",
                     challengeLevel = "normal",
+                    appearances = {
+                        { displayId = 4972, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4973, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4974, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4975, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4976, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    },
                     resourceModifiers = {
                         { resourceRef = "f82db71a:q2ktkztt", percentBonus = 38.888889, flatBonus = 0 },
                         { resourceRef = "f82db71a:4c8mfm99", percentBonus = 0, flatBonus = 1900 },
@@ -12625,6 +12656,13 @@ units = {
                 {
                     name = "Enchantress",
                     challengeLevel = "normal",
+                    appearances = {
+                        { displayId = 4972, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4973, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4974, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4975, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4976, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    },
                     resourceModifiers = {
                         { resourceRef = "f82db71a:q2ktkztt", percentBonus = 38.888889, flatBonus = 0 },
                         { resourceRef = "f82db71a:4c8mfm99", percentBonus = 0, flatBonus = 2000 },
@@ -12643,6 +12681,13 @@ units = {
                 {
                     name = "Siren",
                     challengeLevel = "normal",
+                    appearances = {
+                        { displayId = 4972, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4973, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4974, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4975, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 4976, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    },
                     resourceModifiers = {
                         { resourceRef = "f82db71a:q2ktkztt", percentBonus = 44.444444, flatBonus = 0 },
                         { resourceRef = "f82db71a:4c8mfm99", percentBonus = 0, flatBonus = 1900 },
@@ -12660,6 +12705,11 @@ units = {
                 {
                     name = "Sea Witch",
                     challengeLevel = "elite",
+                    appearances = {
+                        { displayId = 17582, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 18391, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 18392, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    },
                     resourceModifiers = {
                         { resourceRef = "f82db71a:q2ktkztt", percentBonus = 400, flatBonus = 0 },
                         { resourceRef = "f82db71a:4c8mfm99", percentBonus = 0, flatBonus = 2600 },
@@ -12680,6 +12730,15 @@ units = {
                 {
                     name = "Myrmidon",
                     challengeLevel = "elite",
+                    appearances = {
+                        { displayId = 17581, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 18387, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 18388, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 18389, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 18398, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 18394, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                        { displayId = 19364, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    },
                     resourceModifiers = {
                         { resourceRef = "f82db71a:q2ktkztt", percentBonus = 511.111111, flatBonus = 0 },
                         { resourceRef = "f82db71a:e2tfklq7", percentBonus = 0, flatBonus = 100 },

@@ -36,6 +36,17 @@ local function normalizeNonNegative(value)
     return math.max(0, tonumber(value) or 0)
 end
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 local function shouldYield(deadlineMs)
     return type(Tasks.ShouldYield) == "function" and Tasks:ShouldYield(deadlineMs) == true
 end
@@ -363,7 +374,7 @@ local function resolveMovementAllowance(state, member, unit)
     if allowance <= 0 then
         state.pinnedMembers[#state.pinnedMembers + 1] = {
             eventId = eventId,
-            name = tostring(unit.name or ("NPC " .. tostring(eventId))),
+            name = getEventUnitDisplayName(unit, "NPC " .. tostring(eventId)),
             details = details,
         }
     end

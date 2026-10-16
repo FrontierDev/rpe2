@@ -22,6 +22,17 @@ local Event = Addon.Internal
 local Tasks = Addon.Internal.Tasks or {}
 local Debug = Addon.Debug or {}
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "Unknown")
+end
+
 if type(Planner) ~= "table" or type(Event) ~= "table" then
     return
 end
@@ -841,7 +852,7 @@ end
 local function snapshotUnitSummary(unit, spellRefs, movementSnapshot)
     return {
         eventID = normalizeEventId(unit and unit.eventID),
-        name = tostring(unit and unit.name or ""),
+        name = getEventUnitDisplayName(unit, ""),
         active = isUnitActive(unit),
         dead = unit and unit.dead == true or false,
         team = tonumber(unit and unit.team) or 0,

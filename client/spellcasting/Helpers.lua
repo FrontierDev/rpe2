@@ -36,6 +36,19 @@ local SPELLCAST_SLOW_HELPER_MS = 25
 local EMPTY_RESOURCE_COSTS = {}
 local SPELL_RESOURCE_COSTS_BY_PHASE_CACHE = setmetatable({}, { __mode = "k" })
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" then
+        if type(unit.GetDisplayName) == "function" then
+            return tostring(unit:GetDisplayName())
+        end
+        if tostring(unit.name or "") ~= "" then
+            return tostring(unit.name)
+        end
+    end
+
+    return fallback or "Unknown"
+end
+
 local function normalizeDefenceStatRef(value)
     local reference = type(value) == "string" and value or ""
     reference = reference:gsub("^%s+", ""):gsub("%s+$", "")
@@ -369,7 +382,7 @@ local function emitResolvedHealCombatLog(client, eventState, casterUnit, targetR
             targetCount = targetCount + 1
             exactTotal = exactTotal + amount
             if targetCount == 1 then
-                singleTargetName = tostring(targetUnit.name or "Unknown")
+                singleTargetName = getEventUnitDisplayName(targetUnit)
             end
             if amountMin == nil or amount < amountMin then
                 amountMin = amount
@@ -390,7 +403,7 @@ local function emitResolvedHealCombatLog(client, eventState, casterUnit, targetR
         entryType = "heal",
         casterEventId = tonumber(casterUnit.eventID) or nil,
         meterAmount = exactTotal,
-        casterDisplayName = tostring(casterUnit.name or "Unknown"),
+        casterDisplayName = getEventUnitDisplayName(casterUnit),
         targetDisplayName = targetCount > 1 and ("%d targets"):format(targetCount) or singleTargetName,
         targetCount = targetCount,
         amountMin = amountMin,
@@ -429,8 +442,8 @@ local function emitInterruptCombatLog(client, eventState, casterUnit, targetUnit
         eventId = eventState.id,
         entryType = "status",
         logKind = "interrupt",
-        casterDisplayName = tostring(casterUnit.name or "Unknown"),
-        targetDisplayName = tostring(targetUnit.name or "Unknown"),
+        casterDisplayName = getEventUnitDisplayName(casterUnit),
+        targetDisplayName = getEventUnitDisplayName(targetUnit),
         targetCount = 1,
         amountMin = 1,
         amountMax = 1,
@@ -465,8 +478,8 @@ local function emitTauntCombatLog(client, eventState, casterUnit, targetUnit, re
         eventId = eventState.id,
         entryType = "status",
         logKind = "taunt",
-        casterDisplayName = tostring(casterUnit.name or "Unknown"),
-        targetDisplayName = tostring(targetUnit.name or "Unknown"),
+        casterDisplayName = getEventUnitDisplayName(casterUnit),
+        targetDisplayName = getEventUnitDisplayName(targetUnit),
         targetCount = 1,
         amountMin = 1,
         amountMax = 1,

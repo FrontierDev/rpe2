@@ -20,6 +20,16 @@ local MAX_SPEECH_ID_LENGTH = 96
 local NPC_SPEECH_CHAT_COLOR = { r = 1, g = 1, b = 0x9F / 0xFF }
 local generatedSpeechSequence = 0
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+    return tostring(unit and unit.name or fallback or "")
+end
+
 local function normalizeName(value)
     if type(Common.NormalizeName) == "function" then
         return Common.NormalizeName(value)
@@ -167,7 +177,7 @@ end
 local function buildNPCSpeechChatSpeakerLabel(entry, eventState)
     local speaker = findSpeaker(eventState, entry and entry.speakerEventId)
     local eventUnitId = math.max(1, math.floor(tonumber(speaker and speaker.eventID) or tonumber(entry and entry.speakerEventId) or 1))
-    local name = colorizeTeamName(escapeChatMarkup(speaker and speaker.name or "Unknown NPC"), eventState, speaker)
+    local name = colorizeTeamName(escapeChatMarkup(getEventUnitDisplayName(speaker, "Unknown NPC")), eventState, speaker)
     local marker = math.floor(tonumber(speaker and speaker.raidMarker) or 0)
     local inline = Addon.UI and Addon.UI.Inline or nil
     local markerIcon = marker >= 1 and marker <= 8 and type(inline) == "table" and type(inline.RaidMarker) == "function"

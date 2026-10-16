@@ -87,6 +87,7 @@ local function buildEquippedTooltip(slotInfo)
             datasetId = slotInfo.dataset and slotInfo.dataset.id or nil,
             datasetName = datasetName,
             itemId = item.id,
+            itemTier = slotInfo.itemTier,
             isActive = slotInfo.isActive,
             isMissing = slotInfo.isMissing,
             soulbound = slotInfo.soulbound == true,

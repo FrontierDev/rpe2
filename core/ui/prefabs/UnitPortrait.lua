@@ -35,6 +35,17 @@ local DEFAULT_ABSORPTION_EDGE_TEXTURE = "Interface\\Buttons\\WHITE8X8"
 local DEFAULT_ABSORPTION_COLOR = { r = 1, g = 1, b = 1, a = 1 }
 local DEFAULT_ABSORPTION_EDGE_COLOR = { r = 1, g = 1, b = 1, a = 0.95 }
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+
+    return tostring(unit and unit.name or fallback or "")
+end
+
 local function getMaxFrameLevel(...)
     local maxLevel = 0
     for index = 1, select("#", ...) do
@@ -188,7 +199,7 @@ local function buildPortraitTooltip(portraitUnit)
         return nil
     end
 
-    local title = tostring(portraitUnit.name or "")
+    local title = getEventUnitDisplayName(portraitUnit)
     if title == "" then
         return nil
     end

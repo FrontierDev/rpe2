@@ -38,6 +38,7 @@ The base Naga is a `minor`, `medium` Humanoid with moderate durability and a sma
 
 ### Tidehunter — Normal
 
+- Appearances: FileDataID `120294`; DisplayIDs `4036`, `4762`, `4763`, `4765`
 - 3,000 Health
 - 1,900 Armor
 - 525 Melee Attack Power
@@ -48,6 +49,7 @@ The base Naga is a `minor`, `medium` Humanoid with moderate durability and a sma
 
 ### Priestess — Normal
 
+- Appearances: FileDataID `120263`; DisplayIDs `4972`, `4973`, `4974`, `4975`, `4976`
 - 2,500 Health
 - 1,000 Armor
 - 1,900 Mana
@@ -62,6 +64,7 @@ The base Naga is a `minor`, `medium` Humanoid with moderate durability and a sma
 
 ### Enchantress — Normal
 
+- Appearances: FileDataID `120263`; DisplayIDs `4972`, `4973`, `4974`, `4975`, `4976`
 - 2,500 Health
 - 900 Armor
 - 2,000 Mana
@@ -75,6 +78,7 @@ The base Naga is a `minor`, `medium` Humanoid with moderate durability and a sma
 
 ### Siren — Normal
 
+- Appearances: FileDataID `120263`; DisplayIDs `4972`, `4973`, `4974`, `4975`, `4976`
 - 2,600 Health
 - 1,000 Armor
 - 1,900 Mana
@@ -88,6 +92,7 @@ The base Naga is a `minor`, `medium` Humanoid with moderate durability and a sma
 
 ### Sea Witch — Elite
 
+- Appearances: FileDataID `120263`; DisplayIDs `17582`, `18391`, `18392`
 - 9,000 Health
 - 3,000 Armor
 - 2,600 Mana
@@ -104,6 +109,7 @@ The base Naga is a `minor`, `medium` Humanoid with moderate durability and a sma
 
 ### Myrmidon — Elite
 
+- Appearances: FileDataID `120294`; DisplayIDs `17581`, `18387`, `18388`, `18389`, `18398`, `18394`, `19364`
 - 11,000 Health
 - 5,000 Armor
 - 825 Melee Attack Power
@@ -136,6 +142,12 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Tidehunter",
                 challengeLevel = "normal",
+                appearances = {
+                    { displayId = 4036, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4762, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4763, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4765, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                },
                 resourceModifiers = {
                     { resourceRef = "f82db71a:q2ktkztt", percentBonus = 66.666667, flatBonus = 0 },
                 },
@@ -157,6 +169,13 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Priestess",
                 challengeLevel = "normal",
+                appearances = {
+                    { displayId = 4972, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4973, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4974, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4975, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4976, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                },
                 resourceModifiers = {
                     { resourceRef = "f82db71a:q2ktkztt", percentBonus = 38.888889, flatBonus = 0 },
                     { resourceRef = "f82db71a:4c8mfm99", percentBonus = 0, flatBonus = 1900 },
@@ -180,6 +199,13 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Enchantress",
                 challengeLevel = "normal",
+                appearances = {
+                    { displayId = 4972, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4973, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4974, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4975, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4976, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                },
                 resourceModifiers = {
                     { resourceRef = "f82db71a:q2ktkztt", percentBonus = 38.888889, flatBonus = 0 },
                     { resourceRef = "f82db71a:4c8mfm99", percentBonus = 0, flatBonus = 2000 },
@@ -204,6 +230,13 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Siren",
                 challengeLevel = "normal",
+                appearances = {
+                    { displayId = 4972, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4973, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4974, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4975, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 4976, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                },
                 resourceModifiers = {
                     { resourceRef = "f82db71a:q2ktkztt", percentBonus = 44.444444, flatBonus = 0 },
                     { resourceRef = "f82db71a:4c8mfm99", percentBonus = 0, flatBonus = 1900 },
@@ -227,6 +260,11 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Sea Witch",
                 challengeLevel = "elite",
+                appearances = {
+                    { displayId = 17582, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 18391, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 18392, fileDataId = 120263, cam = 0.45, rot = 0.46, z = -0.43 },
+                },
                 resourceModifiers = {
                     { resourceRef = "f82db71a:q2ktkztt", percentBonus = 400, flatBonus = 0 },
                     { resourceRef = "f82db71a:4c8mfm99", percentBonus = 0, flatBonus = 2600 },
@@ -254,6 +292,15 @@ RPE_DATASET_ENTRY_V1
             {
                 name = "Myrmidon",
                 challengeLevel = "elite",
+                appearances = {
+                    { displayId = 17581, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 18387, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 18388, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 18389, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 18398, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 18394, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                    { displayId = 19364, fileDataId = 120294, cam = 0.45, rot = 0.46, z = -0.43 },
+                },
                 resourceModifiers = {
                     { resourceRef = "f82db71a:q2ktkztt", percentBonus = 511.111111, flatBonus = 0 },
                     { resourceRef = "f82db71a:e2tfklq7", percentBonus = 0, flatBonus = 100 },

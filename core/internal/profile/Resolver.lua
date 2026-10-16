@@ -10,9 +10,11 @@ Profile.Resolver = Resolver
 
 local Common = Addon.Utils.Common or {}
 local Database = Addon.Internal.Database or {}
+local Registry = Addon.Internal.Registry or {}
 local Dependencies = Database.Dependecies or {}
 local Equipment = Profile.Equipment or {}
 local Modifications = Profile.Modifications or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 
 local function getRulesetLogic()
     return Addon.Internal and Addon.Internal.Ruleset or {}
@@ -632,6 +634,30 @@ local function resolveStatComponents(entry, byRef, cache, activeRefs, profileBon
     return resolved
 end
 
+local function getItemTierStatOptions()
+    local ruleset = getRulesetLogic()
+    local active = type(ruleset.GetActiveRuleset) == "function" and ruleset.GetActiveRuleset() or nil
+    local getValue = ruleset.GetRulesetRuleValueByKey
+    if type(getValue) ~= "function" then
+        return nil
+    end
+    return {
+        heroicBonusPercent = getValue(active, "equipment", "heroic_item_stat_bonus_percent", 10),
+        mythicBonusPercent = getValue(active, "equipment", "mythic_item_stat_bonus_percent", 20),
+    }
+end
+
+local function resolveEquipmentAuthoredStatValue(statEntry, itemTier)
+    local statDefinition = nil
+    if type(Registry.ResolveStatReference) == "function" then
+        _, statDefinition = Registry:ResolveStatReference(statEntry and statEntry.sourceStatRef)
+    end
+    if type(ItemTier.ResolveAuthoredStatValue) == "function" then
+        return ItemTier.ResolveAuthoredStatValue(statEntry, itemTier, getItemTierStatOptions(), statDefinition)
+    end
+    return type(statEntry) == "table" and tonumber(statEntry.value) or 0
+end
+
 local function accumulateEquipmentStatBonuses(bonuses, equippedRows, equipmentScope)
     for index = 1, #(equippedRows or {}) do
         local entry = equippedRows[index]
@@ -649,7 +675,7 @@ local function accumulateEquipmentStatBonuses(bonuses, equippedRows, equipmentSc
             for statIndex = 1, #stats do
                 local statEntry = stats[statIndex]
                 local statRef = type(statEntry) == "table" and statEntry.sourceStatRef or nil
-                local bonus = type(statEntry) == "table" and tonumber(statEntry.value) or 0
+                local bonus = resolveEquipmentAuthoredStatValue(statEntry, equippedEntry and equippedEntry.itemTier)
                 if statRef and bonus ~= 0 then
                     bonuses[statRef] = (bonuses[statRef] or 0) + bonus
                 end
@@ -1442,9 +1468,9 @@ local function stepResolvedItemLookup(continuation)
     return false
 end
 
-local function addResolvedEquipmentStatBonus(bonuses, statEntry)
+local function addResolvedEquipmentStatBonus(bonuses, statEntry, itemTier)
     local statRef = type(statEntry) == "table" and statEntry.sourceStatRef or nil
-    local value = type(statEntry) == "table" and tonumber(statEntry.value) or 0
+    local value = resolveEquipmentAuthoredStatValue(statEntry, itemTier)
     if statRef and value ~= 0 then
         bonuses[statRef] = (bonuses[statRef] or 0) + value
     end
@@ -1583,7 +1609,7 @@ local function stepResolvedEquipmentPreparation(continuation)
         if statEntry == nil then
             current.phase = "modifications"
         else
-            addResolvedEquipmentStatBonus(bonuses, statEntry)
+            addResolvedEquipmentStatBonus(bonuses, statEntry, current.equippedEntry and current.equippedEntry.itemTier)
             current.statIndex = current.statIndex + 1
         end
     elseif current.phase == "modifications" then

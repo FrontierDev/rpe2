@@ -14,6 +14,7 @@ local STAT_RECORD_SEPARATOR = string.char(20)
 local STAT_FIELD_SEPARATOR = string.char(19)
 local THREAT_RECORD_SEPARATOR = string.char(18)
 local THREAT_FIELD_SEPARATOR = string.char(17)
+local MAX_DISPLAY_NAME_OVERRIDE_LENGTH = 80
 
 local function coerceBoolean(value, defaultValue)
     if value == nil then
@@ -69,6 +70,33 @@ local function normalizeString(value, fallback)
     local text = value == nil and "" or tostring(value)
     if text == "" then
         return fallback or ""
+    end
+
+    return text
+end
+
+local function normalizeDisplayNameOverride(value)
+    if value == nil then
+        return nil
+    end
+
+    local text = tostring(value):gsub("^%s+", ""):gsub("%s+$", "")
+    if text == "" then
+        return nil
+    end
+    for index = 1, #text do
+        local byte = string.byte(text, index)
+        -- WoW markup and every control/separator byte are unsafe in the
+        -- transport codecs and in rendered labels. Display names are plain
+        -- text by design.
+        if byte < 32 or byte == 124 then
+            return nil, "display-name-contains-unsafe-characters"
+        end
+    end
+
+    text = text:gsub("%s+", " ")
+    if #text > MAX_DISPLAY_NAME_OVERRIDE_LENGTH then
+        return nil, "display-name-too-long"
     end
 
     return text
@@ -654,6 +682,7 @@ end
 function EventUnit:New(data)
     return setmetatable({
         name = "",
+        displayNameOverride = nil,
         description = "",
         isPlayer = false,
         eventID = nil,
@@ -702,6 +731,13 @@ function EventUnit:Merge(data)
             self.stats = normalizeStats(value)
         elseif key == "threatTable" then
             self.threatTable = normalizeThreatTable(value)
+        elseif key == "displayNameOverride" then
+            local normalized, reason = normalizeDisplayNameOverride(value)
+            if normalized ~= nil or reason == nil then
+                self.displayNameOverride = normalized
+            elseif Addon.Debug and type(Addon.Debug.Warn) == "function" then
+                Addon.Debug.Warn("Rejected Event unit display name override: %s", tostring(reason or "invalid-name"))
+            end
         else
             self[key] = value
         end
@@ -710,6 +746,7 @@ function EventUnit:Merge(data)
     self.team = normalizeTeam(self.team)
     self.initiative = normalizeInitiative(self.initiative)
     self.name = normalizeString(self.name, "")
+    self.displayNameOverride = normalizeDisplayNameOverride(self.displayNameOverride)
     self.description = normalizeString(self.description, "")
     self.resources = normalizeResources(self.resources)
     self.spells = normalizeSpellRefs(self.spells)
@@ -747,6 +784,22 @@ end
 function EventUnit:GetResolvedPet()
     local _, pet = self:ResolvePetDefinition()
     return pet
+end
+
+function EventUnit:GetDisplayName()
+    local override = normalizeDisplayNameOverride(self.displayNameOverride)
+    if override then
+        return override
+    end
+
+    if type(self.GetResolvedVariantName) == "function" then
+        local ok, resolvedName = pcall(self.GetResolvedVariantName, self)
+        if ok and tostring(resolvedName or "") ~= "" then
+            return tostring(resolvedName)
+        end
+    end
+
+    return tostring(self.name or "")
 end
 
 resolveSpellValue = function(eventUnit, resolvedUnit, fallback)
@@ -806,6 +859,7 @@ end
 function EventUnit:ToTable()
     return {
         name = self.name,
+        displayNameOverride = normalizeDisplayNameOverride(self.displayNameOverride),
         description = self.description,
         isPlayer = self.isPlayer,
         eventID = self.eventID,
@@ -855,6 +909,8 @@ function EventUnit.IsShownInNpcMode(unit)
 end
 
 EventUnit.CoerceBoolean = coerceBoolean
+EventUnit.NormalizeDisplayNameOverride = normalizeDisplayNameOverride
+EventUnit.MaxDisplayNameOverrideLength = MAX_DISPLAY_NAME_OVERRIDE_LENGTH
 
 function EventUnit.BuildResolvedResources(eventUnit, playerCount, options)
     return buildResolvedResources(eventUnit, playerCount, options)

@@ -248,6 +248,8 @@ Rules.Definitions = {
             { key = "shield_slot", label = "Shield Slot", type = "dropdown", default = "", description = "Select the item slot reference used for the unit shield assignment.", optionsSource = "itemSlotReference" },
             { key = "enforce_class_armor_weight_restrictions", label = "Enforce Class Armor Weight Restrictions", type = "checkbox", default = true, description = "Prevent player characters from equipping armor whose Armor Weight is not allowed by their selected class. A class with no allowed armor types cannot equip armor while this rule is enabled." },
             { key = "allow_dual_wield", label = "Allow Dual Wield", type = "checkbox", default = false, description = "Enable dual-wield logic for weapon handling.", retainedWithoutConsumer = true },
+            { key = "heroic_item_stat_bonus_percent", label = "Heroic Item Stat Bonus Percent", type = "text", default = "10", description = "Percent bonus applied to authored stats on Heroic owned items. Must be between 0 and 10000." },
+            { key = "mythic_item_stat_bonus_percent", label = "Mythic Item Stat Bonus Percent", type = "text", default = "20", description = "Percent bonus applied to authored stats on Mythic owned items. Must be between 0 and 10000." },
         },
     },
     {

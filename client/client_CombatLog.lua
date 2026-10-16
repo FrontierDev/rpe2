@@ -194,20 +194,15 @@ local function resolveSpellIconTexture(spell, spellRef)
     return DEFAULT_ICON
 end
 
-local function resolveEventUnitByDisplayName(eventState, displayName)
-    local normalizedName = type(Common.NormalizeName) == "function"
-        and Common.NormalizeName(displayName)
-        or tostring(displayName or "")
-    if normalizedName == "" then
+local function resolveEventUnitByEventId(eventState, eventId)
+    local normalizedEventId = tonumber(eventId)
+    if not normalizedEventId then
         return nil
     end
 
     for index = 1, #((eventState and eventState.units) or {}) do
         local eventUnit = eventState.units[index]
-        local candidateName = type(Common.NormalizeName) == "function"
-            and Common.NormalizeName(eventUnit and eventUnit.name)
-            or tostring(eventUnit and eventUnit.name or "")
-        if candidateName == normalizedName then
+        if tonumber(eventUnit and eventUnit.eventID) == normalizedEventId then
             return eventUnit
         end
     end
@@ -215,8 +210,34 @@ local function resolveEventUnitByDisplayName(eventState, displayName)
     return nil
 end
 
-local function resolveTeamColorHex(eventState, displayName)
-    local eventUnit = resolveEventUnitByDisplayName(eventState, displayName)
+local function resolveEventUnitByCanonicalName(eventState, name)
+    local normalizedName = type(Common.NormalizeName) == "function"
+        and Common.NormalizeName(name)
+        or tostring(name or "")
+    if normalizedName == "" then
+        return nil
+    end
+
+    local match = nil
+    for index = 1, #((eventState and eventState.units) or {}) do
+        local eventUnit = eventState.units[index]
+        local candidateName = type(Common.NormalizeName) == "function"
+            and Common.NormalizeName(eventUnit and eventUnit.name)
+            or tostring(eventUnit and eventUnit.name or "")
+        if candidateName == normalizedName then
+            if match ~= nil then
+                return nil
+            end
+            match = eventUnit
+        end
+    end
+
+    return match
+end
+
+local function resolveTeamColorHex(eventState, legacyName, eventId)
+    local eventUnit = resolveEventUnitByEventId(eventState, eventId)
+        or resolveEventUnitByCanonicalName(eventState, legacyName)
     local color = EventClass and EventClass.GetTeamColor and EventClass.GetTeamColor(eventState, tonumber(eventUnit and eventUnit.team) or 0) or nil
     return encodeColorHex(color)
 end
@@ -403,7 +424,7 @@ function Client:ResolveCombatLogTeamColors(entry, eventState)
         return nil, nil
     end
 
-    return resolveTeamColorHex(state, entry and entry.casterDisplayName), resolveTeamColorHex(state, entry and entry.targetDisplayName)
+    return resolveTeamColorHex(state, entry and entry.casterDisplayName, entry and entry.casterEventId), resolveTeamColorHex(state, entry and entry.targetDisplayName, entry and entry.targetEventId)
 end
 
 function Client:NormalizeCombatLogEntry(entry)

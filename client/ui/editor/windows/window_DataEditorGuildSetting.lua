@@ -9,6 +9,7 @@ local UI = Addon.UI or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Dependecies = Database.Dependecies or {}
 local Contributions = Addon.Internal and Addon.Internal.GuildShopContributions or {}
+local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 
 local OldGetEntryDefinition = DataEditor.GetEntryDefinition
 local OldGetContentPageDefinitions = DataEditor.GetContentPageDefinitions
@@ -208,6 +209,11 @@ function DataEditor:RefreshGuildShopContributionsPage()
     local _, req = selectedRequisition(self)
     self.GuildShopContributionItemRefInput:SetText(req and req.itemRef or "")
     self.GuildShopContributionQuantityInput:SetText(req and tostring(req.quantity or 1) or "")
+    if self.GuildShopContributionItemTierDropdown then
+        self.GuildShopContributionItemTierDropdown:SetItems(ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } })
+        self.GuildShopContributionItemTierDropdown:SetSelectedValue(ItemTier.Normalize and (ItemTier.Normalize(req and req.itemTier) or "normal") or "normal", true)
+        self.GuildShopContributionItemTierDropdown:SetEnabled(req ~= nil)
+    end
     self.GuildShopContributionCategoryDropdown:SetItems(categoryItems(contribution and contribution.targetGuildSettingRef, req and req.shopCategoryId))
     self.GuildShopContributionCategoryDropdown:SetSelectedValue(req and req.shopCategoryId or "", true)
     self.GuildShopContributionRoleDropdown:SetItems(roleItems(contribution and contribution.targetGuildSettingRef, req and req.roleIds))
@@ -265,7 +271,7 @@ function DataEditor:BuildGuildShopContributionsPage(page)
     local reqButtons = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEGuildShopContributionReqButtons", { height = 20, spacing = 4 }); root:AddChild(reqButtons)
     reqButtons:AddChild(UI.CreateButton(reqButtons:GetFrame(), "RPEGuildShopContributionReqNew", "Add Shop Item", 88, function()
         local _, c = selectedContribution(self); if not c then return end; c.requisitions = c.requisitions or {}
-        c.requisitions[#c.requisitions + 1] = { id = nextId(c.requisitions, "shop_item_"), itemRef = "", quantity = 1, costs = {}, characterLimit = 0, roleIds = {}, shopCategoryId = "" }
+        c.requisitions[#c.requisitions + 1] = { id = nextId(c.requisitions, "shop_item_"), itemRef = "", itemTier = "normal", quantity = 1, costs = {}, characterLimit = 0, roleIds = {}, shopCategoryId = "" }
         self.SelectedGuildShopContributionRequisitionIndex = #c.requisitions; changed(self, "shop-contribution-item-create"); self:RefreshGuildShopContributionsPage()
     end, { height = 20, fontSize = 8 }))
     reqButtons:AddChild(UI.CreateButton(reqButtons:GetFrame(), "RPEGuildShopContributionReqDelete", "Delete Item", 72, function()
@@ -274,6 +280,18 @@ function DataEditor:BuildGuildShopContributionsPage(page)
 
     self.GuildShopContributionItemRefInput = inputRow(root, "RPEGuildShopContributionItemRef", "Item Ref")
     self.GuildShopContributionQuantityInput = inputRow(root, "RPEGuildShopContributionQuantity", "Quantity")
+    local itemTierRow = UI.CreateLayout(UI.HorizontalLayoutGroup, root:GetFrame(), "RPEGuildShopContributionItemTierRow", { height = 20, expandWidth = true, spacing = 4, fitChildrenWidth = true }); root:AddChild(itemTierRow)
+    itemTierRow:AddChild(UI.CreateText(itemTierRow:GetFrame(), "RPEGuildShopContributionItemTierLabel", "Item Tier", { width = 90, height = 20, justifyH = "LEFT" }))
+    self.GuildShopContributionItemTierDropdown = UI.CreateDropdown(itemTierRow:GetFrame(), "RPEGuildShopContributionItemTierDropdown", {
+        width = 0, height = 20, expandWidth = true, weight = 1,
+        items = ItemTier.GetOptions and ItemTier.GetOptions() or { { label = "Normal", value = "normal" } },
+        selectedValue = "normal",
+        onValueChanged = function(value)
+            local _, r = selectedRequisition(self)
+            if r then r.itemTier = value or "normal"; changed(self, "shop-contribution-item-tier"); self:RefreshGuildShopContributionsPage() end
+        end,
+    })
+    itemTierRow:AddChild(self.GuildShopContributionItemTierDropdown)
     self.GuildShopContributionItemRefInput:SetScript("OnEditFocusLost", function() local _, r = selectedRequisition(self); if r then r.itemRef = trim(self.GuildShopContributionItemRefInput:GetText()); changed(self, "shop-contribution-item-ref"); self:RefreshGuildShopContributionsPage() end end)
     self.GuildShopContributionQuantityInput:SetScript("OnEditFocusLost", function() local _, r = selectedRequisition(self); if r then r.quantity = math.max(1, math.floor(tonumber(self.GuildShopContributionQuantityInput:GetText()) or 1)); r.characterLimit = 0; changed(self, "shop-contribution-quantity"); self:RefreshGuildShopContributionsPage() end end)
 

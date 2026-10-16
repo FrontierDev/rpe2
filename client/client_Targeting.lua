@@ -73,6 +73,16 @@ local function getEventClass()
         or nil
 end
 
+local function getEventUnitDisplayName(unit, fallback)
+    if type(unit) == "table" and type(unit.GetDisplayName) == "function" then
+        local ok, displayName = pcall(unit.GetDisplayName, unit)
+        if ok and tostring(displayName or "") ~= "" then
+            return tostring(displayName)
+        end
+    end
+    return tostring(unit and unit.name or fallback or "")
+end
+
 Client.PendingSpellTargeting = Client.PendingSpellTargeting or nil
 Client.TargetHistoryEventIds = Client.TargetHistoryEventIds or {}
 
@@ -589,8 +599,8 @@ local function compareCandidateUnits(left, right)
         return leftMarker < rightMarker
     end
 
-    local leftName = string.lower(tostring(left and left.name or ""))
-    local rightName = string.lower(tostring(right and right.name or ""))
+    local leftName = string.lower(getEventUnitDisplayName(left))
+    local rightName = string.lower(getEventUnitDisplayName(right))
     if leftName ~= rightName then
         return leftName < rightName
     end
@@ -1243,7 +1253,7 @@ function Client:GetPendingSpellTargetingDisplayState()
     if #(activeGroupState.candidates or {}) == 0 then
         helperText = ("No valid %s targets."):format(string.lower(tostring(activeGroupState.label or "target")))
     elseif activeGroupState.selectedUnit then
-        helperText = ("Selected: %s"):format(tostring(activeGroupState.selectedUnit.name or "Unit"))
+        helperText = ("Selected: %s"):format(getEventUnitDisplayName(activeGroupState.selectedUnit, "Unit"))
     else
         helperText = ("Select %d to %d %s targets."):format(
             activeGroupState.minTargets,
@@ -1285,7 +1295,7 @@ function Client:GetPendingSpellTargetingDisplayState()
         selectionText = ("%s %d / %d"):format(tostring(activeGroupState.label or "Targets"), activeGroupState.selectedCount, activeGroupState.maxTargets),
         selectedUnit = activeGroupState.selectedUnit,
         selectedUnitRoleText = selectedUnitRoleText,
-        selectedUnitName = activeGroupState.selectedUnit and tostring(activeGroupState.selectedUnit.name or "Unnamed Unit") or "No target selected",
+        selectedUnitName = activeGroupState.selectedUnit and getEventUnitDisplayName(activeGroupState.selectedUnit, "Unnamed Unit") or "No target selected",
         selectedUnitNameColor = selectedUnitNameColor,
         selectedUnitTeamText = selectedUnitTeamText,
         selectedUnitTypeSizeText = selectedUnitTypeSizeText,
