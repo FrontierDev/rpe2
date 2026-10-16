@@ -140,6 +140,16 @@ local function findRow(rows, key, ref)
     return nil
 end
 
+local function findEventUnitById(units, eventID)
+    for index = 1, #(units or {}) do
+        local unit = units[index]
+        if unit and tonumber(unit.eventID) == tonumber(eventID) then
+            return unit
+        end
+    end
+    return nil
+end
+
 local function materializeNpc(eventId, level, presetIndex, difficulty)
     local npc = EventUnit:New({
         eventID = eventId,
@@ -320,6 +330,13 @@ local nameMutationEvent = Event:New({
         EventUnit:New({ eventID = 6, registryID = "test:npc", name = "Progressing NPC" }),
     },
 })
+local mutationPlayer = findEventUnitById(nameMutationEvent.units, 1)
+local mutationUnit2 = findEventUnitById(nameMutationEvent.units, 2)
+local mutationUnit4 = findEventUnitById(nameMutationEvent.units, 4)
+local mutationUnit5 = findEventUnitById(nameMutationEvent.units, 5)
+local mutationUnit6 = findEventUnitById(nameMutationEvent.units, 6)
+assert(mutationPlayer and mutationUnit2 and mutationUnit4 and mutationUnit5 and mutationUnit6,
+    "display-name mutation fixture contains every expected Event unit")
 local broadcastEntries
 local broadcastIncludeState
 Addon.Server.GetEditableEventState = function()
@@ -339,38 +356,38 @@ assert(type(changedNameIds) == "table", "host display-name mutation returns chan
 assertEqual(#changedNameIds, 4, "host display-name mutation reports every changed NPC")
 assertEqual(broadcastIncludeState, false, "display-name mutation broadcasts a delta without a full state")
 assertEqual(#broadcastEntries, 4, "display-name mutation broadcasts only changed units")
-assertEqual(nameMutationEvent.units[2]:GetDisplayName(), "Guard Captain", "host mutation applies the normalized display name")
-assertEqual(nameMutationEvent.units[5].name, "Progressing NPC", "host mutation preserves the canonical name")
-assertEqual(nameMutationEvent.units[3].registryID, "test:npc", "host mutation preserves registry identity")
-assertEqual(nameMutationEvent.units[3].ownerID, "Host", "host mutation preserves owner identity")
-assertEqual(nameMutationEvent.units[3].controllerID, "Host", "host mutation preserves controller identity")
-assertEqual(nameMutationEvent.units[3].presetIndex, 1, "host mutation preserves preset identity")
-assertEqual(nameMutationEvent.units[3].team, 2, "host mutation preserves team state")
-assertEqual(nameMutationEvent.units[3].initiative, 17, "host mutation preserves initiative state")
-assertEqual(nameMutationEvent.units[3].resources[1].currentValue, 80, "host mutation preserves resource state")
-assertEqual(nameMutationEvent.units[3].stats[1].value, 42, "host mutation preserves stat state")
-assertEqual(nameMutationEvent.units[1].displayNameOverride, nil, "host mutation leaves player units untouched")
+assertEqual(mutationUnit2:GetDisplayName(), "Guard Captain", "host mutation applies the normalized display name")
+assertEqual(mutationUnit5.name, "Progressing NPC", "host mutation preserves the canonical name")
+assertEqual(mutationUnit4.registryID, "test:npc", "host mutation preserves registry identity")
+assertEqual(mutationUnit4.ownerID, "Host", "host mutation preserves owner identity")
+assertEqual(mutationUnit4.controllerID, "Host", "host mutation preserves controller identity")
+assertEqual(mutationUnit4.presetIndex, 1, "host mutation preserves preset identity")
+assertEqual(mutationUnit4.team, 2, "host mutation preserves team state")
+assertEqual(mutationUnit4.initiative, 17, "host mutation preserves initiative state")
+assertEqual(mutationUnit4.resources[1].currentValue, 80, "host mutation preserves resource state")
+assertEqual(mutationUnit4.stats[1].value, 42, "host mutation preserves stat state")
+assertEqual(mutationPlayer.displayNameOverride, nil, "host mutation leaves player units untouched")
 assertEqual(nameMutationEvent.draftCopied, true, "active display-name mutation refreshes the draft copy")
 local reassigned = Addon.Server:SetEventUnitDisplayNameOverrides({ 2, 4, 5 }, "Leader", {
     previousEventIds = { 2, 4, 5, 6 },
     previousDisplayName = "Guard Captain",
 })
 assertEqual(reassigned, true, "host reassignment succeeds")
-assertEqual(nameMutationEvent.units[6].displayNameOverride, nil, "reassignment clears removed NPCs from the previous group")
-assertEqual(nameMutationEvent.units[2].displayNameOverride, "Leader", "reassignment applies the new group name")
+assertEqual(mutationUnit6.displayNameOverride, nil, "reassignment clears removed NPCs from the previous group")
+assertEqual(mutationUnit2.displayNameOverride, "Leader", "reassignment applies the new group name")
 assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 1 }, "Invalid"), false, "players cannot receive display overrides")
 assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 2, 2 }, "Invalid"), false, "duplicate event IDs are rejected")
 assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 2 }, nil, { reset = true }), true, "host reset succeeds")
-assertEqual(nameMutationEvent.units[2].displayNameOverride, nil, "host reset clears the display override")
+assertEqual(mutationUnit2.displayNameOverride, nil, "host reset clears the display override")
 assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 4, 5 }, "|cffff0000Unsafe|r"), false, "WoW markup is rejected")
-assertEqual(nameMutationEvent.units[4].displayNameOverride, "Leader", "invalid names do not partially mutate the roster")
+assertEqual(mutationUnit4.displayNameOverride, "Leader", "invalid names do not partially mutate the roster")
 assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 4 }, string.rep("A", 81)), false, "overlong display names are rejected")
-assertEqual(nameMutationEvent.units[4].displayNameOverride, "Leader", "overlong names do not partially mutate the roster")
+assertEqual(mutationUnit4.displayNameOverride, "Leader", "overlong names do not partially mutate the roster")
 assertEqual(Addon.Server:SetEventUnitDisplayNameOverrides({ 4 }, "Next", {
     previousEventIds = { 4, 5 },
     previousDisplayName = "|cffff0000Unsafe|r",
 }), false, "invalid stale editor names are rejected")
-assertEqual(nameMutationEvent.units[4].displayNameOverride, "Leader", "invalid stale editor names do not bypass assignment guards")
+assertEqual(mutationUnit4.displayNameOverride, "Leader", "invalid stale editor names do not bypass assignment guards")
 local originalGetPlayerName = Addon.Utils.Common.GetPlayerName
 Addon.Utils.Common.GetPlayerName = function()
     return "Guest"
