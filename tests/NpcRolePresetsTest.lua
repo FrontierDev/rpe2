@@ -802,6 +802,35 @@ for index = 1, #human.presets do
     assert(deepEqual(human, originalHuman), "Resolving presets does not mutate the base Human")
 end
 
+local civilianIndex = nil
+for index = 1, #human.presets do
+    if human.presets[index].name == "Civilian" then
+        civilianIndex = index
+        break
+    end
+end
+assert(civilianIndex, "Human Civilian preset exists")
+assertEqual(Unit.ResolveEffectiveChallengeLevel(human, civilianIndex), "minor", "Civilian challenge level")
+assertEqual(#Unit.ResolveEffectiveSpells(human, civilianIndex), 0, "Civilian has no inherited combat spells")
+assert(deepEqual(Unit.ResolveEffectiveEquipment(human, civilianIndex), {}), "Civilian has no inherited equipment")
+local civilianPreset = Unit.ResolvePreset(human, civilianIndex)
+for _, level in ipairs({ 1, 60 }) do
+    local baseResources = Unit.ResolveResourceValues(human, level)
+    local civilianResources = Unit.ApplyResourceModifiers(baseResources, civilianPreset)
+    local baseStats = Unit.ResolveStatValues(human, level)
+    local civilianStats = Unit.ApplyStatModifiers(baseStats, civilianPreset)
+    local healthRef = "f82db71a:q2ktkztt"
+    local armorRef = "f82db71a:v42albuv"
+    assertNear(findRow(civilianResources, "resourceRef", healthRef).value,
+        findRow(baseResources, "resourceRef", healthRef).value * 0.2, "Civilian health at level " .. level)
+    assertNear(findRow(civilianStats, "statRef", armorRef).value,
+        findRow(baseStats, "statRef", armorRef).value * 0.25, "Civilian armor at level " .. level)
+    for _, ref in ipairs({ "f82db71a:4c8mfm99", "f82db71a:c3gaf7dd", "f82db71a:e2tfklq7" }) do
+        assertNear(findRow(civilianResources, "resourceRef", ref).value, 0,
+            "Civilian non-health resource at level " .. level)
+    end
+end
+
 local noPresetStats = Unit.ResolveStatValues(human, 60)
 local noPresetResources = Unit.ResolveResourceValues(human, 60)
 local noPreset = Unit.ResolvePreset(human, 0)

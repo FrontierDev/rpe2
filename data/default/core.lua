@@ -9065,6 +9065,25 @@ units = {
                     shield = "f82db71a:stshld01",
                 },
             },
+            {
+                name = "Civilian",
+                challengeLevel = "minor",
+                resourceModifiers = {
+                    { resourceRef = "f82db71a:q2ktkztt", percentBonus = -80, flatBonus = 0 },
+                    { resourceRef = "f82db71a:4c8mfm99", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:c3gaf7dd", percentBonus = -100, flatBonus = 0 },
+                    { resourceRef = "f82db71a:e2tfklq7", percentBonus = -100, flatBonus = 0 },
+                },
+                statModifiers = {
+                    { statRef = "f82db71a:v42albuv", percentBonus = -75, flatBonus = 0 },
+                    { statRef = "f82db71a:u7b49vs9", percentBonus = -75, flatBonus = 0 },
+                    { statRef = "f82db71a:v2rs9cpy", percentBonus = -75, flatBonus = 0 },
+                    { statRef = "f82db71a:7t7xgzcx", percentBonus = -100, flatBonus = 0 },
+                    { statRef = "f82db71a:hj6d4kvy", percentBonus = -100, flatBonus = 0 },
+                },
+                spells = {  },
+                equipment = {  },
+            },
         },
         resistances = {  },
         resources = {
