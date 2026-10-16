@@ -263,7 +263,7 @@ clearIncoming._networkDisplayNameOverridePresent = true
 assertEqual(liveRenamed:MergeLiveNetworkUpdate(clearIncoming), true, "explicit display override clears remain mergeable")
 assertEqual(liveRenamed.displayNameOverride, nil, "explicit display override clears erase the existing override")
 
-renamedNpc.displayNameOverride = nil
+renamedEvent.units[3].displayNameOverride = nil
 local clearedPayload = renamedEvent:SerializeUnitsForNetwork()
 local clearedFields = networkFields(clearedPayload)
 assertEqual(clearedFields[34], "0", "display override clear does not alter the pet-role field")

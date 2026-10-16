@@ -211,7 +211,7 @@ local function deserializeEndLootGrants(text)
         if #fields >= 6 then
             local decoded = {}
             local valid = true
-            for fieldIndex = 1, 6 do
+            for fieldIndex = 1, math.min(#fields, 7) do
                 decoded[fieldIndex] = decodeField(fields[fieldIndex])
                 if decoded[fieldIndex] == nil then
                     valid = false

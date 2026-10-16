@@ -52,9 +52,11 @@ local imported, importError = Database.ImportRuleset(DefaultRuleset.export)
 assert(imported, importError)
 assertEqual(imported.id, CORE_RULESET_ID, "packaged Core import ID")
 assertEqual(imported.name, "Core", "packaged Core import name")
-assertEqual(DefaultRuleset.packageVersion, 14, "packaged Core ruleset version")
+assertEqual(DefaultRuleset.packageVersion, 15, "packaged Core ruleset version")
 assertEqual(imported.rules.event.event_end_justice_currency, "125", "packaged Core end-of-event Justice reward")
 assertEqual(imported.rules.combat.shield_block_value_stat, "f82db71a:sblkval1", "packaged Core enables Shield Block Value")
+assertEqual(imported.rules.equipment.heroic_item_stat_bonus_percent, "10", "packaged Core Heroic item stat bonus")
+assertEqual(imported.rules.equipment.mythic_item_stat_bonus_percent, "20", "packaged Core Mythic item stat bonus")
 
 local expectedDefaultClasses = {
     ["b0211ab3:wvirv9um"] = "Paladin",
