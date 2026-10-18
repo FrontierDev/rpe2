@@ -1535,19 +1535,59 @@ local function createResolvedEquipmentPreparation()
 end
 
 local function applyResolvedItemSetBonuses(continuation)
-    if type(Equipment.GetEquippedItemSetBonuses) ~= "function" then
+    local context = continuation.context
+    if type(Equipment.GetEquippedItemSetBonuses) == "function" then
+        local itemSetBonuses = Equipment.GetEquippedItemSetBonuses()
+        for statRef, bonus in pairs(itemSetBonuses and itemSetBonuses.stats or {}) do
+            if statRef and bonus ~= 0 then
+                context.bonuses[statRef] = (context.bonuses[statRef] or 0) + bonus
+            end
+        end
+        for skillRef, bonus in pairs(itemSetBonuses and itemSetBonuses.skills or {}) do
+            if skillRef and bonus ~= 0 then
+                context.skillBonuses[skillRef] = (context.skillBonuses[skillRef] or 0) + bonus
+            end
+        end
+    end
+
+    if type(Equipment.ListEquippedItemSetEquipmentBonuses) ~= "function" then
         return
     end
 
-    local itemSetBonuses = Equipment.GetEquippedItemSetBonuses()
-    for statRef, bonus in pairs(itemSetBonuses and itemSetBonuses.stats or {}) do
-        if statRef and bonus ~= 0 then
-            continuation.context.bonuses[statRef] = (continuation.context.bonuses[statRef] or 0) + bonus
+    local runtimeItemSetTraitKeys = {}
+    for index = 1, #(continuation.traitEntries or {}) do
+        local traitEntry = continuation.traitEntries[index]
+        if type(traitEntry) == "table" and type(traitEntry.itemSet) == "table" then
+            local sourceKey = ensureString(traitEntry.sourceKey)
+            if sourceKey ~= "" then
+                runtimeItemSetTraitKeys[sourceKey] = true
+            end
         end
     end
-    for skillRef, bonus in pairs(itemSetBonuses and itemSetBonuses.skills or {}) do
-        if skillRef and bonus ~= 0 then
-            continuation.context.skillBonuses[skillRef] = (continuation.context.skillBonuses[skillRef] or 0) + bonus
+
+    local itemSetEquipmentBonuses = Equipment.ListEquippedItemSetEquipmentBonuses()
+    for index = 1, #(itemSetEquipmentBonuses or {}) do
+        local entry = itemSetEquipmentBonuses[index]
+        local payload = entry and entry.payload
+        local sourceKey = table.concat({
+            ensureString(entry and entry.itemSetRef),
+            tostring(entry and entry.bonusIndex or 0),
+            tostring(entry and entry.equipmentIndex or 0),
+        }, ":")
+        if type(payload) == "table"
+            and not runtimeItemSetTraitKeys[sourceKey]
+            and evaluateProfileConditions("trait", payload, {
+                itemSetRef = entry and entry.itemSetRef,
+                itemSet = entry and entry.itemSet,
+                requiredPieces = entry and entry.requiredPieces,
+            })
+        then
+            accumulateTraitStatBonuses(
+                context.bonuses.__traitBonuses,
+                context.bonuses.__traitPercentBonuses,
+                payload
+            )
+            accumulateTraitSkillBonuses(context.skillBonuses, payload)
         end
     end
 end
