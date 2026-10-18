@@ -1034,6 +1034,7 @@ local function buildAutomaticTraitAuraSourceKey(sourceEntry, auraIndex)
     return table.concat({
         tostring(sourceEntry and sourceEntry.sourceType or ""),
         tostring(sourceEntry and sourceEntry.traitRef or ""),
+        tostring(sourceEntry and sourceEntry.sourceKey or ""),
         tostring(sourceEntry and sourceEntry.itemRef or ""),
         tostring(sourceEntry and sourceEntry.datasetId or ""),
         tostring(auraIndex or 0),
@@ -1085,6 +1086,8 @@ local function appendRuntimeEquippedTraitEntry(eventState, rows, row)
     local conditionState = row and type(payload) == "table" and evaluateRuntimeItemAndPayloadConditions(row.item, payload, {
         itemRef = row.itemRef,
         item = row.item,
+        itemSet = row.itemSet,
+        requiredPieces = row.requiredPieces,
         eventState = eventState,
         equipmentScope = (row.sourceType == "mount_equipment" or row.sourceType == "mount_equipment_modification") and "mount" or nil,
     }) or nil
@@ -1100,6 +1103,9 @@ local function appendRuntimeEquippedTraitEntry(eventState, rows, row)
             name = row.name,
             itemName = row.itemName,
             itemRef = row.itemRef,
+            sourceKey = row.sourceKey,
+            itemSet = row.itemSet,
+            requiredPieces = row.requiredPieces,
             dataset = row.dataset,
             datasetId = row.datasetId,
             payload = payload,
@@ -1359,7 +1365,7 @@ function Client:BuildProfileTraitRows()
 
         local sourceType = ensureString(row.sourceType)
         local itemRef = ensureString(row.itemRef)
-        local key = sourceType .. ":" .. itemRef
+        local key = sourceType .. ":" .. ensureString(row.sourceKey and row.sourceKey ~= "" and row.sourceKey or itemRef)
         if itemRef ~= "" and seenEquipmentRefs[key] then
             return false
         end
@@ -1373,6 +1379,7 @@ function Client:BuildProfileTraitRows()
             name = row.name,
             itemName = row.itemName,
             itemRef = row.itemRef,
+            sourceKey = row.sourceKey,
             slotKey = row.slotKey,
             summaryText = row.summaryText,
             authoredDescriptionText = row.authoredDescriptionText,
@@ -1383,6 +1390,8 @@ function Client:BuildProfileTraitRows()
             datasetId = row.datasetId,
             datasetName = row.datasetName,
             item = row.item,
+            itemSet = row.itemSet,
+            requiredPieces = row.requiredPieces,
             payload = row.payload or row.equipmentTrait,
             equipmentTrait = row.equipmentTrait,
             isActive = true,

@@ -266,11 +266,15 @@ local function buildTraitStatBonusMap()
             and evaluateProfileConditions("item", row.item, {
                 itemRef = row.itemRef,
                 item = row.item,
+                itemSet = row.itemSet,
+                requiredPieces = row.requiredPieces,
                 equipmentScope = row.sourceType == "mount_equipment" and "mount" or nil,
             })
             and evaluateProfileConditions("trait", row.payload or row.equipmentTrait, {
                 itemRef = row.itemRef,
                 item = row.item,
+                itemSet = row.itemSet,
+                requiredPieces = row.requiredPieces,
                 equipmentScope = row.sourceType == "mount_equipment" and "mount" or nil,
             })
         then
@@ -328,11 +332,15 @@ local function buildTraitSkillBonusMap()
             and evaluateProfileConditions("item", row.item, {
                 itemRef = row.itemRef,
                 item = row.item,
+                itemSet = row.itemSet,
+                requiredPieces = row.requiredPieces,
                 equipmentScope = row.sourceType == "mount_equipment" and "mount" or nil,
             })
             and evaluateProfileConditions("trait", row.payload or row.equipmentTrait, {
                 itemRef = row.itemRef,
                 item = row.item,
+                itemSet = row.itemSet,
+                requiredPieces = row.requiredPieces,
                 equipmentScope = row.sourceType == "mount_equipment" and "mount" or nil,
             })
         then
@@ -689,6 +697,17 @@ local function accumulateEquipmentStatBonuses(bonuses, equippedRows, equipmentSc
             end
         end
     end
+
+    if (equipmentScope == nil or equipmentScope == "character")
+        and type(Equipment.GetEquippedItemSetBonuses) == "function"
+    then
+        local itemSetBonuses = Equipment.GetEquippedItemSetBonuses()
+        for statRef, bonus in pairs(itemSetBonuses and itemSetBonuses.stats or {}) do
+            if statRef and bonus ~= 0 then
+                bonuses[statRef] = (bonuses[statRef] or 0) + bonus
+            end
+        end
+    end
 end
 
 local function accumulateEquipmentSkillBonuses(bonuses, equippedRows, equipmentScope)
@@ -720,6 +739,17 @@ local function accumulateEquipmentSkillBonuses(bonuses, equippedRows, equipmentS
             end
         end
     end
+
+    if (equipmentScope == nil or equipmentScope == "character")
+        and type(Equipment.GetEquippedItemSetBonuses) == "function"
+    then
+        local itemSetBonuses = Equipment.GetEquippedItemSetBonuses()
+        for skillRef, bonusValue in pairs(itemSetBonuses and itemSetBonuses.skills or {}) do
+            if ensureString(skillRef) ~= "" and bonusValue ~= 0 then
+                bonuses[skillRef] = (bonuses[skillRef] or 0) + bonusValue
+            end
+        end
+    end
 end
 
 local function appendRuntimeStatValue(rows, valuesByRef, order, statRef, value)
@@ -737,7 +767,7 @@ local function appendRuntimeStatValue(rows, valuesByRef, order, statRef, value)
     valuesByRef[normalizedStatRef] = (valuesByRef[normalizedStatRef] or 0) + numericValue
 end
 
-local function buildRuntimeStatRows(baseEntries, equippedRows, extraEntries)
+local function buildRuntimeStatRows(baseEntries, equippedRows, extraEntries, equipmentScope)
     local valuesByRef = {}
     local order = {}
     local equipmentBonuses = {}
@@ -748,7 +778,7 @@ local function buildRuntimeStatRows(baseEntries, equippedRows, extraEntries)
         appendRuntimeStatValue(rows, valuesByRef, order, entry and entry.statRef, entry and entry.value)
     end
 
-    accumulateEquipmentStatBonuses(equipmentBonuses, equippedRows, nil)
+    accumulateEquipmentStatBonuses(equipmentBonuses, equippedRows, equipmentScope)
     for statRef, value in pairs(equipmentBonuses) do
         appendRuntimeStatValue(rows, valuesByRef, order, statRef, value)
     end
@@ -1500,7 +1530,26 @@ local function createResolvedEquipmentPreparation()
         current = nil,
         mountStats = nil,
         mountStatIndex = 1,
+        itemSetBonusesApplied = false,
     }
+end
+
+local function applyResolvedItemSetBonuses(continuation)
+    if type(Equipment.GetEquippedItemSetBonuses) ~= "function" then
+        return
+    end
+
+    local itemSetBonuses = Equipment.GetEquippedItemSetBonuses()
+    for statRef, bonus in pairs(itemSetBonuses and itemSetBonuses.stats or {}) do
+        if statRef and bonus ~= 0 then
+            continuation.context.bonuses[statRef] = (continuation.context.bonuses[statRef] or 0) + bonus
+        end
+    end
+    for skillRef, bonus in pairs(itemSetBonuses and itemSetBonuses.skills or {}) do
+        if skillRef and bonus ~= 0 then
+            continuation.context.skillBonuses[skillRef] = (continuation.context.skillBonuses[skillRef] or 0) + bonus
+        end
+    end
 end
 
 local function startResolvedEquipmentRow(continuation, preparation, scope)
@@ -1561,6 +1610,17 @@ local function stepResolvedEquipmentPreparation(continuation)
         preparation.mountStatIndex = 1
         preparation.phase = "mount-stats"
         return false
+    elseif preparation.phase == "character-set-bonuses" then
+        if not preparation.itemSetBonusesApplied then
+            applyResolvedItemSetBonuses(continuation)
+            preparation.itemSetBonusesApplied = true
+        end
+        if type(Profile.IsMounted) == "function" and Profile.IsMounted() then
+            preparation.phase = "mount-stats-init"
+        else
+            preparation.phase = "complete"
+        end
+        return false
     elseif preparation.phase == "mount-equipment-init" then
         preparation.rows = Profile.ListEquippedSlotsByScope and Profile.ListEquippedSlotsByScope("mount") or {}
         preparation.rowIndex = 1
@@ -1591,11 +1651,7 @@ local function stepResolvedEquipmentPreparation(continuation)
         end
         if not started then
             if preparation.phase == "character" then
-                if type(Profile.IsMounted) == "function" and Profile.IsMounted() then
-                    preparation.phase = "mount-stats-init"
-                else
-                    preparation.phase = "complete"
-                end
+                preparation.phase = "character-set-bonuses"
             else
                 preparation.phase = "complete"
             end
@@ -1696,6 +1752,7 @@ function Resolver.CreateResolvedStateContinuation(options)
             cache = {},
             profileBonuses = {},
             bonuses = equipmentBonuses,
+            skillBonuses = {},
             auraContext = nil,
             auraModifiersByStat = {},
             progressionContext = {

@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 32,
+    version = 33,
     dataset = {
         achievements = {},
         auras = {
@@ -697,6 +697,73 @@ Addon.Data.DefaultDatasets:Register({
         id = "23d5dce2",
         interactions = {},
         itemSlots = {},
+        itemSets = {
+            {
+                bonuses = {
+                    {
+                        requiredPieces = 2,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:u7b49vs9",
+                                value = 40,
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 4,
+                        skillBonuses = {},
+                        statBonuses = {},
+                        equipmentBonuses = {
+                            {
+                                description = "Basic attacks have a 3% chance to restore 35 Energy.",
+                                events = {
+                                    {
+                                        chance = 3,
+                                        combatEventId = "on_auto_attack_hit",
+                                        effects = {
+                                            {
+                                                amount = 35,
+                                                amountMode = "flat",
+                                                resourceRef = "f82db71a:c3gaf7dd",
+                                                type = "resource",
+                                            },
+                                        },
+                                        triggerTarget = "event_source",
+                                    },
+                                },
+                                name = "Darkmantle Energy",
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 6,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:zs1nbz13",
+                                value = 2,
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 8,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:v42albuv",
+                                value = 200,
+                            },
+                        },
+                    },
+                },
+                description = "Darkmantle Armor rogue set.",
+                icon = "interface/icons/inv_chest_leather_09.blp",
+                id = "t05_rogue_darkmantle",
+                key = "t05_rogue_darkmantle",
+                name = "Darkmantle Armor",
+            },
+        },
         items = {
             {
                 allowWowConversion = false,

@@ -453,7 +453,10 @@ function Combat:ResolveDamageSchoolMitigation(damageSchool, statValue, unitLevel
     if model == "legacy" then
         local mitigationValue = numericStatValue * (tonumber(damageSchool.mitigationCoefficient) or 1)
         if tostring(damageSchool.mitigationMode or "direct") == "percent" then
-            local mitigationPercent = math.max(0, math.min(100, mitigationValue))
+            -- Resistance debuffs are allowed to push mitigation below zero.
+            -- Keep the upper cap so positive resistance cannot exceed full
+            -- mitigation, but preserve negative resistance for vulnerability.
+            local mitigationPercent = math.min(100, mitigationValue)
             return {
                 mode = "percent",
                 percent = mitigationPercent,
@@ -485,7 +488,9 @@ function Combat:ResolveDamageSchoolMitigation(damageSchool, statValue, unitLevel
     if effectiveReferenceAmount > 0 and referencePercent ~= 0 then
         rawPercent = (numericStatValue / effectiveReferenceAmount) * referencePercent
     end
-    local mitigationPercent = math.max(0, math.min(100, rawPercent))
+    -- Negative resistance represents vulnerability and must remain negative so
+    -- damage is increased instead of silently treating it as zero resistance.
+    local mitigationPercent = math.min(100, rawPercent)
     return {
         mode = "percent",
         percent = mitigationPercent,

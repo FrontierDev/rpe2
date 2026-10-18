@@ -117,7 +117,7 @@ local function normalizeThreatUpdates(text)
     return normalized
 end
 
-local function applyThreatUpdatesToUnits(units, threatUpdates, changedByEventId, validSourceUnits)
+local function applyThreatUpdatesToUnits(units, threatUpdates, validSourceUnits)
     local changed = false
     local sourceUnits = validSourceUnits or {}
     for index = 1, #(threatUpdates or {}) do
@@ -129,7 +129,6 @@ local function applyThreatUpdatesToUnits(units, threatUpdates, changedByEventId,
         if unit and unit.isPlayer ~= true and sourceUnit and sourceEventId > 0 and amount > 0 then
             unit.threatTable = type(unit.threatTable) == "table" and unit.threatTable or {}
             unit.threatTable[sourceEventId] = (tonumber(unit.threatTable[sourceEventId]) or 0) + amount
-            changedByEventId[tonumber(unit.eventID) or 0] = unit
             changed = true
         end
     end
@@ -143,32 +142,17 @@ local function applyThreatUpdatesToServerState(server, threatUpdates)
         return false
     end
 
-    local changedByEventId = {}
     local activeUnits = server.EventState and server.EventState.units or nil
-    local eventChanged = applyThreatUpdatesToUnits(activeUnits, normalizedThreatUpdates, changedByEventId, activeUnits)
+    local eventChanged = applyThreatUpdatesToUnits(activeUnits, normalizedThreatUpdates, activeUnits)
     local draftChanged = applyThreatUpdatesToUnits(
         server.EventDraftState and server.EventDraftState.units,
         normalizedThreatUpdates,
-        {},
         activeUnits
     )
     if not eventChanged and not draftChanged then
         return false
     end
 
-    if eventChanged and type(server.BroadcastEventDeltaBatch) == "function" then
-        local entries = {}
-        for _, unit in pairs(changedByEventId) do
-            entries[#entries + 1] = {
-                operation = "upsert",
-                eventID = tonumber(unit and unit.eventID) or 0,
-                unit = unit,
-            }
-        end
-        if #entries > 0 then
-            server:BroadcastEventDeltaBatch(entries, false)
-        end
-    end
     refreshEventManagePage()
     return true
 end

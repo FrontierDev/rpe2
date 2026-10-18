@@ -216,6 +216,48 @@ local function filterThreatUpdatesForEvent(threatUpdates, eventState)
     return filtered
 end
 
+local function applyThreatUpdatesToEventState(eventState, threatUpdates)
+    local appliedTargetEventIds = {}
+    local appliedTargetEventIdSet = {}
+    local units = type(eventState) == "table" and eventState.units or nil
+    if type(units) ~= "table" then
+        return appliedTargetEventIds
+    end
+
+    for index = 1, #(threatUpdates or {}) do
+        local entry = threatUpdates[index]
+        local targetEventId = math.floor(tonumber(entry and entry.targetEventId) or 0)
+        local sourceEventId = math.floor(tonumber(entry and entry.sourceEventId) or 0)
+        local amount = math.max(0, tonumber(entry and entry.amount) or 0)
+        local sourceUnit = findEventUnitById(units, sourceEventId)
+        local targetUnit = findEventUnitById(units, targetEventId)
+        if sourceUnit and targetUnit and targetUnit.isPlayer ~= true
+            and targetEventId > 0 and sourceEventId > 0 and amount > 0
+        then
+            targetUnit.threatTable = type(targetUnit.threatTable) == "table" and targetUnit.threatTable or {}
+            targetUnit.threatTable[sourceEventId] = (tonumber(targetUnit.threatTable[sourceEventId]) or 0) + amount
+            if not appliedTargetEventIdSet[targetEventId] then
+                appliedTargetEventIdSet[targetEventId] = true
+                appliedTargetEventIds[#appliedTargetEventIds + 1] = targetEventId
+            end
+        end
+    end
+
+    return appliedTargetEventIds
+end
+
+local function refreshThreatDependentDisplays(targetClient, eventState, targetEventIds, reason)
+    if type(targetEventIds) ~= "table" or #targetEventIds == 0 then
+        return false
+    end
+
+    for index = 1, #targetEventIds do
+        bumpEventTooltipContextRevision(eventState, targetEventIds[index])
+    end
+    refreshTargetingForEventState(targetClient, reason)
+    return true
+end
+
 local function coalesceThreatUpdates(threatUpdates, additionalThreatUpdates)
     local totals = {}
     local order = {}
@@ -2423,9 +2465,11 @@ function Client:HandleResourceDelta(arguments, sender)
     local deltaPayload = arguments and arguments[3] or ""
 
     local localPlayerName = Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or nil)
+    local localEcho = false
     if localPlayerName ~= "" and playerName == localPlayerName then
         local signature = buildResourceDeltaSignature(channelName, playerName, deltaPayload, targetEventId)
-        if not consumePendingSignature(self.PendingLocalResourceDeltaEchoSignatures, signature) then
+        localEcho = consumePendingSignature(self.PendingLocalResourceDeltaEchoSignatures, signature)
+        if not localEcho then
             return true
         end
     end
@@ -2436,12 +2480,20 @@ function Client:HandleResourceDelta(arguments, sender)
     end
 
     local eventState = self:GetEventState()
+    local appliedThreatEventIds = {}
     local threatUpdates = filterThreatUpdatesForEvent(
         deserializeThreatUpdates(arguments and arguments[5] or ""),
         eventState
     )
-    recordThreatUpdates(self, eventState, threatUpdates)
+    if not localEcho then
+        -- The initiating client already committed this threat locally; its echo
+        -- may still need the normal resource-delta handling below, but must not
+        -- add the threat or meter row a second time.
+        appliedThreatEventIds = applyThreatUpdatesToEventState(eventState, threatUpdates)
+        recordThreatUpdates(self, eventState, threatUpdates)
+    end
     if #threatUpdates > 0 then refreshThreatMeterWidget(self) end
+    refreshThreatDependentDisplays(self, eventState, appliedThreatEventIds, "resource-delta-threat")
     local result = applyInboundResourceDeltasForTarget(self, state, eventState, playerName, sender, targetEventId, resourceDeltas)
     grantBossKillValor(self, eventState, result)
     if transportActionOwner then
@@ -2533,9 +2585,11 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
 
     local deltaPayload = arguments and arguments[3] or ""
     local localPlayerName = Common.NormalizeName(Common.GetPlayerName and Common.GetPlayerName() or nil)
+    local localEcho = false
     if localPlayerName ~= "" and playerName == localPlayerName then
         local signature = buildResourceDeltaBatchSignature(channelName, playerName, deltaPayload)
-        if not consumePendingSignature(self.PendingLocalResourceDeltaBatchEchoSignatures, signature) then
+        localEcho = consumePendingSignature(self.PendingLocalResourceDeltaBatchEchoSignatures, signature)
+        if not localEcho then
             return true
         end
     end
@@ -2557,8 +2611,16 @@ function Client:HandleResourceDeltaBatch(arguments, sender)
         deserializeThreatUpdates(arguments and arguments[4] or ""),
         eventState
     )
-    recordThreatUpdates(self, eventState, threatUpdates)
+    local appliedThreatEventIds = {}
+    if not localEcho then
+        -- The initiating client already committed this threat locally; its echo
+        -- may still need the normal resource-delta handling below, but must not
+        -- add the threat or meter row a second time.
+        appliedThreatEventIds = applyThreatUpdatesToEventState(eventState, threatUpdates)
+        recordThreatUpdates(self, eventState, threatUpdates)
+    end
     if #threatUpdates > 0 then refreshThreatMeterWidget(self) end
+    refreshThreatDependentDisplays(self, eventState, appliedThreatEventIds, "resource-delta-batch-threat")
     local changed = false
     local anyEventUpdated = false
     local anyCompanionBarRelevantTarget = false

@@ -202,6 +202,7 @@ local DATASET_ENTRY_DEFINITIONS = {
     mounts = { className = "Mount", singular = "Mount", assignsId = true },
     pets = { className = "Pet", singular = "Pet", assignsId = true },
     items = { className = "Item", singular = "Item", assignsId = true },
+    itemSets = { className = "ItemSet", singular = "Item Set", assignsId = true },
     spells = { className = "Spell", singular = "Spell", assignsId = true },
     traits = { className = "Trait", singular = "Trait", assignsId = true },
     skills = { className = "Skill", singular = "Skill", assignsId = true },
@@ -816,6 +817,7 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         mounts = ensureTable(data.mounts),
         pets = ensureTable(data.pets),
         items = ensureTable(data.items),
+        itemSets = ensureTable(data.itemSets),
         spells = ensureTable(data.spells),
         traits = ensureTable(data.traits),
         skills = ensureTable(data.skills),
@@ -1842,6 +1844,34 @@ local function nextDatasetEntryId(entries, collectionKey, definition)
     end
 end
 
+local function nextDatasetEntryKey(entries, requestedKey)
+    local baseKey = ensureString(requestedKey, "item_set")
+    baseKey = baseKey:gsub("^%s+", ""):gsub("%s+$", "")
+    if baseKey == "" then
+        baseKey = "item_set"
+    end
+
+    local seen = {}
+    for index = 1, #(entries or {}) do
+        local key = type(entries[index]) == "table"
+            and ensureString(entries[index].key, ""):gsub("^%s+", ""):gsub("%s+$", "")
+            or ""
+        if key ~= "" then
+            seen[key] = true
+        end
+    end
+
+    if not seen[baseKey] then
+        return baseKey
+    end
+
+    local suffix = 2
+    while seen[baseKey .. "_" .. tostring(suffix)] do
+        suffix = suffix + 1
+    end
+    return baseKey .. "_" .. tostring(suffix)
+end
+
 local function buildSeededUnitFields(dataset)
     local seededSpells = {}
     local seededStats = {}
@@ -1906,6 +1936,13 @@ local function createDatasetEntryRecord(dataset, collectionKey, entryId)
 
     if collectionKey == "units" then
         entry.spells, entry.stats, entry.resources = buildSeededUnitFields(dataset)
+    end
+
+    if collectionKey == "itemSets" then
+        entry.key = nextDatasetEntryKey(
+            dataset and dataset.itemSets or {},
+            ("item_set_%s"):format(tostring(entryId or "new"))
+        )
     end
 
     if classObject and classObject.ToTable then
@@ -2026,6 +2063,118 @@ local function normalizeDatasetEntryRecord(dataset, collectionKey, data, entryId
     end
 
     return normalized
+end
+
+local function collectItemSetDiagnostics(datasetId)
+    local diagnostics = {}
+    local root = Database.Datasets or rawget(_G, "RPEngineDatasetDB")
+    local datasets = type(root) == "table" and root.datasets or {}
+    local targetDataset = datasets and datasets[tostring(datasetId or "")] or nil
+    local itemSetClass = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.ItemSet
+        or nil
+    local registry = Addon.Internal and Addon.Internal.Registry or nil
+    if type(targetDataset) ~= "table" then
+        return diagnostics
+    end
+
+    local keys = {}
+    local itemSets = ensureTable(targetDataset.itemSets)
+    for index = 1, #itemSets do
+        local itemSet = itemSets[index]
+        local key = type(itemSet) == "table" and tostring(itemSet.key or ""):gsub("^%s+", ""):gsub("%s+$", "") or ""
+        if key == "" then
+            diagnostics[#diagnostics + 1] = ("itemSets[%d] has an empty key."):format(index)
+        elseif keys[key] then
+            diagnostics[#diagnostics + 1] = ("itemSets[%d] duplicates key '%s' also used at itemSets[%d].")
+                :format(index, key, keys[key])
+        else
+            keys[key] = index
+        end
+
+        if itemSetClass and type(itemSetClass.Validate) == "function" then
+            local valid, itemSetDiagnostics = itemSetClass.Validate(itemSet)
+            if not valid then
+                for diagnosticIndex = 1, #itemSetDiagnostics do
+                    diagnostics[#diagnostics + 1] = ("itemSets[%d]: %s"):format(index, itemSetDiagnostics[diagnosticIndex])
+                end
+            end
+        end
+
+        if type(itemSet) == "table" and type(registry) == "table" then
+            local bonuses = ensureTable(itemSet.bonuses)
+            for bonusIndex = 1, #bonuses do
+                local bonus = bonuses[bonusIndex]
+                local statBonuses = type(bonus) == "table" and ensureTable(bonus.statBonuses) or {}
+                for statIndex = 1, #statBonuses do
+                    local statBonus = statBonuses[statIndex]
+                    local statRef = type(statBonus) == "table" and statBonus.statRef or nil
+                    if type(statRef) == "string" and statRef ~= "" and type(registry.ResolveStatReference) == "function" then
+                        local _, stat = registry:ResolveStatReference(statRef)
+                        if not stat then
+                            diagnostics[#diagnostics + 1] = ("itemSets[%d].bonuses[%d].statBonuses[%d] references missing stat '%s'.")
+                                :format(index, bonusIndex, statIndex, statRef)
+                        end
+                    end
+                end
+                local skillBonuses = type(bonus) == "table" and ensureTable(bonus.skillBonuses) or {}
+                for skillIndex = 1, #skillBonuses do
+                    local skillBonus = skillBonuses[skillIndex]
+                    local skillRef = type(skillBonus) == "table" and skillBonus.skillRef or nil
+                    if type(skillRef) == "string" and skillRef ~= "" and type(registry.ResolveSkillReference) == "function" then
+                        local _, skill = registry:ResolveSkillReference(skillRef)
+                        if not skill then
+                            diagnostics[#diagnostics + 1] = ("itemSets[%d].bonuses[%d].skillBonuses[%d] references missing skill '%s'.")
+                                :format(index, bonusIndex, skillIndex, skillRef)
+                        end
+                    end
+                end
+            end
+        end
+    end
+
+    local items = ensureTable(targetDataset.items)
+    for itemIndex = 1, #items do
+        local item = items[itemIndex]
+        local itemSetKey = type(item) == "table" and tostring(item.itemSetKey or "") or ""
+        if itemSetKey ~= "" and type(registry) == "table" and type(registry.ResolveItemSetForItem) == "function" then
+            local _, itemSet, reason = registry:ResolveItemSetForItem(targetDataset.id, item)
+            if not itemSet then
+                diagnostics[#diagnostics + 1] = ("items[%d] references unresolved item set '%s'%s.")
+                    :format(itemIndex, itemSetKey, reason and (": " .. tostring(reason)) or "")
+            end
+        elseif itemSetKey ~= "" then
+            diagnostics[#diagnostics + 1] = ("items[%d] has an item set reference but the Item Set resolver is unavailable.")
+                :format(itemIndex)
+        end
+    end
+
+    return diagnostics
+end
+
+function Database.ValidateDataset(datasetId)
+    local normalizedId = ensureString(datasetId, "")
+    local diagnostics = collectItemSetDiagnostics(normalizedId)
+    Database.DatasetValidationDiagnostics = Database.DatasetValidationDiagnostics or {}
+    Database.DatasetValidationDiagnostics[normalizedId] = diagnostics
+
+    if #diagnostics > 0 then
+        local debug = Addon.Debug or nil
+        if debug and type(debug.Internal) == "function" then
+            for index = 1, #diagnostics do
+                debug.Internal("Dataset %s validation: %s", normalizedId, diagnostics[index])
+            end
+        end
+    end
+
+    return #diagnostics == 0, diagnostics
+end
+
+function Database.GetDatasetValidationDiagnostics(datasetId)
+    local valid, diagnostics = Database.ValidateDataset(datasetId)
+    return diagnostics, valid
 end
 
 -- Compatibility is deliberately a projection of the current executable
@@ -4831,6 +4980,7 @@ function Database.CreateDataset(name)
         mounts = {},
         pets = {},
         items = {},
+        itemSets = {},
         spells = {},
         traits = {},
         skills = {},
@@ -5421,6 +5571,68 @@ function Database.UpdateDatasetMetadata(datasetId, metadata)
     return dataset
 end
 
+function Database.RenameDatasetEntry(datasetId, collectionKey, entryIndex, newKey)
+    if collectionKey ~= "itemSets" then
+        return nil, "Only Item Set entries have renameable keys."
+    end
+
+    local dataset = Database.GetDatasetByID(datasetId)
+    local index = tonumber(entryIndex)
+    local entries = dataset and ensureTable(dataset.itemSets) or nil
+    local entry = entries and index and entries[index] or nil
+    local normalizedKey = ensureString(newKey, ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if not dataset or not entry then
+        return nil, "Item Set entry not found."
+    end
+    if normalizedKey == "" then
+        return nil, "Item Set key must be non-empty."
+    end
+    if string.find(normalizedKey, ":", 1, true) then
+        return nil, "Item Set key must not contain ':'."
+    end
+
+    for otherIndex = 1, #entries do
+        local otherEntry = entries[otherIndex]
+        local otherKey = type(otherEntry) == "table" and otherEntry.key or ""
+        otherKey = ensureString(otherKey, ""):gsub("^%s+", ""):gsub("%s+$", "")
+        if otherIndex ~= index and otherKey == normalizedKey then
+            return nil, ("Item Set key '%s' is already in use."):format(normalizedKey)
+        end
+    end
+
+    local oldKey = ensureString(entry.key, ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if oldKey == normalizedKey then
+        return entry
+    end
+
+    local oldReference = Dependecies and Dependecies.ComposeSourceStatRef
+        and Dependecies.ComposeSourceStatRef(dataset.id, oldKey)
+        or nil
+    local newReference = Dependecies and Dependecies.ComposeSourceStatRef
+        and Dependecies.ComposeSourceStatRef(dataset.id, normalizedKey)
+        or nil
+    entry.key = normalizedKey
+
+    local root = Database.EnsureDatasets()
+    for currentDatasetId, currentDataset in pairs(root.datasets or {}) do
+        for itemIndex = 1, #(currentDataset.items or {}) do
+            local item = currentDataset.items[itemIndex]
+            if type(item) == "table" then
+                if oldReference and tostring(item.itemSetKey or "") == oldReference then
+                    item.itemSetKey = newReference
+                elseif tostring(currentDatasetId) == tostring(dataset.id)
+                    and tostring(item.itemSetKey or "") == oldKey
+                then
+                    item.itemSetKey = normalizedKey
+                end
+            end
+        end
+    end
+
+    Database.NotifyDatasetEntryChanged(dataset.id, collectionKey)
+    return entry
+end
+
 function Database.NotifyDatasetEntryChanged(datasetId, collectionKey, options)
     local dataset = Database.GetDatasetByID(datasetId)
     if not dataset then
@@ -5432,6 +5644,7 @@ function Database.NotifyDatasetEntryChanged(datasetId, collectionKey, options)
             or collectionKey == "stats"
             or collectionKey == "resources"
             or collectionKey == "items"
+            or collectionKey == "itemSets"
             or collectionKey == "spells"
             or collectionKey == "traits"
             or collectionKey == "skills"
@@ -5455,6 +5668,8 @@ function Database.NotifyDatasetEntryChanged(datasetId, collectionKey, options)
     else
         notifyConfigurationChanged("dataset-entry")
     end
+
+    Database.ValidateDataset(datasetId)
 
     return dataset
 end
@@ -5494,6 +5709,9 @@ function Database.CloneDatasetEntry(datasetId, collectionKey, entryIndex)
     local clone = deepCopy(source)
     if definition.assignsId then
         clone.id = nextDatasetEntryId(entries, collectionKey, definition)
+    end
+    if collectionKey == "itemSets" then
+        clone.key = nextDatasetEntryKey(entries, clone.key)
     end
     clone.name = ensureString(clone.name, "")
     if clone.name == "" then

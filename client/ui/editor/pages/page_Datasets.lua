@@ -103,6 +103,7 @@ local function buildDatasetStatus(dataset)
 
     local total = #(dataset.units or {})
         + #(dataset.items or {})
+        + #(dataset.itemSets or {})
         + #(dataset.spells or {})
         + #(dataset.skills or {})
         + #(dataset.stats or {})

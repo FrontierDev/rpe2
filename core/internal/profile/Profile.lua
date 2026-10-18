@@ -2164,7 +2164,7 @@ function Profile.BuildSelectedPetRuntimeStats()
 
     local unit = selectedPet.unit or nil
     local equipped = Profile.ListEquippedSlotsByScope and Profile.ListEquippedSlotsByScope("pet") or {}
-    return resolver.BuildUnitRuntimeStatRows(unit and unit.stats or {}, equipped)
+    return resolver.BuildUnitRuntimeStatRows(unit and unit.stats or {}, equipped, nil, "pet")
 end
 
 function Profile.IsMounted()
@@ -2905,11 +2905,67 @@ function Profile.ListEquippedItemTraits()
         end
     end
 
+    local setEquipmentBonuses = type(Equipment.ListEquippedItemSetEquipmentBonuses) == "function"
+        and Equipment.ListEquippedItemSetEquipmentBonuses()
+        or {}
+    for index = 1, #setEquipmentBonuses do
+        local entry = setEquipmentBonuses[index]
+        local itemSet = entry and entry.itemSet or nil
+        local payload = entry and entry.payload or nil
+        if type(itemSet) == "table" and type(payload) == "table" then
+            payload = normalizeTraitPayload(payload)
+            local itemSetName = trimString(itemSet.name)
+            local payloadName = trimString(payload.name)
+            local itemSetRef = ensureString(entry.itemSetRef)
+            local sourceKey = table.concat({
+                itemSetRef,
+                tostring(entry.bonusIndex or 0),
+                tostring(entry.equipmentIndex or 0),
+            }, ":")
+            local conditionState = evaluateDetailConditions("trait", payload, {
+                itemSetRef = itemSetRef,
+                itemSet = itemSet,
+                requiredPieces = entry.requiredPieces,
+            })
+            local displayName = itemSetName ~= "" and itemSetName or "Item Set"
+            if payloadName ~= "" then
+                displayName = ("%s: %s"):format(displayName, payloadName)
+            end
+            local authoredDescriptionText = trimString(payload.description)
+            local summaryText = getTraitSummaryText(payload, "No effects")
+
+            rows[#rows + 1] = {
+                sourceType = "item_set",
+                sourceKey = sourceKey,
+                category = "equipment",
+                item = nil,
+                itemSet = itemSet,
+                itemRef = itemSetRef,
+                itemName = itemSetName,
+                requiredPieces = entry.requiredPieces,
+                name = displayName,
+                payload = payload,
+                summaryText = summaryText,
+                authoredDescriptionText = authoredDescriptionText,
+                descriptionText = authoredDescriptionText ~= "" and authoredDescriptionText or summaryText,
+                descriptionSource = authoredDescriptionText ~= "" and "authored" or "summary",
+                icon = trimString(payload.icon) ~= "" and payload.icon or ensureString(itemSet.icon),
+                dataset = entry.dataset,
+                datasetId = entry.dataset and entry.dataset.id or nil,
+                equipmentTrait = payload,
+                isMissing = false,
+                conditionFailureText = conditionState.passed ~= true and conditionState.failureText or "",
+            }
+        end
+    end
+
     table.sort(rows, function(left, right)
         local leftName = string.lower(ensureString(left and left.name))
         local rightName = string.lower(ensureString(right and right.name))
         if leftName == rightName then
-            return ensureString(left and left.itemRef) < ensureString(right and right.itemRef)
+            local leftKey = ensureString(left and (left.sourceKey or left.itemRef))
+            local rightKey = ensureString(right and (right.sourceKey or right.itemRef))
+            return leftKey < rightKey
         end
         return leftName < rightName
     end)

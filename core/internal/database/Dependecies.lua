@@ -156,8 +156,75 @@ local function getItemSourceRefs(item)
         end
     end
 
+    if type(item.itemSetKey) == "string" and item.itemSetKey ~= "" then
+        refs[#refs + 1] = item.itemSetKey
+    end
+
     appendEmbeddedTraitRefs(type(item.consumableTrait) == "table" and item.consumableTrait or nil)
     appendEmbeddedTraitRefs(type(item.equipmentTrait) == "table" and item.equipmentTrait or nil)
+
+    return refs
+end
+
+local function getItemSetSourceRefs(itemSet)
+    local refs = {}
+    if type(itemSet) ~= "table" then
+        return refs
+    end
+
+    local bonuses = ensureTable(itemSet.bonuses)
+    for bonusIndex = 1, #bonuses do
+        local bonus = bonuses[bonusIndex]
+        local statBonuses = type(bonus) == "table" and ensureTable(bonus.statBonuses) or {}
+        for statIndex = 1, #statBonuses do
+            local statBonus = statBonuses[statIndex]
+            local statRef = type(statBonus) == "table"
+                and (statBonus.statRef or statBonus.sourceStatRef)
+                or nil
+            if type(statRef) == "string" and statRef ~= "" then
+                refs[#refs + 1] = statRef
+            end
+        end
+
+        local skillBonuses = type(bonus) == "table" and ensureTable(bonus.skillBonuses) or {}
+        for skillIndex = 1, #skillBonuses do
+            local skillBonus = skillBonuses[skillIndex]
+            local skillRef = type(skillBonus) == "table" and skillBonus.skillRef or nil
+            if type(skillRef) == "string" and skillRef ~= "" then
+                refs[#refs + 1] = skillRef
+            end
+        end
+
+        local equipmentBonuses = type(bonus) == "table" and ensureTable(bonus.equipmentBonuses) or {}
+        for equipmentIndex = 1, #equipmentBonuses do
+            local equipmentBonus = equipmentBonuses[equipmentIndex]
+            if type(equipmentBonus) == "table" then
+                for statIndex = 1, #(equipmentBonus.statBonuses or {}) do
+                    local statBonus = equipmentBonus.statBonuses[statIndex]
+                    local statRef = type(statBonus) == "table" and statBonus.statRef or nil
+                    if type(statRef) == "string" and statRef ~= "" then
+                        refs[#refs + 1] = statRef
+                    end
+                end
+
+                for skillIndex = 1, #(equipmentBonus.skillBonuses or {}) do
+                    local skillBonus = equipmentBonus.skillBonuses[skillIndex]
+                    local skillRef = type(skillBonus) == "table" and skillBonus.skillRef or nil
+                    if type(skillRef) == "string" and skillRef ~= "" then
+                        refs[#refs + 1] = skillRef
+                    end
+                end
+
+                for auraIndex = 1, #(equipmentBonus.automaticAuras or {}) do
+                    local automaticAura = equipmentBonus.automaticAuras[auraIndex]
+                    local auraRef = type(automaticAura) == "table" and automaticAura.auraRef or nil
+                    if type(auraRef) == "string" and auraRef ~= "" then
+                        refs[#refs + 1] = auraRef
+                    end
+                end
+            end
+        end
+    end
 
     return refs
 end
@@ -771,6 +838,7 @@ function Dependecies.RecomputeDatasetDependencies(datasetId)
     local items = ensureTable(dataset.items)
     local damageSchools = ensureTable(dataset.damageSchools)
     local spells = ensureTable(dataset.spells)
+    local itemSets = ensureTable(dataset.itemSets)
     local traits = ensureTable(dataset.traits)
     local skills = ensureTable(dataset.skills)
     local races = ensureTable(dataset.races)
@@ -847,6 +915,19 @@ function Dependecies.RecomputeDatasetDependencies(datasetId)
     for index = 1, #items do
         local item = items[index]
         local sourceRefs = getItemSourceRefs(item)
+
+        for refIndex = 1, #sourceRefs do
+            local sourceDatasetId = Dependecies.ParseSourceStatRef(sourceRefs[refIndex])
+            if sourceDatasetId and sourceDatasetId ~= dataset.id and not seen[sourceDatasetId] then
+                dependencies[#dependencies + 1] = sourceDatasetId
+                seen[sourceDatasetId] = true
+            end
+        end
+    end
+
+    for index = 1, #itemSets do
+        local itemSet = itemSets[index]
+        local sourceRefs = getItemSetSourceRefs(itemSet)
 
         for refIndex = 1, #sourceRefs do
             local sourceDatasetId = Dependecies.ParseSourceStatRef(sourceRefs[refIndex])
@@ -1009,6 +1090,7 @@ function Dependecies.HandleDatasetDeleted(datasetId)
             local items = ensureTable(dataset.items)
             local damageSchools = ensureTable(dataset.damageSchools)
             local spells = ensureTable(dataset.spells)
+            local itemSets = ensureTable(dataset.itemSets)
             local mounts = ensureTable(dataset.mounts)
             local pets = ensureTable(dataset.pets)
             local traits = ensureTable(dataset.traits)
@@ -1254,6 +1336,58 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                             mutated = true
                         end
                     end
+                end
+
+                local itemSetDatasetId = item and Dependecies.ParseSourceStatRef(item.itemSetKey) or nil
+                if itemSetDatasetId == datasetId then
+                    item.itemSetKey = ""
+                    mutated = true
+                end
+            end
+
+            for index = 1, #itemSets do
+                local itemSet = itemSets[index]
+                local setMutated = false
+                local bonuses = type(itemSet) == "table" and ensureTable(itemSet.bonuses) or {}
+                for bonusIndex = 1, #bonuses do
+                    local bonus = bonuses[bonusIndex]
+                    local keptStats = {}
+                    local statMutated = false
+                    local statBonuses = type(bonus) == "table" and ensureTable(bonus.statBonuses) or {}
+                    for statIndex = 1, #statBonuses do
+                        local statBonus = statBonuses[statIndex]
+                        local statRef = type(statBonus) == "table"
+                            and (statBonus.statRef or statBonus.sourceStatRef)
+                            or nil
+                        if Dependecies.ParseSourceStatRef(statRef) == datasetId then
+                            statMutated = true
+                            setMutated = true
+                        else
+                            keptStats[#keptStats + 1] = statBonus
+                        end
+                    end
+                    if statMutated then
+                        bonus.statBonuses = keptStats
+                    end
+
+                    local keptSkills = {}
+                    local skillMutated = false
+                    local skillBonuses = type(bonus) == "table" and ensureTable(bonus.skillBonuses) or {}
+                    for skillIndex = 1, #skillBonuses do
+                        local skillBonus = skillBonuses[skillIndex]
+                        if Dependecies.ParseSourceStatRef(type(skillBonus) == "table" and skillBonus.skillRef or nil) == datasetId then
+                            skillMutated = true
+                            setMutated = true
+                        else
+                            keptSkills[#keptSkills + 1] = skillBonus
+                        end
+                    end
+                    if skillMutated then
+                        bonus.skillBonuses = keptSkills
+                    end
+                end
+                if setMutated then
+                    mutated = true
                 end
             end
 
@@ -2005,6 +2139,30 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
                     end
                 end
             end
+
+            local itemSets = ensureTable(dataset.itemSets)
+            for index = 1, #itemSets do
+                local itemSet = itemSets[index]
+                local bonuses = type(itemSet) == "table" and ensureTable(itemSet.bonuses) or {}
+                for bonusIndex = 1, #bonuses do
+                    local bonus = bonuses[bonusIndex]
+                    local keptBonuses = {}
+                    local bonusMutated = false
+                    local skillBonuses = type(bonus) == "table" and ensureTable(bonus.skillBonuses) or {}
+                    for skillIndex = 1, #skillBonuses do
+                        local skillBonus = skillBonuses[skillIndex]
+                        if type(skillBonus) == "table" and tostring(skillBonus.skillRef or "") == deletedRef then
+                            bonusMutated = true
+                        else
+                            keptBonuses[#keptBonuses + 1] = skillBonus
+                        end
+                    end
+                    if bonusMutated then
+                        bonus.skillBonuses = keptBonuses
+                        mutated = true
+                    end
+                end
+            end
         elseif collectionKey == "stats" then
             for index = 1, #(dataset.skills or {}) do
                 local skill = dataset.skills[index]
@@ -2031,12 +2189,67 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
                     mutated = true
                 end
             end
+
+            local itemSets = ensureTable(dataset.itemSets)
+            for index = 1, #itemSets do
+                local itemSet = itemSets[index]
+                local bonuses = type(itemSet) == "table" and ensureTable(itemSet.bonuses) or {}
+                for bonusIndex = 1, #bonuses do
+                    local bonus = bonuses[bonusIndex]
+                    local keptBonuses = {}
+                    local bonusMutated = false
+                    local statBonuses = type(bonus) == "table" and ensureTable(bonus.statBonuses) or {}
+                    for statIndex = 1, #statBonuses do
+                        local statBonus = statBonuses[statIndex]
+                        if type(statBonus) == "table"
+                            and tostring(statBonus.statRef or statBonus.sourceStatRef or "") == deletedRef
+                        then
+                            bonusMutated = true
+                        else
+                            keptBonuses[#keptBonuses + 1] = statBonus
+                        end
+                    end
+                    if bonusMutated then
+                        bonus.statBonuses = keptBonuses
+                        mutated = true
+                    end
+                end
+            end
         elseif collectionKey == "units" then
             for index = 1, #(dataset.pets or {}) do
                 local pet = dataset.pets[index]
                 if type(pet) == "table" and tostring(pet.unitRef or "") == deletedRef then
                     pet.unitRef = nil
                     mutated = true
+                end
+            end
+        elseif collectionKey == "itemSets" then
+            local deletedKey = type(entry) == "table" and trimText(entry.key) or ""
+            local deletedSetRef = deletedKey ~= ""
+                and Dependecies.ComposeSourceStatRef(datasetId, deletedKey)
+                or nil
+            if deletedSetRef then
+                for index = 1, #(dataset.items or {}) do
+                    local item = dataset.items[index]
+                    if type(item) == "table"
+                        and (tostring(item.itemSetKey or "") == deletedSetRef
+                            or (tostring(currentDatasetId) == tostring(datasetId)
+                                and tostring(item.itemSetKey or "") == deletedKey))
+                    then
+                        item.itemSetKey = ""
+                        mutated = true
+                    end
+                end
+            end
+            for otherDatasetId, otherDataset in pairs(root.datasets or {}) do
+                if tostring(otherDatasetId) ~= tostring(datasetId) and deletedSetRef then
+                    for index = 1, #(otherDataset.items or {}) do
+                        local item = otherDataset.items[index]
+                        if type(item) == "table" and tostring(item.itemSetKey or "") == deletedSetRef then
+                            item.itemSetKey = ""
+                            mutated = true
+                        end
+                    end
                 end
             end
         elseif collectionKey == "itemSlots" then

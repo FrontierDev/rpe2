@@ -166,6 +166,7 @@ function LootNotifications:ShowItemTooltip(itemRef, owner, itemTier)
 
     local tooltip = itemTooltip:Build(item, {
         itemId = item.id,
+        itemRef = itemRef,
         isActive = true,
         itemTier = itemTier,
     })

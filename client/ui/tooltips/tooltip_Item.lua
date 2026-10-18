@@ -35,10 +35,13 @@ ensureString = function(value, fallback)
     return tostring(value)
 end
 
-local TOOLTIP_CACHE_VERSION = "item-tooltip-v5"
+local TOOLTIP_CACHE_VERSION = "item-tooltip-v6"
 ItemTooltip.BuildCache = ItemTooltip.BuildCache or {}
 ItemTooltip.StaticBuildCache = ItemTooltip.StaticBuildCache or {}
 ItemTooltip.DatasetIndexCache = ItemTooltip.DatasetIndexCache or {}
+ItemTooltip.ItemSetMemberCache = ItemTooltip.ItemSetMemberCache or {}
+ItemTooltip.ItemSetProgressCache = ItemTooltip.ItemSetProgressCache or {}
+ItemTooltip.ItemSetActivationCache = ItemTooltip.ItemSetActivationCache or {}
 ItemTooltip.BuildCacheHits = math.max(0, math.floor(tonumber(ItemTooltip.BuildCacheHits) or 0))
 ItemTooltip.BuildCacheMisses = math.max(0, math.floor(tonumber(ItemTooltip.BuildCacheMisses) or 0))
 ItemTooltip.DatasetIndexBuilds = math.max(0, math.floor(tonumber(ItemTooltip.DatasetIndexBuilds) or 0))
@@ -103,6 +106,26 @@ local function getRuntimeRevision(domain, key)
     end
 
     return 0
+end
+
+local function isItemSetDatasetActivated(registry, datasetId)
+    local normalizedDatasetId = ensureString(datasetId)
+    if normalizedDatasetId == "" or type(registry) ~= "table" or type(registry.IsDatasetActivated) ~= "function" then
+        return false
+    end
+
+    local cacheKey = table.concat({
+        tostring(ItemTooltip.ItemSetCacheRevision or getConfigurationRevision()),
+        normalizedDatasetId,
+    }, "\31")
+    local cached = ItemTooltip.ItemSetActivationCache[cacheKey]
+    if cached ~= nil then
+        return cached
+    end
+
+    local active = registry:IsDatasetActivated(normalizedDatasetId) == true
+    ItemTooltip.ItemSetActivationCache[cacheKey] = active
+    return active
 end
 
 local function sortedTableKeys(value)
@@ -273,6 +296,7 @@ local function getTooltipVariantKey(item, values, runtimeRevisionKey)
         tostring(values.itemId or item.id or ""),
         tostring(values.datasetName or ""),
         tostring(values.itemRef or ""),
+        tostring(item.itemSetKey or ""),
         tostring(values.equipmentScope or ""),
         tostring(values.isActive == false),
         tostring(values.isMissing == true),
@@ -299,6 +323,7 @@ local function getStaticTooltipVariantKey(item, values)
         tostring(values.itemId or item.id or ""),
         tostring(values.datasetName or ""),
         tostring(values.itemRef or ""),
+        tostring(item.itemSetKey or ""),
         tostring(values.equipmentScope or ""),
         tostring(values.isActive == false),
         tostring(values.isMissing == true),
@@ -1401,6 +1426,316 @@ local function appendSkillBonusLines(lines, item)
     end
 end
 
+local function resolveTooltipItemDatasetId(item, options)
+    local values = options or {}
+    local datasetId = ensureString(values.datasetId or (values.dataset and values.dataset.id) or (item and item.datasetId))
+    if datasetId ~= "" then
+        return datasetId
+    end
+
+    local itemRef = ensureString(values.itemRef)
+    if itemRef ~= "" and type(Dependencies) == "table" and type(Dependencies.ParseSourceStatRef) == "function" then
+        local parsedDatasetId = Dependencies.ParseSourceStatRef(itemRef)
+        return ensureString(parsedDatasetId)
+    end
+
+    return ""
+end
+
+local function appendItemSetUnavailableLine(lines, reason)
+    appendSpacerLine(lines)
+    local reasonText = tostring(reason or "unavailable")
+    local labels = {
+        ["missing-dataset"] = "dataset unavailable",
+        ["missing-item-set-collection"] = "set data unavailable",
+        ["missing-item-set"] = "set definition unavailable",
+        ["invalid-item-set"] = "set definition invalid",
+        ["duplicate-key"] = "set key is ambiguous",
+        ["inactive-dataset"] = "dataset inactive",
+        ["unqualified-reference-requires-owning-dataset"] = "item reference unavailable",
+    }
+    lines[#lines + 1] = {
+        text = ("Item Set unavailable (%s)."):format(labels[reasonText] or reasonText),
+        r = 1,
+        g = 0.25,
+        b = 0.25,
+        wrap = true,
+    }
+end
+
+local function resolveItemSetStatBonus(entry, registry)
+    local statRef = type(entry) == "table" and ensureString(entry.statRef) or ""
+    local value = type(entry) == "table" and tonumber(entry.value) or 0
+    if statRef == "" or value == 0 or type(registry.ResolveStatReference) ~= "function" then
+        return nil, statRef ~= "" and value ~= 0
+    end
+
+    local statDataset, statDefinition = registry:ResolveStatReference(statRef)
+    if type(statDataset) ~= "table" or type(statDefinition) ~= "table" then
+        return nil, true
+    end
+    if not isItemSetDatasetActivated(registry, statDataset.id) then
+        return nil, true
+    end
+
+    local label = ensureString(statDefinition.name, statRef)
+    return buildFormattedStatText(value, label, statDefinition), false
+end
+
+local function resolveItemSetSkillBonus(entry, registry)
+    local skillRef = type(entry) == "table" and ensureString(entry.skillRef) or ""
+    local value = type(entry) == "table" and tonumber(entry.value) or 0
+    if skillRef == "" or value == 0 or type(registry.ResolveSkillReference) ~= "function" then
+        return nil, skillRef ~= "" and value ~= 0
+    end
+
+    local skillDataset, skillDefinition = registry:ResolveSkillReference(skillRef)
+    if type(skillDataset) ~= "table" or type(skillDefinition) ~= "table" then
+        return nil, true
+    end
+    if not isItemSetDatasetActivated(registry, skillDataset.id) then
+        return nil, true
+    end
+
+    local label = ensureString(skillDefinition.name, skillRef)
+    local verb = value > 0 and "Increases" or "Reduces"
+    return ("%s skill in %s by %g"):format(verb, label, math.abs(value)), false
+end
+
+local function resolveItemSetEquipmentBonus(payload)
+    if type(payload) ~= "table" then
+        return nil, true
+    end
+
+    local description = ensureString(payload.description)
+    if description == "" then
+        return "Equipment effect", false
+    end
+
+    return description, false
+end
+
+local function resolveItemSetSlotKey(slotRef)
+    local normalizedRef = ensureString(slotRef)
+    if normalizedRef == "" then
+        return ""
+    end
+
+    if type(Equipment.ResolveSlotKeyFromRef) == "function" then
+        local slotKey = Equipment.ResolveSlotKeyFromRef(normalizedRef)
+        if ensureString(slotKey) ~= "" then
+            if type(Equipment.NormalizeSlotMatchKey) == "function" then
+                return ensureString(Equipment.NormalizeSlotMatchKey(slotKey))
+            end
+            if type(Equipment.NormalizeSlotKey) == "function" then
+                return ensureString(Equipment.NormalizeSlotKey(slotKey))
+            end
+            return ensureString(slotKey)
+        end
+    end
+
+    return normalizedRef
+end
+
+local function countUniqueItemSetSlots(members)
+    local slotKeys = {}
+    for index = 1, #(members or {}) do
+        local member = members[index]
+        local item = member and member.item or nil
+        local slotRefs = item and item.validSlotRefs or nil
+        for slotIndex = 1, type(slotRefs) == "table" and #slotRefs or 0 do
+            local slotKey = resolveItemSetSlotKey(slotRefs[slotIndex])
+            if slotKey ~= "" then
+                slotKeys[slotKey] = true
+            end
+        end
+    end
+
+    local count = 0
+    for _ in pairs(slotKeys) do
+        count = count + 1
+    end
+    if count > 0 then
+        return count
+    end
+
+    -- Older imported items may omit validSlotRefs. Keep the set display useful
+    -- for those records by falling back to unique item definitions.
+    local itemRefs = {}
+    for index = 1, #(members or {}) do
+        local itemRef = ensureString(members[index] and members[index].itemRef)
+        if itemRef ~= "" then
+            itemRefs[itemRef] = true
+        end
+    end
+    for _ in pairs(itemRefs) do
+        count = count + 1
+    end
+    return count
+end
+
+local function appendItemSetLines(lines, item, options)
+    if type(item) ~= "table" then
+        return false
+    end
+
+    local itemSetKey = ensureString(item.itemSetKey)
+    if itemSetKey == "" then
+        return false
+    end
+
+    local registry = Addon.Internal and Addon.Internal.Registry or Registry
+    local datasetId = resolveTooltipItemDatasetId(item, options)
+    if type(registry) ~= "table"
+        or type(registry.ResolveItemSetForItem) ~= "function"
+        or type(registry.ListItemSetMembers) ~= "function"
+        or type(Equipment) ~= "table"
+        or type(Equipment.GetEquippedItemSetProgress) ~= "function"
+    then
+        appendItemSetUnavailableLine(lines, "set data unavailable")
+        return true
+    end
+
+    local setDataset, itemSet, reason = registry:ResolveItemSetForItem(datasetId, item)
+    if type(setDataset) ~= "table" or type(itemSet) ~= "table" then
+        appendItemSetUnavailableLine(lines, reason)
+        return true
+    end
+    if not isItemSetDatasetActivated(registry, setDataset.id) then
+        appendItemSetUnavailableLine(lines, "inactive-dataset")
+        return true
+    end
+    if datasetId ~= "" and not isItemSetDatasetActivated(registry, datasetId) then
+        appendItemSetUnavailableLine(lines, "inactive-dataset")
+        return true
+    end
+
+    local setDatasetId = ensureString(setDataset.id)
+    local setKey = ensureString(itemSet.key)
+    if setDatasetId == "" or setKey == "" then
+        appendItemSetUnavailableLine(lines, "invalid-item-set")
+        return true
+    end
+
+    local itemSetRef = ("%s:%s"):format(setDatasetId, setKey)
+    local itemSetCacheKey = table.concat({
+        tostring(ItemTooltip.ItemSetCacheRevision or getTooltipRuntimeRevisionKey()),
+        itemSetRef,
+        datasetId,
+    }, "\31")
+    local members = ItemTooltip.ItemSetMemberCache[itemSetCacheKey]
+    if members == nil then
+        members = registry:ListItemSetMembers(itemSetRef, datasetId)
+        if type(members) ~= "table" then
+            members = {}
+        end
+        ItemTooltip.ItemSetMemberCache[itemSetCacheKey] = members
+    end
+    if type(members) ~= "table" or #members == 0 then
+        appendItemSetUnavailableLine(lines, "no-members")
+        return true
+    end
+
+    local cachedProgress = ItemTooltip.ItemSetProgressCache[itemSetCacheKey]
+    local progress = cachedProgress and cachedProgress.progress or nil
+    if not cachedProgress then
+        progress = Equipment.GetEquippedItemSetProgress(itemSetRef, datasetId)
+        ItemTooltip.ItemSetProgressCache[itemSetCacheKey] = { progress = progress }
+    end
+    if type(progress) ~= "table" then
+        appendItemSetUnavailableLine(lines, "progress unavailable")
+        return true
+    end
+
+    local totalSlots = countUniqueItemSetSlots(members)
+    appendSpacerLine(lines)
+    lines[#lines + 1] = {
+        text = ("%s (%d/%d)"):format(
+            ensureString(itemSet.name, setKey),
+            math.max(0, math.floor(tonumber(progress.count) or 0)),
+            totalSlots
+        ),
+        r = 1,
+        g = 0.82,
+        b = 0,
+        wrap = true,
+    }
+
+    local bonuses = {}
+    for index = 1, #(itemSet.bonuses or {}) do
+        bonuses[#bonuses + 1] = itemSet.bonuses[index]
+    end
+    table.sort(bonuses, function(left, right)
+        local leftRequired = tonumber(left and left.requiredPieces) or 0
+        local rightRequired = tonumber(right and right.requiredPieces) or 0
+        if leftRequired == rightRequired then
+            return stableSerialize(left or {}) < stableSerialize(right or {})
+        end
+        return leftRequired < rightRequired
+    end)
+
+    for index = 1, #bonuses do
+        local bonus = bonuses[index]
+        local requiredPieces = math.floor(tonumber(bonus and bonus.requiredPieces) or 0)
+        local bonusParts = {}
+        local unavailableCount = 0
+        for statIndex = 1, #(bonus and bonus.statBonuses or {}) do
+            local text, unavailable = resolveItemSetStatBonus(bonus.statBonuses[statIndex], registry)
+            if text then
+                bonusParts[#bonusParts + 1] = text
+            elseif unavailable then
+                unavailableCount = unavailableCount + 1
+            end
+        end
+        for skillIndex = 1, #(bonus and bonus.skillBonuses or {}) do
+            local text, unavailable = resolveItemSetSkillBonus(bonus.skillBonuses[skillIndex], registry)
+            if text then
+                bonusParts[#bonusParts + 1] = text
+            elseif unavailable then
+                unavailableCount = unavailableCount + 1
+            end
+        end
+        for equipmentIndex = 1, #(bonus and bonus.equipmentBonuses or {}) do
+            local text, unavailable = resolveItemSetEquipmentBonus(bonus.equipmentBonuses[equipmentIndex])
+            if text then
+                bonusParts[#bonusParts + 1] = text
+            elseif unavailable then
+                unavailableCount = unavailableCount + 1
+            end
+        end
+
+        local active = requiredPieces > 0 and requiredPieces <= (tonumber(progress.count) or 0)
+        local bonusText = #bonusParts > 0 and table.concat(bonusParts, "; ") or "Bonus unavailable"
+        if #bonusParts == 0 and unavailableCount == 0 then
+            bonusText = "No bonus defined"
+        end
+        local activeColor = active and #bonusParts > 0
+            and { r = 0.12, g = 1.0, b = 0.0 }
+            or { r = 0.62, g = 0.62, b = 0.62 }
+        lines[#lines + 1] = {
+            text = ("(%d) %s"):format(requiredPieces, bonusText),
+            r = activeColor.r,
+            g = activeColor.g,
+            b = activeColor.b,
+            wrap = true,
+        }
+        if unavailableCount > 0 then
+            lines[#lines + 1] = {
+                text = ("    %d bonus reference%s unresolved."):format(
+                    unavailableCount,
+                    unavailableCount == 1 and " is" or "s are"
+                ),
+                r = 0.62,
+                g = 0.62,
+                b = 0.62,
+                wrap = true,
+            }
+        end
+    end
+
+    return true
+end
+
 local function appendAppliedModificationLines(lines, item, options)
     if type(item) ~= "table" then
         return
@@ -1892,6 +2227,10 @@ local function hasDynamicTooltipContent(item)
         return false
     end
 
+    if ensureString(item.itemSetKey) ~= "" then
+        return true
+    end
+
     if type(item.conditions) == "table" and #item.conditions > 0 then
         return true
     end
@@ -1936,6 +2275,12 @@ function ItemTooltip:Build(item, options)
         ItemTooltip.BuildCacheRevision = cacheRevision
     elseif type(ItemTooltip.BuildCache) ~= "table" then
         ItemTooltip.BuildCache = {}
+    end
+    if ItemTooltip.ItemSetCacheRevision ~= cacheRevision then
+        ItemTooltip.ItemSetMemberCache = {}
+        ItemTooltip.ItemSetProgressCache = {}
+        ItemTooltip.ItemSetActivationCache = {}
+        ItemTooltip.ItemSetCacheRevision = cacheRevision
     end
 
     local configurationRevision = getConfigurationRevision()
@@ -2032,6 +2377,7 @@ function ItemTooltip:Build(item, options)
     appendOnUseSpellLine(lines, item)
     appendUseLine(lines, item, values)
     appendAppliedModificationLines(lines, item, values)
+    appendItemSetLines(lines, item, values)
     appendDescriptionLine(lines, item)
     appendEconomyLine(lines, item)
 

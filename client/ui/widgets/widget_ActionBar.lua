@@ -150,6 +150,25 @@ local function buildCooldownBucketSignature(unitState)
     return table.concat(parts, "\30")
 end
 
+local function buildSelectedTargetEventIdsSignature(selectedTargetEventIds)
+    if type(selectedTargetEventIds) ~= "table" then
+        return ""
+    end
+
+    local selectedIds = {}
+    for eventId, selected in pairs(selectedTargetEventIds) do
+        local numericEventId = tonumber(eventId)
+        if selected and numericEventId then
+            selectedIds[#selectedIds + 1] = numericEventId
+        end
+    end
+    table.sort(selectedIds)
+    for index = 1, #selectedIds do
+        selectedIds[index] = tostring(selectedIds[index])
+    end
+    return table.concat(selectedIds, ",")
+end
+
 local function buildTargetingSignature()
     local pending = type(Client.GetPendingSpellTargeting) == "function" and Client:GetPendingSpellTargeting() or nil
     if type(pending) ~= "table" then
@@ -165,7 +184,7 @@ local function buildTargetingSignature()
         parts[#parts + 1] = buildSignature(
             tostring(group and group.key or ""),
             tonumber(group and group.focusedTargetEventId) or 0,
-            table.concat(group and group.selectedTargetEventIds or {}, ",")
+            buildSelectedTargetEventIdsSignature(group and group.selectedTargetEventIds)
         )
     end
 

@@ -1,10 +1,40 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 57,
+    version = 61,
     dataset = {
         achievements = {},
         auras = {
+            {
+                description = "Increases Spell Power and Healing Power by 95.",
+                duration = 2,
+                effects = {
+                    {
+                        baseAmount = 95,
+                        operation = "flat",
+                        scaleWithRank = false,
+                        statRef = "f82db71a:7t7xgzcx",
+                        statScaling = {},
+                        type = "stat",
+                    },
+                    {
+                        baseAmount = 95,
+                        operation = "flat",
+                        scaleWithRank = false,
+                        statRef = "f82db71a:hj6d4kvy",
+                        statScaling = {},
+                        type = "stat",
+                    },
+                },
+                events = {},
+                icon = "interface/icons/inv_helmet_08.blp",
+                id = "sfempwr1",
+                maxStacks = 1,
+                name = "Soulforge Empowerment",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = false,
+            },
             {
                 description = "",
                 duration = 3,
@@ -1324,6 +1354,92 @@ Addon.Data.DefaultDatasets:Register({
         id = "b0211ab3",
         interactions = {},
         itemSlots = {},
+        itemSets = {
+            {
+                bonuses = {
+                    {
+                        requiredPieces = 2,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:u7b49vs9",
+                                value = 40,
+                            },
+                            {
+                                statRef = "f82db71a:hj6d4kvy",
+                                value = 40,
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 4,
+                        skillBonuses = {},
+                        statBonuses = {},
+                        equipmentBonuses = {
+                            {
+                                description = "Melee autoattacks have a 6% chance, and spellcasts a 4% chance, to increase spell power and healing power by 95 for 2 turns.",
+                                events = {
+                                    {
+                                        chance = 6,
+                                        combatEventId = "on_auto_attack_hit",
+                                        effects = {
+                                            {
+                                                auraRef = "b0211ab3:sfempwr1",
+                                                basePower = 0,
+                                                duration = 2,
+                                                stacks = 1,
+                                                type = "apply_aura",
+                                            },
+                                        },
+                                        triggerTarget = "event_source",
+                                    },
+                                    {
+                                        chance = 4,
+                                        combatEventId = "on_spell_hit",
+                                        effects = {
+                                            {
+                                                auraRef = "b0211ab3:sfempwr1",
+                                                basePower = 0,
+                                                duration = 2,
+                                                stacks = 1,
+                                                type = "apply_aura",
+                                            },
+                                        },
+                                        triggerTarget = "event_source",
+                                    },
+                                },
+                                name = "Soulforge Empowerment",
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 6,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:zs1nbz13",
+                                value = 2,
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 8,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:v42albuv",
+                                value = 200,
+                            },
+                        },
+                    },
+                },
+                description = "Tier 0.5 Soulforge Paladin set.",
+                icon = "interface/icons/inv_helmet_08.blp",
+                id = "t05_pala_soulforge",
+                key = "t05_pala_soulforge",
+                name = "Soulforge Armor",
+            },
+        },
         items = {
             {
                 allowWowConversion = false,
@@ -6957,7 +7073,7 @@ Addon.Data.DefaultDatasets:Register({
                 _resourceCostsByPhase = {
                     on_cast_end = {
                         {
-                            amount = 50,
+                            amount = 100,
                             amountMode = "base_percent",
                             castPhase = "on_cast_end",
                             refundOnInterrupt = 0,
@@ -7026,7 +7142,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 50,
+                        amount = 100,
                         amountMode = "base_percent",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -7358,6 +7474,71 @@ Addon.Data.DefaultDatasets:Register({
                 },
                 totalTicks = 0,
                 useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {},
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            maxAuras = nil,
+                            tags = { "magic", "poison", "disease" },
+                            targetEvents = {},
+                            type = "remove_aura_by_tag",
+                        },
+                        key = "clnseff1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "single",
+                        },
+                    },
+                },
+                conditions = {},
+                cooldown = 1,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_purify.blp",
+                id = "clnsepal",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 42,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Cleanse",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 5,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99",
+                    },
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Remove magic, poison and disease effects from an ally.",
+                    tokens = {},
+                    version = 1,
+                },
+                totalTicks = 0,
+                useCooldownCharges = false,
             },
             {
                 allowDeadTargets = false,
@@ -8474,7 +8655,7 @@ Addon.Data.DefaultDatasets:Register({
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {
-                            amount = 40,
+                            amount = 10,
                             amountMode = "base_percent",
                             resourceRef = "f82db71a:4c8mfm99",
                             targetEvents = {},
@@ -8586,7 +8767,7 @@ Addon.Data.DefaultDatasets:Register({
                             tokens = {}
                         }
                     },
-                    mainText = "Restore 40% of Base Mana to yourself. Apply Judgement of the Wise to an enemy for 5 turns.",
+                    mainText = "Restore 10% of Base Mana to yourself. Apply Judgement of the Wise to an enemy for 5 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -10927,6 +11108,94 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     mainText = "Apply Repentance to an enemy for 2 turns.",
                     tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_heal",
+                    "on_critical_heal"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseHealing = 84.5,
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.507,
+                                    statRef = "f82db71a:hj6d4kvy"
+                                }
+                            },
+                            targetEvents = {
+                                "on_heal_taken"
+                            },
+                            type = "heal",
+                            usesProjectile = false
+                        },
+                        key = "hlyshck1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "ally",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {},
+                cooldown = 3,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/spell_holy_searinglight.blp",
+                id = "hlyshck1",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 40,
+                usesRanks = true,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Holy Shock",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 6.3,
+                        amountMode = "base_percent",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:4c8mfm99"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Holy",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Heal an ally for {HEAL_1} health.",
+                    tokens = {
+                        {
+                            applyMode = "heal_range",
+                            componentIndex = 1,
+                            key = "HEAL_1",
+                            tokenType = "spell_heal_range"
+                        }
+                    },
                     version = 1
                 },
                 totalTicks = 0,

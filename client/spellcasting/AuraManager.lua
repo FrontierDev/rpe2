@@ -918,6 +918,27 @@ local function isAuraDefinitionHarmful(auraDefinition)
     return false
 end
 
+local function auraDefinitionAppliesControl(auraDefinition)
+    if type(auraDefinition) ~= "table" then
+        return false
+    end
+
+    local effectKeys = sortedNumericKeys(auraDefinition.effects)
+    for index = 1, #effectKeys do
+        local effect = auraDefinition.effects[effectKeys[index].key]
+        if type(effect) == "table" and tostring(effect.type or "") == "control" then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function isBossUnit(unit)
+    return type(unit) == "table"
+        and string.lower(tostring(unit.challengeLevel or "")) == "boss"
+end
+
 local function normalizeTurnCount(turnCount)
     if Spellcasting.NormalizeTurnCount then
         local normalized = Spellcasting.NormalizeTurnCount(turnCount)
@@ -3270,6 +3291,19 @@ function AuraManager:UpsertAura(client, payload)
                 tostring(type(payload) == "table" and payload.datasetId or "nil"),
                 tostring(type(payload) == "table" and payload.spellDatasetId or "nil"),
                 tostring(type(payload) == "table" and payload.sourceDatasetId or "nil")
+            )
+        end
+        return false, nil
+    end
+
+    local targetUnit = type(payload) == "table" and payload.targetUnit or nil
+    targetUnit = type(targetUnit) == "table" and targetUnit or findEventUnit(eventState, payload.targetEventId)
+    if isBossUnit(targetUnit) and auraDefinitionAppliesControl(auraDefinition) then
+        if type(Debug.Internal) == "function" then
+            Debug.Internal(
+                "Aura upsert rejected: boss control immunity aura=%s targetEventId=%s.",
+                tostring(qualifiedAuraRef or payload.auraRef or "nil"),
+                tostring(tonumber(payload.targetEventId) or 0)
             )
         end
         return false, nil

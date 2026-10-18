@@ -102,4 +102,198 @@ local markDescription = Addon.Client.Spellcasting.AuraDescriptionBuilder:BuildGe
 assertTrue(markDescription:find("2%% of Max", 1, false) ~= nil, "Mark of Blood matches Judgement of the Light healing")
 assertTrue(markDescription:find("0%% of Max", 1, false) == nil, "Mark of Blood does not render zero percentage healing")
 
+local equipmentRevision = 1
+local equippedCount = 1
+local itemSet = {
+    key = "dawn",
+    name = "Dawn Regalia",
+    bonuses = {
+        {
+            requiredPieces = 1,
+            statBonuses = {
+                { statRef = "stats:strength", value = 5 },
+            },
+            equipmentBonuses = {
+                {
+                    name = "Dawn Attunement",
+                    description = "A set equipment effect.",
+                },
+            },
+        },
+        {
+            requiredPieces = 2,
+            skillBonuses = {
+                { skillRef = "skills:alchemy", value = 1 },
+            },
+        },
+        {
+            requiredPieces = 4,
+            statBonuses = {
+                { statRef = "stats:strength", value = 10 },
+            },
+        },
+    },
+}
+
+Addon.Client.Spellcasting.DescriptionBuilder = {
+    ProfileTooltipContextRevision = 1,
+}
+Addon.Internal.Database.Dependecies.ParseSourceStatRef = function(reference)
+    return tostring(reference or ""):match("^([^:]+):([^:]+)$")
+end
+Addon.Internal.Runtime = {
+    GetRevision = function(_, domain)
+        if domain == "EquipmentRevision" then
+            return equipmentRevision
+        end
+        return 1
+    end,
+}
+Addon.Internal.ItemTier = {
+    Normalize = function(value) return value or "normal" end,
+    DisplayName = function(value) return tostring(value) end,
+}
+Addon.Internal.Profile.Equipment = {
+    GetEquippedItemSetProgress = function(itemSetRef)
+        local itemRefs = { "items:chest" }
+        if equippedCount >= 2 then
+            itemRefs[#itemRefs + 1] = "items:ring"
+        end
+        if equippedCount >= 4 then
+            itemRefs[#itemRefs + 1] = "items:shoulder"
+            itemRefs[#itemRefs + 1] = "items:belt"
+        end
+        return {
+            itemSetRef = itemSetRef,
+            count = equippedCount,
+            itemRefs = equippedCount > 0 and itemRefs or {},
+        }
+    end,
+}
+Addon.Internal.Registry.ResolveItemSetForItem = function(_, datasetId, item)
+    if tostring(item and item.itemSetKey or "") == "missing" then
+        return nil, nil, "missing-item-set"
+    end
+    return { id = "sets" }, itemSet
+end
+Addon.Internal.Registry.ListItemSetMembers = function(_, itemSetRef)
+    return {
+        { itemRef = "items:shoulder", item = { name = "Shoulder", validSlotRefs = { "slots:shoulder" } } },
+        { itemRef = "items:chest", item = { name = "Chest", validSlotRefs = { "slots:chest" } } },
+        { itemRef = "items:chest-variant", item = { name = "Chest Variant", validSlotRefs = { "slots:chest" } } },
+        { itemRef = "items:ring", item = { name = "Ring", validSlotRefs = { "slots:finger" } } },
+        { itemRef = "items:belt", item = { name = "Belt", validSlotRefs = { "slots:belt" } } },
+    }, { id = "sets" }, itemSet
+end
+Addon.Internal.Registry.IsDatasetActivated = function(_, datasetId)
+    return datasetId == "items" or datasetId == "sets" or datasetId == "stats" or datasetId == "skills"
+end
+Addon.Internal.Registry.ResolveStatReference = function(_, reference)
+    if reference == "stats:strength" then
+        return { id = "stats" }, { name = "Strength", displayMode = "signed_value" }
+    end
+    return nil, nil
+end
+Addon.Internal.Registry.ResolveSkillReference = function(_, reference)
+    if reference == "skills:alchemy" then
+        return { id = "skills" }, { name = "Alchemy" }
+    end
+    return nil, nil
+end
+
+loadAddonFile("client/ui/tooltips/tooltip_Item.lua")
+local itemTooltip = Addon.Client.UI.Tooltips.Item
+itemTooltip.BuildCache = {}
+itemTooltip.StaticBuildCache = {}
+itemTooltip.BuildCacheRevision = nil
+itemTooltip.StaticBuildCacheRevision = nil
+
+local function findTooltipLine(tooltip, prefix)
+    for index = 1, #(tooltip and tooltip.lines or {}) do
+        local line = tooltip.lines[index]
+        if type(line) == "table" and tostring(line.text or ""):sub(1, #prefix) == prefix then
+            return line
+        end
+    end
+    return nil
+end
+
+local function containsTooltipText(tooltip, text)
+    return findTooltipLine(tooltip, text) ~= nil
+end
+
+local nonSetTooltip = itemTooltip:Build({
+    id = "plain",
+    name = "Plain Item",
+    itemType = "none",
+    canSell = false,
+}, { datasetId = "items", itemId = "plain" })
+assertTrue(not containsTooltipText(nonSetTooltip, "Item Set:"), "non-set tooltip remains unchanged")
+itemTooltip.StaticBuildCache = {}
+
+local setItem = {
+    id = "chest",
+    name = "Chest",
+    itemType = "armor",
+    itemSetKey = "dawn",
+    canSell = false,
+}
+local onePieceTooltip = itemTooltip:Build(setItem, {
+    datasetId = "items",
+    itemRef = "items:chest",
+    itemId = "chest",
+})
+local setHeader = findTooltipLine(onePieceTooltip, "Dawn Regalia")
+assertTrue(setHeader ~= nil and setHeader.text:find("%(1/4%)") ~= nil, "item set header counts unique slots")
+assertTrue(not containsTooltipText(onePieceTooltip, "  Chest"), "item-set members are not shown")
+assertTrue(not containsTooltipText(onePieceTooltip, "  Ring"), "item-set member list is omitted")
+assertTrue(not containsTooltipText(onePieceTooltip, "  Shoulder"), "item-set member list is omitted")
+local activeTier = findTooltipLine(onePieceTooltip, "(1) +5 Strength")
+local unmetTier = findTooltipLine(onePieceTooltip, "(2) Increases skill in Alchemy")
+assertTrue(activeTier ~= nil and activeTier.g == 1.0, "active item-set tier is emphasized")
+assertTrue(activeTier.text:find("A set equipment effect.", 1, true) ~= nil, "item-set equipment bonus is rendered")
+assertTrue(activeTier.text:find("Dawn Attunement", 1, true) == nil, "item-set equipment trait name is omitted")
+assertTrue(activeTier.text:sub(1, 1) ~= " ", "item-set bonus tier is not indented")
+assertTrue(unmetTier ~= nil and unmetTier.r == 0.62, "unmet item-set tier is muted")
+local staticEntryCount = 0
+for _ in pairs(itemTooltip.StaticBuildCache) do
+    staticEntryCount = staticEntryCount + 1
+end
+assertEqual(staticEntryCount, 0, "item-set tooltip does not use static cache")
+
+equippedCount = 2
+equipmentRevision = 2
+local twoPieceTooltip = itemTooltip:Build(setItem, {
+    datasetId = "items",
+    itemRef = "items:chest",
+    itemId = "chest",
+})
+local twoPieceHeader = findTooltipLine(twoPieceTooltip, "Dawn Regalia")
+assertTrue(twoPieceHeader ~= nil and twoPieceHeader.text:find("%(2/4%)") ~= nil, "equipment revision invalidates item-set progress")
+local activeSkillTier = findTooltipLine(twoPieceTooltip, "(2) Increases skill in Alchemy")
+assertTrue(activeSkillTier ~= nil and activeSkillTier.g == 1.0, "newly active item-set tier is emphasized")
+
+equippedCount = 4
+equipmentRevision = 3
+local fourPieceTooltip = itemTooltip:Build(setItem, {
+    datasetId = "items",
+    itemRef = "items:chest",
+    itemId = "chest",
+})
+local fourPieceTier = findTooltipLine(fourPieceTooltip, "(4) +10 Strength")
+assertTrue(fourPieceTier ~= nil and fourPieceTier.g == 1.0, "four-piece item-set tier uses live progress")
+
+local unavailableTooltip = itemTooltip:Build({
+    id = "missing",
+    name = "Missing Set Item",
+    itemType = "none",
+    itemSetKey = "missing",
+    canSell = false,
+}, {
+    datasetId = "items",
+    itemRef = "items:missing",
+    itemId = "missing",
+})
+assertTrue(containsTooltipText(unavailableTooltip, "Item Set unavailable"), "missing item-set data is reported without an error")
+
 print("TooltipBuilderRegressionTest passed")

@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 38,
+    version = 39,
     dataset = {
         achievements = {},
         auras = {
@@ -776,6 +776,77 @@ Addon.Data.DefaultDatasets:Register({
         id = "d7c874c4",
         interactions = {},
         itemSlots = {},
+        itemSets = {
+            {
+                bonuses = {
+                    {
+                        requiredPieces = 2,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:7t7xgzcx",
+                                value = 23,
+                            },
+                            {
+                                statRef = "f82db71a:hj6d4kvy",
+                                value = 23,
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 4,
+                        skillBonuses = {},
+                        statBonuses = {},
+                        equipmentBonuses = {
+                            {
+                                description = "Damaging spells have a 6% chance to restore 125 Mana.",
+                                events = {
+                                    {
+                                        chance = 6,
+                                        combatEventId = "on_spell_hit",
+                                        effects = {
+                                            {
+                                                amount = 125,
+                                                amountMode = "flat",
+                                                resourceRef = "f82db71a:4c8mfm99",
+                                                type = "resource",
+                                            },
+                                        },
+                                        triggerTarget = "event_source",
+                                    },
+                                },
+                                name = "Sorcerer's Focus",
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 6,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:zs1nbz13",
+                                value = 2,
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 8,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:v42albuv",
+                                value = 200,
+                            },
+                        },
+                    },
+                },
+                description = "Sorcerer's Regalia mage set.",
+                icon = "interface/icons/inv_chest_cloth_25.blp",
+                id = "t05_mage_sorcerers",
+                key = "t05_mage_sorcerers",
+                name = "Sorcerer's Regalia",
+            },
+        },
         items = {
             {
                 allowWowConversion = false,

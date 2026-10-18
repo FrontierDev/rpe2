@@ -212,6 +212,10 @@ function DataEditor:RefreshAuraInspectorPage()
         self.AuraInspectorIconInput:SetText(aura and (aura.icon or "") or "")
         self:SetAuraInspectorTextElementEnabled(self.AuraInspectorIconInput, hasAura)
     end
+    if self.AuraInspectorTagsInput then
+        self.AuraInspectorTagsInput:SetText(UI.Utils.JoinCommaSeparatedList(aura and aura.tags or nil))
+        self:SetAuraInspectorTextElementEnabled(self.AuraInspectorTagsInput, hasAura)
+    end
     if self.AuraInspectorDurationInput then
         self.AuraInspectorDurationInput:SetText(tostring(aura and aura.duration or 1))
         self:SetAuraInspectorTextElementEnabled(self.AuraInspectorDurationInput, hasAura)

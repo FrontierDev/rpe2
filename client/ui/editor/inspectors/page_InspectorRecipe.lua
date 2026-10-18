@@ -625,7 +625,9 @@ function DataEditor:BuildRecipeInspectorOutputItemItems(datasetId)
             }
             if ItemTooltip and ItemTooltip.Build then
                 itemLeaf.tooltip = ItemTooltip:Build(item, {
+                    datasetId = datasetId,
                     itemId = item.id,
+                    itemRef = itemLeaf.value,
                     isActive = true,
                 })
             end

@@ -139,6 +139,22 @@ function DataEditor:BuildAuraInspectorGeneralPage(page)
         end,
     }
 
+    root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorTagsLabel", "Tags"))
+    self.AuraInspectorTagsInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAuraInspectorTagsInput", {
+        width = self.AuraInspectorFieldWidth,
+        height = self.AuraInspectorControlHeight,
+        text = "",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitTags = function()
+        self:CommitSelectedAura(function(aura)
+            aura.tags = UI.Utils.ParseCommaSeparatedList(self.AuraInspectorTagsInput:GetText())
+        end)
+    end
+    self.AuraInspectorTagsInput:SetScript("OnEnterPressed", commitTags)
+    self.AuraInspectorTagsInput:SetScript("OnEditFocusLost", commitTags)
+    root:AddChild(self.AuraInspectorTagsInput)
+
     root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorDurationLabel", "Duration"))
     self.AuraInspectorDurationInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAuraInspectorDurationInput", {
         width = self.AuraInspectorFieldWidth,

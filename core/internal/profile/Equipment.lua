@@ -51,6 +51,10 @@ local function getDependencies()
     return Database.Dependecies or {}
 end
 
+local function getRegistry()
+    return Addon.Internal and Addon.Internal.Registry or {}
+end
+
 local function normalizeArmorWeight(value)
     local normalized = string.lower(ensureString(value))
     return normalized:gsub("^%s+", ""):gsub("%s+$", "")
@@ -365,6 +369,255 @@ end
 
 function Equipment.ListMountEquippedSlots()
     return Equipment.ListEquippedSlotsByScope("mount")
+end
+
+local function isDatasetActivated(datasetId)
+    local registry = getRegistry()
+    if type(registry.IsDatasetActivated) == "function" then
+        return registry:IsDatasetActivated(datasetId) == true
+    end
+    if type(Database.IsDatasetActivated) == "function" then
+        return Database.IsDatasetActivated(datasetId) == true
+    end
+    return false
+end
+
+local function getEquippedItemReference(entry)
+    local itemRef = ensureString(entry and entry.itemRef)
+    if itemRef ~= "" then
+        return itemRef
+    end
+
+    local datasetId = ensureString(entry and entry.datasetId)
+    local itemId = ensureString(entry and entry.itemId)
+    if datasetId == "" or itemId == "" then
+        return ""
+    end
+
+    return ("%s:%s"):format(datasetId, itemId)
+end
+
+local function buildItemSetProgress(itemSetRef, setDataset, itemSet, count, itemRefs, members)
+    local unlockedBonuses = {}
+    local nextRequiredPieces = nil
+    local maxRequiredPieces = 0
+
+    for index = 1, #(itemSet and itemSet.bonuses or {}) do
+        local bonus = itemSet.bonuses[index]
+        local requiredPieces = math.floor(tonumber(bonus and bonus.requiredPieces) or 0)
+        if requiredPieces > maxRequiredPieces then
+            maxRequiredPieces = requiredPieces
+        end
+        if requiredPieces > 0 and requiredPieces <= count then
+            unlockedBonuses[#unlockedBonuses + 1] = bonus
+        elseif requiredPieces > count and nextRequiredPieces == nil then
+            nextRequiredPieces = requiredPieces
+        end
+    end
+
+    return {
+        itemSetRef = itemSetRef,
+        dataset = setDataset,
+        itemSet = itemSet,
+        count = count,
+        itemRefs = itemRefs or {},
+        members = members or {},
+        bonuses = itemSet and itemSet.bonuses or {},
+        unlockedBonuses = unlockedBonuses,
+        nextRequiredPieces = nextRequiredPieces,
+        maxRequiredPieces = maxRequiredPieces,
+    }
+end
+
+function Equipment.ListEquippedItemSetProgress()
+    local progressByRef = {}
+    local seenItemRefs = {}
+    local equipped = Equipment.ListEquippedSlots()
+
+    for index = 1, #equipped do
+        local slot = equipped[index]
+        local entry = slot and slot.entry or nil
+        local itemRef = getEquippedItemReference(entry)
+        if itemRef ~= "" and not seenItemRefs[itemRef] then
+            local item, itemDataset = Equipment.ResolveItemDefinition(itemRef)
+            local itemDatasetId = itemDataset and ensureString(itemDataset.id) or ""
+            if item and itemDatasetId ~= ""
+                and isDatasetActivated(itemDatasetId)
+                and type(getRegistry().ResolveItemSetForItem) == "function"
+            then
+                local setDataset, itemSet = getRegistry():ResolveItemSetForItem(itemDatasetId, item)
+                local setDatasetId = setDataset and ensureString(setDataset.id) or ""
+                local setKey = itemSet and ensureString(itemSet.key) or ""
+                if itemSet and setDatasetId ~= "" and setKey ~= "" and isDatasetActivated(setDatasetId) then
+                    local itemSetRef = ("%s:%s"):format(setDatasetId, setKey)
+                    local progress = progressByRef[itemSetRef]
+                    if not progress then
+                        progress = {
+                            itemSetRef = itemSetRef,
+                            dataset = setDataset,
+                            itemSet = itemSet,
+                            count = 0,
+                            itemRefs = {},
+                            members = {},
+                        }
+                        progressByRef[itemSetRef] = progress
+                    end
+                    progress.count = progress.count + 1
+                    progress.itemRefs[#progress.itemRefs + 1] = itemRef
+                    progress.members[#progress.members + 1] = {
+                        itemRef = itemRef,
+                        slotKey = slot.slotKey,
+                        dataset = itemDataset,
+                        item = item,
+                    }
+                end
+            end
+            seenItemRefs[itemRef] = true
+        end
+    end
+
+    local progress = {}
+    for itemSetRef, value in pairs(progressByRef) do
+        progress[#progress + 1] = buildItemSetProgress(
+            itemSetRef,
+            value.dataset,
+            value.itemSet,
+            value.count,
+            value.itemRefs,
+            value.members
+        )
+    end
+    table.sort(progress, function(left, right)
+        return tostring(left.itemSetRef or "") < tostring(right.itemSetRef or "")
+    end)
+    return progress
+end
+
+function Equipment.GetEquippedItemSetProgress(itemSetRef, owningDatasetId)
+    local setDataset, itemSet
+    local registry = getRegistry()
+    if type(registry.ResolveItemSetReference) == "function" then
+        setDataset, itemSet = registry:ResolveItemSetReference(itemSetRef, owningDatasetId)
+    end
+    if not setDataset or not itemSet or not isDatasetActivated(setDataset.id) then
+        return nil
+    end
+
+    local canonicalRef = ("%s:%s"):format(tostring(setDataset.id), tostring(itemSet.key))
+    local progress = Equipment.ListEquippedItemSetProgress()
+    for index = 1, #progress do
+        if progress[index].itemSetRef == canonicalRef then
+            return progress[index]
+        end
+    end
+
+    return buildItemSetProgress(canonicalRef, setDataset, itemSet, 0, {}, {})
+end
+
+function Equipment.GetItemSetProgressForItem(itemRef, item, owningDatasetId)
+    local resolvedItem = item
+    local itemDataset = nil
+    local resolvedItemRef = ensureString(itemRef)
+    if not resolvedItem and resolvedItemRef ~= "" then
+        resolvedItem, itemDataset = Equipment.ResolveItemDefinition(resolvedItemRef)
+    elseif resolvedItem and owningDatasetId then
+        itemDataset = Database.GetDatasetByID and Database.GetDatasetByID(owningDatasetId) or nil
+    end
+    if not resolvedItem then
+        return nil
+    end
+
+    local itemDatasetId = ensureString(itemDataset and itemDataset.id or owningDatasetId)
+    local registry = getRegistry()
+    if itemDatasetId == "" or type(registry.ResolveItemSetForItem) ~= "function" then
+        return nil
+    end
+    local setDataset, itemSet = registry:ResolveItemSetForItem(itemDatasetId, resolvedItem)
+    if not setDataset or not itemSet then
+        return nil
+    end
+
+    return Equipment.GetEquippedItemSetProgress(("%s:%s"):format(setDataset.id, itemSet.key))
+end
+
+function Equipment.GetEquippedItemSetBonuses()
+    local stats = {}
+    local skills = {}
+    local progress = Equipment.ListEquippedItemSetProgress()
+
+    for index = 1, #progress do
+        local unlocked = progress[index].unlockedBonuses or {}
+        for bonusIndex = 1, #unlocked do
+            local bonus = unlocked[bonusIndex]
+            for statIndex = 1, #(bonus and bonus.statBonuses or {}) do
+                local statBonus = bonus.statBonuses[statIndex]
+                local statRef = type(statBonus) == "table" and ensureString(statBonus.statRef) or ""
+                local value = type(statBonus) == "table" and tonumber(statBonus.value) or 0
+                local statDataset, statDefinition
+                if statRef ~= "" and type(getRegistry().ResolveStatReference) == "function" then
+                    statDataset, statDefinition = getRegistry():ResolveStatReference(statRef)
+                end
+                if statRef ~= "" and value ~= 0
+                    and statDefinition
+                    and statDataset
+                    and isDatasetActivated(statDataset.id)
+                then
+                    stats[statRef] = (stats[statRef] or 0) + value
+                end
+            end
+            for skillIndex = 1, #(bonus and bonus.skillBonuses or {}) do
+                local skillBonus = bonus.skillBonuses[skillIndex]
+                local skillRef = type(skillBonus) == "table" and ensureString(skillBonus.skillRef) or ""
+                local value = type(skillBonus) == "table" and tonumber(skillBonus.value) or 0
+                local skillDataset, skillDefinition
+                if skillRef ~= "" and type(getRegistry().ResolveSkillReference) == "function" then
+                    skillDataset, skillDefinition = getRegistry():ResolveSkillReference(skillRef)
+                end
+                if skillRef ~= "" and value ~= 0
+                    and skillDefinition
+                    and skillDataset
+                    and isDatasetActivated(skillDataset.id)
+                then
+                    skills[skillRef] = (skills[skillRef] or 0) + value
+                end
+            end
+        end
+    end
+
+    return {
+        stats = stats,
+        skills = skills,
+    }
+end
+
+function Equipment.ListEquippedItemSetEquipmentBonuses()
+    local bonuses = {}
+    local progress = Equipment.ListEquippedItemSetProgress()
+
+    for progressIndex = 1, #progress do
+        local setProgress = progress[progressIndex]
+        local unlocked = setProgress and setProgress.unlockedBonuses or {}
+        for bonusIndex = 1, #unlocked do
+            local bonus = unlocked[bonusIndex]
+            local equipmentBonuses = bonus and bonus.equipmentBonuses or {}
+            for equipmentIndex = 1, #equipmentBonuses do
+                local payload = equipmentBonuses[equipmentIndex]
+                if type(payload) == "table" then
+                    bonuses[#bonuses + 1] = {
+                        itemSetRef = setProgress.itemSetRef,
+                        itemSet = setProgress.itemSet,
+                        dataset = setProgress.dataset,
+                        requiredPieces = bonus.requiredPieces,
+                        bonusIndex = bonusIndex,
+                        equipmentIndex = equipmentIndex,
+                        payload = payload,
+                    }
+                end
+            end
+        end
+    end
+
+    return bonuses
 end
 
 function Equipment.GetEquippedEntryByScope(scope, slotKey)

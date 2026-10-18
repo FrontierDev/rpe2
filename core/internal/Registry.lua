@@ -57,7 +57,7 @@ local function ensureDatasetEntryCache(dataset, collectionKey)
 
     local revision = getConfigurationRevision()
     local entries = dataset[collectionKey]
-    local entryCount = #(entries or {})
+    local entryCount = type(entries) == "table" and #entries or 0
     local cacheByCollection = type(dataset.__entryCacheByCollection) == "table" and dataset.__entryCacheByCollection or {}
     dataset.__entryCacheByCollection = cacheByCollection
 
@@ -86,6 +86,72 @@ local function ensureDatasetEntryCache(dataset, collectionKey)
         byId = byId,
     }
     return byId
+end
+
+local function ensureItemSetCache(dataset)
+    if type(dataset) ~= "table" then
+        return nil
+    end
+
+    local revision = getConfigurationRevision()
+    local entries = dataset.itemSets
+    local entryCount = type(entries) == "table" and #entries or 0
+    local cacheByCollection = type(dataset.__entryCacheByCollection) == "table" and dataset.__entryCacheByCollection or {}
+    dataset.__entryCacheByCollection = cacheByCollection
+    local cached = cacheByCollection.itemSetsByKey
+    if type(cached) == "table"
+        and cached.revision == revision
+        and cached.entries == entries
+        and cached.entryCount == entryCount
+    then
+        return cached
+    end
+
+    local byKey = {}
+    local duplicateKeys = {}
+    local invalidKeys = {}
+    local itemSetClass = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.ItemSet
+        or nil
+
+    for index = 1, entryCount do
+        local itemSet = entries[index]
+        local key = type(itemSet) == "table" and tostring(itemSet.key or ""):gsub("^%s+", ""):gsub("%s+$", "") or ""
+        if key ~= "" then
+            if byKey[key] ~= nil then
+                duplicateKeys[key] = true
+            else
+                byKey[key] = itemSet
+            end
+
+            if itemSetClass and type(itemSetClass.Validate) == "function" then
+                local valid = itemSetClass.Validate(itemSet)
+                if not valid then
+                    invalidKeys[key] = true
+                end
+            end
+        end
+    end
+
+    for key in pairs(duplicateKeys) do
+        byKey[key] = nil
+    end
+    for key in pairs(invalidKeys) do
+        byKey[key] = nil
+    end
+
+    cached = {
+        revision = revision,
+        entries = entries,
+        entryCount = entryCount,
+        byKey = byKey,
+        duplicateKeys = duplicateKeys,
+        invalidKeys = invalidKeys,
+    }
+    cacheByCollection.itemSetsByKey = cached
+    return cached
 end
 
 local function sortIds(values)
@@ -533,6 +599,95 @@ function Registry:ResolveItemReference(itemRef)
     end
 
     return resolveDatasetEntryByCollection(datasetId, itemId, "items")
+end
+
+function Registry:ResolveItemSetByKey(datasetId, itemSetKey)
+    local normalizedDatasetId = tostring(datasetId or "")
+    local normalizedKey = tostring(itemSetKey or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if normalizedDatasetId == "" or normalizedKey == "" then
+        return nil, nil, "invalid-reference"
+    end
+
+    local dataset = Database.GetDatasetByID and Database.GetDatasetByID(normalizedDatasetId) or nil
+    if not dataset then
+        return nil, nil, "missing-dataset"
+    end
+
+    local cache = ensureItemSetCache(dataset)
+    if not cache then
+        return dataset, nil, "missing-item-set-collection"
+    end
+    if cache.duplicateKeys[normalizedKey] then
+        return dataset, nil, "duplicate-key"
+    end
+    if cache.invalidKeys[normalizedKey] then
+        return dataset, nil, "invalid-item-set"
+    end
+
+    return dataset, cache.byKey[normalizedKey], cache.byKey[normalizedKey] and nil or "missing-item-set"
+end
+
+function Registry:ResolveItemSetReference(itemSetRef, owningDatasetId)
+    local normalizedReference = tostring(itemSetRef or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if normalizedReference == "" then
+        return nil, nil, "empty-reference"
+    end
+
+    local datasetId, itemSetKey = parseDatasetQualifiedRef(normalizedReference)
+    if not datasetId then
+        datasetId = tostring(owningDatasetId or "")
+        itemSetKey = normalizedReference
+        if datasetId == "" then
+            return nil, nil, "unqualified-reference-requires-owning-dataset"
+        end
+    end
+
+    return self:ResolveItemSetByKey(datasetId, itemSetKey)
+end
+
+function Registry:ResolveItemSetForItem(itemDatasetId, item)
+    local itemSetKey = type(item) == "table" and tostring(item.itemSetKey or "") or ""
+    if itemSetKey == "" then
+        return nil, nil, "no-item-set"
+    end
+
+    return self:ResolveItemSetReference(itemSetKey, itemDatasetId)
+end
+
+function Registry:ListItemSetMembers(itemSetRef, owningDatasetId)
+    local setDataset, itemSet, reason = self:ResolveItemSetReference(itemSetRef, owningDatasetId)
+    if not setDataset or not itemSet then
+        return {}, setDataset, itemSet, reason
+    end
+
+    local members = {}
+    local datasets = Database.ListDatasets and Database.ListDatasets() or {}
+    local expectedReference = ("%s:%s"):format(tostring(setDataset.id), tostring(itemSet.key))
+
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local items = dataset and type(dataset.items) == "table" and dataset.items or {}
+        for itemIndex = 1, #items do
+            local item = items[itemIndex]
+            local itemSetKey = type(item) == "table"
+                and tostring(item.itemSetKey or ""):gsub("^%s+", ""):gsub("%s+$", "")
+                or ""
+            local matches = itemSetKey == expectedReference
+                or (itemSetKey == tostring(itemSet.key) and tostring(dataset.id) == tostring(setDataset.id))
+            if matches and item and item.id ~= nil then
+                members[#members + 1] = {
+                    itemRef = ("%s:%s"):format(tostring(dataset.id), tostring(item.id)),
+                    dataset = dataset,
+                    item = item,
+                }
+            end
+        end
+    end
+
+    table.sort(members, function(left, right)
+        return tostring(left.itemRef or "") < tostring(right.itemRef or "")
+    end)
+    return members, setDataset, itemSet
 end
 
 function Registry:ResolveItemName(itemRef)
