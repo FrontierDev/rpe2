@@ -38,7 +38,7 @@ loadAddonFile("core/internal/ruleset/Ruleset.lua", Addon)
 for _, path in ipairs({
     "core/classes/Condition.lua", "core/classes/Unit.lua", "core/classes/Mount.lua",
     "core/classes/Pet.lua", "core/classes/Spell.lua", "core/classes/Trait.lua",
-    "core/classes/Skill.lua", "core/classes/Item.lua", "core/classes/Stat.lua",
+    "core/classes/Skill.lua", "core/classes/Item.lua", "core/classes/ItemSet.lua", "core/classes/Stat.lua",
     "core/classes/Resource.lua", "core/classes/Race.lua", "core/classes/Class.lua",
     "core/classes/ItemSlot.lua", "core/classes/WeaponType.lua", "core/classes/DamageSchool.lua",
     "core/classes/Loot.lua", "core/classes/Recipe.lua", "core/classes/Aura.lua",
