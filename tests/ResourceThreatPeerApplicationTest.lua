@@ -176,7 +176,7 @@ assertEqual(targetUnit.resources[1].currentValue, 100, "capped resource delta do
 assertEqual(#meterRecords, 2, "threat meter retains its player-source display filter")
 assertEqual(meterRefreshes, 1, "single threat refreshes the visible threat meter")
 assertEqual(#tooltipRevisions, 1, "single threat refreshes the affected tooltip context")
-assertEqual(#targetingRefreshes, 1, "single threat refreshes threat-dependent targeting")
+assertEqual(targetingRefreshes, 1, "single threat refreshes threat-dependent targeting")
 assertEqual(structuralRefreshes, 0, "single threat does not queue a structural event widget refresh")
 
 local targetedPayload = ResourceSync.SerializeTargetedResourceDeltas({
@@ -196,7 +196,7 @@ assertEqual(targetUnit.resources[1].currentValue, 100, "batch threat does not ov
 assertEqual(#meterRecords, 4, "batch threat records player sources in the meter")
 assertEqual(meterRefreshes, 2, "batch threat refreshes the visible threat meter")
 assertEqual(#tooltipRevisions, 2, "batch threat refreshes the affected tooltip context")
-assertEqual(#targetingRefreshes, 2, "batch threat refreshes threat-dependent targeting")
+assertEqual(targetingRefreshes, 2, "batch threat refreshes threat-dependent targeting")
 assertEqual(structuralRefreshes, 0, "batch threat does not queue a structural event widget refresh")
 
 targetUnit.threatTable[101] = 40

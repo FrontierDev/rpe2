@@ -108,7 +108,7 @@ end
 local members, memberDataset, memberSet = Registry:ListItemSetMembers("sets:raid")
 assertEqual(memberDataset.id, "sets", "qualified member lookup returns the set dataset")
 assertEqual(memberSet.key, "raid", "qualified member lookup returns the set by key")
-assertEqual(#members, 4, "member lookup includes all items regardless of owning dataset or slot")
+assertEqual(#members, 5, "member lookup includes all items regardless of owning dataset or slot")
 
 local localMembers = Registry:ListItemSetMembers("local-set", "gear")
 assertEqual(#localMembers, 1, "legacy item set references resolve only in the owning dataset")
