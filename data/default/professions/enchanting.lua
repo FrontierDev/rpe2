@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 6,
+    version = 7,
     dataset = {
         achievements = {},
         auras = {},
@@ -8146,6 +8146,7 @@ Addon.Data.DefaultDatasets:Register({
                 consumableType = "",
                 damageMode = "range",
                 damagePerTurn = 0,
+                damageSchoolRef = "f82db71a:dtxhglqg",
                 description = "",
                 gemColor = "none",
                 genericModificationKey = "",
@@ -8195,6 +8196,7 @@ Addon.Data.DefaultDatasets:Register({
                 consumableType = "",
                 damageMode = "range",
                 damagePerTurn = 0,
+                damageSchoolRef = "f82db71a:dtxhglqg",
                 description = "",
                 gemColor = "none",
                 genericModificationKey = "",
@@ -8244,6 +8246,7 @@ Addon.Data.DefaultDatasets:Register({
                 consumableType = "",
                 damageMode = "range",
                 damagePerTurn = 0,
+                damageSchoolRef = "f82db71a:dtxhglqg",
                 description = "",
                 gemColor = "none",
                 genericModificationKey = "",
@@ -8293,6 +8296,7 @@ Addon.Data.DefaultDatasets:Register({
                 consumableType = "",
                 damageMode = "range",
                 damagePerTurn = 0,
+                damageSchoolRef = "f82db71a:dtxhglqg",
                 description = "",
                 gemColor = "none",
                 genericModificationKey = "",

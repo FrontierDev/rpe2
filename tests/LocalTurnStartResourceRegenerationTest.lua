@@ -110,13 +110,14 @@ assertEqual(#queued, 2, "the next turn queues a new resource delta")
 Client.LastAppliedTurnRegenKey = nil
 Client.testActiveUnit = npc
 Client.testControlContext = { isControlled = false }
+local queuedBeforeNpc = #queued
 assertEqual(
     Client:ApplyLocalTurnStartResourceRegeneration(state, eventState),
     false,
     "uncontrolled NPC receives no automatic turn-start regeneration"
 )
 assertEqual(buildCalls, 2, "uncontrolled NPC does not calculate regeneration")
-assertEqual(#queued, 1, "uncontrolled NPC does not queue a resource delta")
+assertEqual(#queued, queuedBeforeNpc, "uncontrolled NPC does not queue a resource delta")
 
 Client.LastAppliedTurnRegenKey = nil
 Client.testControlContext = { isControlled = true }
@@ -126,7 +127,7 @@ assertEqual(
     "host-controlled NPC receives no automatic turn-start regeneration"
 )
 assertEqual(buildCalls, 2, "host-controlled NPC does not calculate regeneration")
-assertEqual(#queued, 1, "host-controlled NPC does not queue a resource delta")
+assertEqual(#queued, queuedBeforeNpc, "host-controlled NPC does not queue a resource delta")
 
 local npcResources = {
     { resourceRef = "health", currentValue = 50, maxValue = 100 },
