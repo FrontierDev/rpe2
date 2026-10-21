@@ -19,6 +19,7 @@ local profileRows = {
 }
 local itemDefinitions = {
     ["npc:sword"] = { weaponTypeRef = "sword" },
+    ["npc:two-handed"] = { isTwoHanded = true, weaponTypeRef = "axe" },
     ["npc:shield"] = { armorWeight = "shield" },
 }
 
@@ -56,10 +57,20 @@ assertTrue(
     Conditions:ResolveItemEquippedMatch({ casterUnit = npc }, { slotKey = "offhand", requiresShield = true }),
     "NPC shield conditions use the NPC authored shield"
 )
+assertTrue(
+    not Conditions:ResolveItemEquippedMatch({ casterUnit = npc }, { slotKey = "mainhand", requiresTwoHanded = true }),
+    "NPC one-handed weapons do not satisfy two-handed conditions"
+)
+
+npc.mainHandWeapon = "npc:two-handed"
+assertTrue(
+    Conditions:ResolveItemEquippedMatch({ casterUnit = npc }, { slotKey = "mainhand", requiresTwoHanded = true }),
+    "NPC two-handed weapons satisfy two-handed conditions"
+)
 
 local rows = Conditions:ResolveEquippedItemRows({ casterUnit = npc })
-assertEqual(rows[1].entry.itemRef, "npc:sword", "NPC equipment rows retain main-hand reference")
-assertEqual(rows[1].item.weaponTypeRef, "sword", "NPC equipment rows resolve item definitions")
+assertEqual(rows[1].entry.itemRef, "npc:two-handed", "NPC equipment rows retain main-hand reference")
+assertEqual(rows[1].item.weaponTypeRef, "axe", "NPC equipment rows resolve item definitions")
 
 local playerRows = Conditions:ResolveEquippedItemRows({ casterUnit = { isPlayer = true } })
 assertEqual(playerRows, profileRows, "player conditions continue to use profile equipment")

@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 49,
+    version = 50,
     dataset = {
         achievements = {},
         auras = {
@@ -106,7 +106,7 @@ Addon.Data.DefaultDatasets:Register({
                 duration = 5,
                 effects = {
                     {
-                        amount = 3,
+                        amount = 5,
                         amountMode = "flat",
                         resourceRef = "f82db71a:e2tfklq7",
                         type = "resource"
@@ -656,6 +656,7 @@ Addon.Data.DefaultDatasets:Register({
                     "7bbb4cb9:cruelty3",
                     "7bbb4cb9:antcwar1",
                     "7bbb4cb9:shldspc1",
+                    "7bbb4cb9:2hspec01",
                     "7bbb4cb9:0yud4l94"
                 }
             }
@@ -4066,7 +4067,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 15,
+                        amount = 10,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -4527,7 +4528,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 15,
+                        amount = 10,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -4663,7 +4664,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 30,
+                        amount = 20,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -5127,7 +5128,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 8,
+                        amount = 5,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -5523,7 +5524,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 15,
+                        amount = 10,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -5956,15 +5957,7 @@ Addon.Data.DefaultDatasets:Register({
                 mountedCombatOnly = false,
                 name = "Battle Shout",
                 range = 0,
-                resourceCosts = {
-                    {
-                        amount = 10,
-                        amountMode = "flat",
-                        castPhase = "on_cast_end",
-                        refundOnInterrupt = 0,
-                        resourceRef = "f82db71a:e2tfklq7"
-                    }
-                },
+                resourceCosts = {},
                 seedNPCSpell = false,
                 spellbookCategory = "Fury",
                 tags = {},
@@ -6042,15 +6035,7 @@ Addon.Data.DefaultDatasets:Register({
                 mountedCombatOnly = false,
                 name = "Commanding Shout",
                 range = 0,
-                resourceCosts = {
-                    {
-                        amount = 10,
-                        amountMode = "flat",
-                        castPhase = "on_cast_end",
-                        refundOnInterrupt = 0,
-                        resourceRef = "f82db71a:e2tfklq7"
-                    }
-                },
+                resourceCosts = {},
                 seedNPCSpell = false,
                 spellbookCategory = "Arms",
                 tags = {},
@@ -6315,7 +6300,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 15,
+                        amount = 10,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -6547,7 +6532,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 10,
+                        amount = 5,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -6629,7 +6614,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 10,
+                        amount = 5,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -6743,7 +6728,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 15,
+                        amount = 10,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -7305,7 +7290,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 10,
+                        amount = 5,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -7426,7 +7411,7 @@ Addon.Data.DefaultDatasets:Register({
                 range = 0,
                 resourceCosts = {
                     {
-                        amount = 19,
+                        amount = 5,
                         amountMode = "flat",
                         castPhase = "on_cast_end",
                         refundOnInterrupt = 0,
@@ -7556,6 +7541,43 @@ Addon.Data.DefaultDatasets:Register({
                 id = "a8x4ee34",
                 isEnvironmental = false,
                 name = "Enrage",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Arms",
+                conditions = {
+                    {
+                        invert = false,
+                        requiresTwoHanded = true,
+                        showOnTooltip = true,
+                        slotKey = "mainhand",
+                        tooltipTextOverride = "Requires a two-handed weapon in the main hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                description = "",
+                events = {
+                    {
+                        combatEventId = "on_auto_attack_hit",
+                        effects = {
+                            {
+                                amount = 10,
+                                amountMode = "flat",
+                                resourceRef = "f82db71a:e2tfklq7",
+                                type = "resource"
+                            }
+                        },
+                        triggerTarget = "aura_caster"
+                    }
+                },
+                icon = "interface/icons/inv_sword_07.blp",
+                id = "2hspec01",
+                isEnvironmental = false,
+                name = "Two-Handed Specialisation",
                 skillBonuses = {},
                 statBonuses = {},
                 unlockLevel = 1

@@ -3490,8 +3490,8 @@ function Client:HandleEventState(arguments)
     end
     appendTimingPart(turnEffectParts, "local-turn-cue", turnCueStartTime, 10)
     local regenStartTime = turnEffectParts and getTimingNowMilliseconds() or nil
-    if previousTurnNumber ~= (tonumber(eventState.turnNumber) or 0)
-        and isLocalTurn
+    if stepAdvanced
+        and isLocalPlayerTurn
         and type(self.ApplyLocalTurnStartResourceRegeneration) == "function"
     then
         self:ApplyLocalTurnStartResourceRegeneration(sessionState, eventState, {

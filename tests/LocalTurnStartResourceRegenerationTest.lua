@@ -88,6 +88,24 @@ assertTrue(
 assertEqual(buildCalls, 1, "player regeneration calculates resource deltas")
 assertEqual(#queued, 1, "player regeneration queues a resource delta")
 assertEqual(queued[1].targetEventId, player.eventID, "player regeneration targets the active player")
+assertEqual(queued[1].options.scope, "turn", "player regeneration uses the turn resource-delta scope")
+assertEqual(queued[1].options.allowLocalEchoApply, true, "player regeneration allows the local resource echo")
+
+assertEqual(
+    Client:ApplyLocalTurnStartResourceRegeneration(state, eventState),
+    false,
+    "duplicate event-state refresh does not regenerate the player twice"
+)
+assertEqual(buildCalls, 1, "duplicate event-state refresh does not recalculate regeneration")
+assertEqual(#queued, 1, "duplicate event-state refresh does not queue another resource delta")
+
+eventState.turnNumber = 3
+assertTrue(
+    Client:ApplyLocalTurnStartResourceRegeneration(state, eventState),
+    "the next turn gets a fresh regeneration opportunity"
+)
+assertEqual(buildCalls, 2, "the next turn recalculates resource deltas")
+assertEqual(#queued, 2, "the next turn queues a new resource delta")
 
 Client.LastAppliedTurnRegenKey = nil
 Client.testActiveUnit = npc
@@ -97,7 +115,7 @@ assertEqual(
     false,
     "uncontrolled NPC receives no automatic turn-start regeneration"
 )
-assertEqual(buildCalls, 1, "uncontrolled NPC does not calculate regeneration")
+assertEqual(buildCalls, 2, "uncontrolled NPC does not calculate regeneration")
 assertEqual(#queued, 1, "uncontrolled NPC does not queue a resource delta")
 
 Client.LastAppliedTurnRegenKey = nil
@@ -107,7 +125,7 @@ assertEqual(
     false,
     "host-controlled NPC receives no automatic turn-start regeneration"
 )
-assertEqual(buildCalls, 1, "host-controlled NPC does not calculate regeneration")
+assertEqual(buildCalls, 2, "host-controlled NPC does not calculate regeneration")
 assertEqual(#queued, 1, "host-controlled NPC does not queue a resource delta")
 
 local npcResources = {

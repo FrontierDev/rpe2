@@ -1718,8 +1718,13 @@ function Client:ApplyLocalTurnStartResourceRegeneration(stateOverride, eventStat
         return false
     end
 
+    -- Regeneration belongs to the local player even when the action bar is
+    -- currently controlling an NPC that shares the same active tick.
     local activeEventUnit = nil
-    if type(self.ResolveActiveSpellcasterUnit) == "function" then
+    if type(self.ResolveLocalEventUnit) == "function" then
+        activeEventUnit = self:ResolveLocalEventUnit(eventState)
+    end
+    if type(activeEventUnit) ~= "table" and type(self.ResolveActiveSpellcasterUnit) == "function" then
         activeEventUnit = self:ResolveActiveSpellcasterUnit(eventState)
     end
     local activeEventId = tonumber(activeEventUnit and activeEventUnit.eventID) or 0

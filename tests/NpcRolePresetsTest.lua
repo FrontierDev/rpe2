@@ -196,6 +196,22 @@ assertEqual(ghoul.stats[1].initialValue, 20, "Ghoul base Armor")
 assertEqual(ghoul.stats[6].initialValue, 3, "Ghoul Dodge Chance")
 assertEqual(ghoul.stats[9].initialValue, 45, "Ghoul Melee Attack Power")
 assertEqual(ghoul.stats[23].initialValue, 35, "Ghoul Movement Speed")
+local diseasedBiteAura
+for _, aura in ipairs(core.auras or {}) do
+    if aura.id == "ghdisau1" then diseasedBiteAura = aura break end
+end
+assert(diseasedBiteAura, "Diseased Bite aura exists in Core")
+assertEqual(diseasedBiteAura.tags[1], "disease", "Diseased Bite aura tag")
+local expectedGhoulAppearances = { 137, 414, 519, 547 }
+assertEqual(#(ghoul.appearances or {}), #expectedGhoulAppearances, "Ghoul appearance count")
+for index, expectedDisplayId in ipairs(expectedGhoulAppearances) do
+    local appearance = ghoul.appearances[index]
+    assertEqual(appearance.displayId, expectedDisplayId, "Ghoul appearance display ID " .. index)
+    assertEqual(appearance.fileDataId, 1574421, "Ghoul appearance file data ID " .. index)
+    assertEqual(appearance.cam, 0.50, "Ghoul appearance camera distance " .. index)
+    assertEqual(appearance.rot, 0.01, "Ghoul appearance rotation " .. index)
+    assertEqual(appearance.z, -0.35, "Ghoul appearance vertical offset " .. index)
+end
 assertEqual(#(ghoul.presets or {}), 3, "Ghoul variant preset count")
 assertEqual(ghoul.presets[1].name, "Plaguebearer", "Ghoul Plaguebearer preset")
 assertEqual(ghoul.presets[2].name, "Leaper", "Ghoul Leaper preset")
@@ -208,6 +224,40 @@ for presetIndex = 1, #(ghoul.presets or {}) do
     for spellIndex = 1, #(preset.spells or {}) do
         assert(entityRefs.spells[preset.spells[spellIndex]], "Ghoul preset spell ref resolves: " .. preset.spells[spellIndex])
     end
+end
+
+local deathKnight = findUnit("dkunit01")
+assert(deathKnight, "Death Knight Unit exists in Core")
+assertEqual(deathKnight.name, "Death Knight", "Death Knight unit name")
+assertEqual(deathKnight.challengeLevel, "elite", "Death Knight challenge level")
+assertEqual(deathKnight.creatureSize, "medium", "Death Knight creature size")
+assertEqual(deathKnight.creatureType, "undead", "Death Knight creature type")
+assertEqual(deathKnight.mainHandWeapon, "f82db71a:stw2sw01", "Death Knight main-hand weapon")
+assertEqual(#(deathKnight.presets or {}), 0, "Death Knight preset count")
+assertEqual(#(deathKnight.appearances or {}), 5, "Death Knight appearance count")
+for index, expectedDisplayId in ipairs({ 16612, 23386, 25444, 25447, 25448 }) do
+    local appearance = deathKnight.appearances[index]
+    assertEqual(appearance.displayId, expectedDisplayId, "Death Knight appearance display ID " .. index)
+    assertEqual(appearance.fileDataId, 1011653, "Death Knight appearance file data ID " .. index)
+    assertEqual(appearance.cam, 0.45, "Death Knight appearance camera distance " .. index)
+    assertEqual(appearance.rot, -0.09, "Death Knight appearance rotation " .. index)
+    assertEqual(appearance.z, -0.54, "Death Knight appearance vertical offset " .. index)
+end
+assertEqual(deathKnight.resources[1].initialValue, 200, "Death Knight base Health")
+assertEqual(deathKnight.resources[2].resourceRef, "f82db71a:runes001", "Death Knight Runes resource")
+assertEqual(deathKnight.resources[3].resourceRef, "f82db71a:jolh6o6e", "Death Knight Runic Power resource")
+assertEqual(deathKnight.stats[1].initialValue, 60, "Death Knight base Armor")
+assertEqual(deathKnight.stats[9].perLevelValue, 10.423729, "Death Knight Melee Attack Power progression")
+assertEqual(#deathKnight.spells, 5, "Death Knight spell count")
+for index, expectedSpellRef in ipairs({
+    "f82db71a:z36xzk0w",
+    "dknight1:dkss0001",
+    "dknight1:dkfs0001",
+    "dknight1:dkmf0001",
+    "dknight1:dkdnd001",
+}) do
+    assertEqual(deathKnight.spells[index], expectedSpellRef, "Death Knight spell " .. index)
+    assert(entityRefs.spells[expectedSpellRef], "Death Knight spell ref resolves: " .. expectedSpellRef)
 end
 
 local gnoll = findUnit("gnoll001")

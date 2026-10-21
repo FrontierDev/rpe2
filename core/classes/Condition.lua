@@ -109,6 +109,7 @@ local TYPE_DEFAULTS = {
         slotKey = "",
         weaponTypeRefs = {},
         requiresShield = false,
+        requiresTwoHanded = false,
     },
     aura_requirement = {
         unit = "caster",
@@ -242,6 +243,7 @@ function Condition.Normalize(value)
         normalized.slotKey = string.lower(ensureString(data.slotKey))
         normalized.weaponTypeRefs = normalizeRefList(data.weaponTypeRefs)
         normalized.requiresShield = normalizeBoolean(data.requiresShield, false)
+        normalized.requiresTwoHanded = normalizeBoolean(data.requiresTwoHanded, false)
         return normalized.slotKey ~= "" and normalized or nil
     end
 

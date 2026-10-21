@@ -541,6 +541,7 @@ end
 function Conditions:ResolveItemEquippedMatch(context, condition)
     local desiredWeaponTypeRefs = type(condition) == "table" and condition.weaponTypeRefs or {}
     local requiresShield = type(condition) == "table" and condition.requiresShield == true
+    local requiresTwoHanded = type(condition) == "table" and condition.requiresTwoHanded == true
     local slotKey = lowercase(type(condition) == "table" and condition.slotKey)
     local equippedRows = self:ResolveEquippedItemRows(context)
     for index = 1, #equippedRows do
@@ -553,7 +554,9 @@ function Conditions:ResolveItemEquippedMatch(context, condition)
             if not item and itemRef and type(Equipment.ResolveItemDefinition) == "function" then
                 item = select(1, Equipment.ResolveItemDefinition(itemRef))
             end
-            if not requiresShield or lowercase(item and item.armorWeight) == "shield" then
+            if (not requiresShield or lowercase(item and item.armorWeight) == "shield")
+                and (not requiresTwoHanded or item and item.isTwoHanded == true)
+            then
                 if #desiredWeaponTypeRefs == 0 then
                     return true
                 else
