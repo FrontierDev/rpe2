@@ -10481,7 +10481,13 @@ units = {
                 tags = {  },
             },
         {
-            appearances = {  },
+            appearances = {
+                { displayId = 1061, fileDataId = 1598184, cam = 0.40, rot = 0.01, z = -0.35 },
+                { displayId = 7864, fileDataId = 1598184, cam = 0.40, rot = 0.01, z = -0.35 },
+                { displayId = 9760, fileDataId = 1598184, cam = 0.40, rot = 0.01, z = -0.35 },
+                { displayId = 14701, fileDataId = 1598184, cam = 0.40, rot = 0.01, z = -0.35 },
+                { displayId = 16159, fileDataId = 1598184, cam = 0.40, rot = 0.01, z = -0.35 },
+            },
             attributes = {  },
             challengeLevel = "elite",
             creatureSize = "large",
@@ -10786,7 +10792,12 @@ units = {
             tags = {  },
         },
         {
-            appearances = {  },
+            appearances = {
+                { displayId = 3942, fileDataId = 124155, cam = 0.40, rot = 0.01, z = -0.35 },
+                { displayId = 10700, fileDataId = 124155, cam = 0.40, rot = 0.01, z = -0.35 },
+                { displayId = 10701, fileDataId = 124155, cam = 0.40, rot = 0.01, z = -0.35 },
+                { displayId = 10771, fileDataId = 124155, cam = 0.40, rot = 0.01, z = -0.35 },
+            },
             attributes = {  },
             challengeLevel = "normal",
             creatureSize = "medium",
