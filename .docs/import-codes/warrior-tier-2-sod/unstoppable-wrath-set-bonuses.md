@@ -2,7 +2,7 @@
 
 This is **one standalone Item Set entry** (not an armor-piece import). Paste the complete code block into RPE's dataset-entry importer.
 
-- Target dataset: `sb4b9ef3` (the Warrior dataset used by the item import files here).
+- Target dataset: `7bbb4cb9` (the Warrior dataset used by the item import files here).
 - Collection: `itemSets`.
 - Matching key: `t2_warrior_dps` (already present on the eight DPS armor entries).
 - Unlocks: **2, 4, and 6 pieces**. No 8-piece bonus exists on the SoD source set.
@@ -17,7 +17,7 @@ RPE_DATASET_ENTRY_V1
     format = "rpe-dataset-entry",
     version = 1,
     collectionKey = "itemSets",
-    datasetId = "sb4b9ef3",
+    datasetId = "7bbb4cb9",
     entry = {
         id = "t2_warrior_dps",
         key = "t2_warrior_dps",
@@ -41,7 +41,7 @@ RPE_DATASET_ENTRY_V1
                                 effects = {
                                     {
                                         type = "apply_aura",
-                                        auraRef = "sb4b9ef3:jkptpqlh",
+                                        auraRef = "7bbb4cb9:jkptpqlh",
                                         stacks = 1,
                                         duration = 5,
                                         basePower = 0,

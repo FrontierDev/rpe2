@@ -5,7 +5,7 @@ This folder contains standalone RPE dataset-entry import codes for all 16 Warrio
 - **Unstoppable Wrath** — melee DPS, 8 pieces.
 - **Immoveable Wrath** — tank, 8 pieces.
 
-The codes target the Warrior dataset `sb4b9ef3`, use the current `RPE_DATASET_ENTRY_V1` format, require level 60 and Warrior, and use Core stat and equipment-slot references.
+The codes target the Warrior dataset `7bbb4cb9`, use the current `RPE_DATASET_ENTRY_V1` format, require level 60 and Warrior, and use Core stat and equipment-slot references.
 
 ## RPE normalization
 
