@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 37,
+    version = 38,
     dataset = {
         achievements = {},
         auras = {
@@ -6541,7 +6541,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 conditions = {},
-                cooldown = 0,
+                cooldown = 6,
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
@@ -6600,6 +6600,122 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     mainText = "Apply Shadow Blades to yourself for 2 turns.",
                     tokens = {},
+                    version = 1
+                },
+                totalTicks = 0,
+                useCooldownCharges = false
+            },
+            {
+                allowDeadTargets = false,
+                canMoveWhileCasting = false,
+                castTime = 0,
+                casterEvents = {
+                    "on_melee_hit",
+                    "on_critical_hit"
+                },
+                charges = 0,
+                components = {
+                    {
+                        castPhase = "on_cast_end",
+                        castingGroup = "default",
+                        effect = {
+                            alwaysHits = true,
+                            amountMode = "flat",
+                            applyAura = false,
+                            auraStacks = 1,
+                            baseDamage = 70.6875,
+                            damageSchoolRefs = {
+                                "f82db71a:v1azo4j6"
+                            },
+                            damageType = "melee",
+                            hitType = "ability",
+                            projectilePath = "",
+                            projectileSpeed = 0,
+                            statScaling = {
+                                {
+                                    coefficient = 0.329875,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
+                            targetEvents = {
+                                "on_melee_taken",
+                                "on_critical_hit_taken"
+                            },
+                            threatCoefficient = 1,
+                            type = "damage",
+                            usesProjectile = false,
+                            weaponDamageCoefficient = 0.9425,
+                            weaponDamageMode = "off_hand"
+                        },
+                        key = "shivcmp1",
+                        target = {
+                            allowDeadTargets = false,
+                            disableSelfCast = false,
+                            maxTargets = 1,
+                            minTargets = 1,
+                            requiresTarget = true,
+                            targetDisposition = "enemy",
+                            type = "single"
+                        }
+                    }
+                },
+                conditions = {
+                    {
+                        invert = false,
+                        showOnTooltip = true,
+                        slotKey = "offhand",
+                        tooltipTextOverride = "Requires off hand",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    },
+                    {
+                        invert = true,
+                        requiresShield = true,
+                        showOnTooltip = true,
+                        slotKey = "offhand",
+                        tooltipTextOverride = "Requires an off-hand weapon, not a shield",
+                        type = "item_equipped",
+                        weaponTypeRefs = {}
+                    }
+                },
+                cooldown = 4,
+                cooldownGroup = "",
+                cooldownScalesWithHaste = false,
+                description = "",
+                icon = "interface/icons/ability_rogue_shiv.blp",
+                id = "shiv0001",
+                cooldownChannel = 2,
+                learnMode = "always_learned",
+                learnLevel = 1,
+                usesRanks = false,
+                rankInterval = 8,
+                mountedCombatOnly = false,
+                name = "Shiv",
+                range = 0,
+                resourceCosts = {
+                    {
+                        amount = 15,
+                        amountMode = "flat",
+                        castPhase = "on_cast_end",
+                        refundOnInterrupt = 0,
+                        resourceRef = "f82db71a:c3gaf7dd"
+                    }
+                },
+                seedNPCSpell = false,
+                spellbookCategory = "Combat",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    auraSections = {},
+                    mainText = "Deal {DAMAGE_1} Physical damage to an enemy. This attack always hits.",
+                    tokens = {
+                        {
+                            applyMode = "damage_range",
+                            componentIndex = 1,
+                            key = "DAMAGE_1",
+                            tokenType = "spell_damage_range"
+                        }
+                    },
                     version = 1
                 },
                 totalTicks = 0,
