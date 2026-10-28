@@ -210,9 +210,6 @@ local function logSessionInternal(message, ...)
     if not timings or type(timings.IsEnabled) ~= "function" or not timings:IsEnabled() then
         return
     end
-    if Debug and type(Debug.SetLevelEnabled) == "function" and type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal") then
-        Debug.SetLevelEnabled("internal", true)
-    end
     if Debug and type(Debug.Internal) == "function" then
         Debug.Internal(message, ...)
     end
@@ -872,7 +869,9 @@ function Client:HandleClientConnect(arguments, sender)
         return true
     end
 
-    Debug.Info("%s joined the server.", clientName)
+    if DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function" then
+        DEFAULT_CHAT_FRAME:AddMessage(("%s joined the server."):format(clientName), 0.6, 0.8, 1)
+    end
 
     return true
 end
@@ -893,7 +892,9 @@ function Client:HandleClientDisconnect(arguments, sender)
         return false
     end
 
-    Debug.Info("%s left the server.", clientName)
+    if DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function" then
+        DEFAULT_CHAT_FRAME:AddMessage(("%s left the server."):format(clientName), 0.6, 0.8, 1)
+    end
     return true
 end
 

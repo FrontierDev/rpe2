@@ -32,6 +32,11 @@ local Addon = {
         Common = {
             Round = function(value) return math.floor((tonumber(value) or 0) + 0.5) end,
         },
+        Lookup = {
+            GetStatValue = function(unit, statRef, defaultValue)
+                return tonumber(unit and unit.stats and unit.stats[statRef]) or defaultValue or 0
+            end,
+        },
     },
 }
 
@@ -101,6 +106,90 @@ end
 local markDescription = Addon.Client.Spellcasting.AuraDescriptionBuilder:BuildGeneratedDescription(markOfBlood, {})
 assertTrue(markDescription:find("2%% of Max", 1, false) ~= nil, "Mark of Blood matches Judgement of the Light healing")
 assertTrue(markDescription:find("0%% of Max", 1, false) == nil, "Mark of Blood does not render zero percentage healing")
+
+Addon.Client.Spellcasting.AuraManager.ResolveEffectAmount = function(_, context, effect, baseField)
+    local amount = tonumber(effect[baseField]) or 0
+    for index = 1, #(effect.statScaling or {}) do
+        local scaling = effect.statScaling[index]
+        amount = amount + (Addon.Utils.Lookup.GetStatValue(context.casterUnit, scaling.statRef, 0) * scaling.coefficient)
+    end
+    return amount
+end
+
+local scaledAura = {
+    events = {
+        {
+            effects = {
+                {
+                    amountMode = "max_percent",
+                    baseHealing = 3,
+                    statScaling = { { statRef = "healing", coefficient = 0.01 } },
+                    type = "heal",
+                },
+                {
+                    amount = 3,
+                    amountMode = "max_percent",
+                    resourceRef = "mana",
+                    statScaling = { { statRef = "spell", coefficient = 0.01 } },
+                    type = "resource",
+                },
+            },
+        },
+    },
+}
+local scaledPayload = {
+    bodyText = "Heal for {AURA_EVENT_HEAL_1}. Restore {AURA_EVENT_RESOURCE_GAIN_1}.",
+    bodyTokens = {
+        { applyMode = "heal_amount", baseField = "baseHealing", effectIndex = 1, eventIndex = 1, key = "AURA_EVENT_HEAL_1", tokenType = "aura_amount" },
+        { applyMode = "resource_gain_amount", effectIndex = 2, eventIndex = 1, key = "AURA_EVENT_RESOURCE_GAIN_1", tokenType = "aura_amount" },
+    },
+    stackingText = "",
+    stackingTokens = {},
+}
+local scaledRendered, scaledRenderError = Addon.Client.Spellcasting.AuraDescriptionBuilder:ResolveTooltipTemplatePayload(scaledAura, scaledPayload, {
+    casterUnit = { stats = { healing = 10, spell = 20 } },
+})
+assertTrue(scaledRendered ~= nil, scaledRenderError or "scaled Aura tooltip rendering failed")
+assertEqual(scaledRendered, "Heal for 3.1% of Max. Restore 3.2% of Max mana.",
+    "percentage Aura tokens include stat scaling")
+
+Addon.Client.Combat = {
+    NormalizeComponent = function(_, component)
+        return component
+    end,
+}
+Addon.Client.Spellcasting.ApplySpellRankMultiplier = function(_, amount)
+    return amount
+end
+Addon.Internal.Profile.GetResolvedResourceRow = function(resourceRef)
+    return resourceRef == "mana" and { name = "Mana" } or nil
+end
+loadAddonFile("client/spellcasting/DescriptionBuilder.lua")
+
+local directSpellTooltip, directSpellError = Addon.Client.Spellcasting.DescriptionBuilder:ResolveTooltipTemplatePayload({
+    spell = {
+        components = {
+            {
+                effect = {
+                    amount = 10,
+                    amountMode = "base_percent",
+                    resourceRef = "mana",
+                    statScaling = { { statRef = "spell", coefficient = 0.01 } },
+                    type = "resource",
+                },
+            },
+        },
+    },
+}, {
+    auraSections = {},
+    mainText = "Restore {RESOURCE_1} to yourself.",
+    tokens = {
+        { applyMode = "resource_gain_amount", componentIndex = 1, key = "RESOURCE_1", tokenType = "spell_resource_amount" },
+    },
+}, { stats = { spell = 20 } })
+assertTrue(directSpellTooltip ~= nil, directSpellError or "scaled spell resource tooltip rendering failed")
+assertEqual(directSpellTooltip.descriptionText, "Restore 10.2% of Base Mana to yourself.",
+    "spell resource token includes stat scaling")
 
 local areaAuraSection = Addon.Client.Spellcasting.AuraDescriptionBuilder:BuildTooltipSection("area", {
     datasetId = "test",

@@ -167,6 +167,15 @@ local function normalizePolarity(value)
     return nil
 end
 
+local function normalizeDisposition(value)
+    local disposition = string.lower(trimText(value))
+    if disposition == "helpful" or disposition == "harmful" or disposition == "auto" then
+        return disposition
+    end
+
+    return "auto"
+end
+
 local function normalizeTickTargetMode(value)
     return trimText(value) == "nearby_players" and "nearby_players" or "single"
 end
@@ -566,6 +575,7 @@ function Aura:New(data)
         stackBehavior = "refresh_duration",
         maxStacks = 1,
         tags = {},
+        disposition = "auto",
         polarity = nil,
         tickTargetMode = "single",
         tickRadiusYards = nil,
@@ -590,7 +600,14 @@ function Aura:Merge(data)
     self.icon = ensureString(self.icon)
     self.duration = normalizeAuraDuration(self.duration, 1)
     self.stackBehavior = normalizeStackBehavior(self.stackBehavior)
-    self.polarity = normalizePolarity(self.polarity)
+    local hasDisposition = data.disposition ~= nil
+    if hasDisposition then
+        self.disposition = normalizeDisposition(data.disposition)
+        self.polarity = self.disposition ~= "auto" and self.disposition or nil
+    else
+        self.polarity = normalizePolarity(self.polarity)
+        self.disposition = self.polarity or normalizeDisposition(self.disposition)
+    end
     self.tickTargetMode = normalizeTickTargetMode(self.tickTargetMode)
     self.tickRadiusYards = normalizeTickRadius(self.tickRadiusYards)
     self.maxStacks = math.max(1, math.floor(tonumber(self.maxStacks) or 1))
@@ -615,10 +632,194 @@ function Aura:ToTable()
         stackBehavior = self.stackBehavior,
         maxStacks = self.maxStacks,
         tags = normalizeTags(self.tags),
+        disposition = normalizeDisposition(self.disposition),
         polarity = self.polarity,
         tickTargetMode = self.tickTargetMode,
         tickRadiusYards = self.tickRadiusYards,
     }
+end
+
+local function addSignedSignal(signals, value)
+    local numericValue = tonumber(value)
+    if numericValue == nil or numericValue == 0 then
+        return
+    end
+
+    if numericValue < 0 then
+        signals.harmful = true
+    else
+        signals.helpful = true
+    end
+end
+
+local function addEffectSignals(signals, effect, visitAura, targetIsRecipient)
+    if type(effect) ~= "table" or targetIsRecipient ~= true then
+        return
+    end
+
+    local effectType = string.lower(ensureString(effect.type))
+    if effectType == "damage" or effectType == "interrupt" then
+        signals.harmful = true
+        return
+    end
+    if effectType == "heal" or effectType == "absorb" then
+        signals.helpful = true
+        return
+    end
+    if effectType == "stat" then
+        addSignedSignal(signals, effect.baseAmount)
+        for index = 1, #(effect.statScaling or {}) do
+            addSignedSignal(signals, effect.statScaling[index] and effect.statScaling[index].coefficient)
+        end
+        return
+    end
+    if effectType == "resource" or effectType == "skill" then
+        addSignedSignal(signals, effect.amount or effect.baseAmount)
+        for index = 1, #(effect.statScaling or {}) do
+            addSignedSignal(signals, effect.statScaling[index] and effect.statScaling[index].coefficient)
+        end
+        return
+    end
+    if effectType == "control" then
+        local movementRangeOverride = tonumber(effect.movementRangeOverride)
+        if effect.preventCasting == true
+            or effect.forceAutoHitAgainstTarget == true
+            or (movementRangeOverride ~= nil and movementRangeOverride <= 0)
+        then
+            signals.harmful = true
+        end
+        return
+    end
+    if effectType == "apply_aura" and type(visitAura) == "function" then
+        visitAura(effect.auraRef)
+    end
+end
+
+local function resolveNestedAuraDefinition(auraRef, options)
+    if type(options) == "table" and type(options.resolveAura) == "function" then
+        local resolved = options.resolveAura(auraRef)
+        if type(resolved) == "table" then
+            return resolved
+        end
+    end
+
+    local reference = normalizeRef(auraRef)
+    local datasetId, auraId
+    if reference then
+        datasetId, auraId = reference:match("^([^:]+):(.+)$")
+    end
+    if not datasetId then
+        return nil
+    end
+    local database = Addon.Internal and Addon.Internal.Database or nil
+    local dataset = database and type(database.GetDatasetByID) == "function" and database.GetDatasetByID(datasetId) or nil
+    for index = 1, #(dataset and dataset.auras or {}) do
+        local aura = dataset.auras[index]
+        if type(aura) == "table" and tostring(aura.id or "") == auraId then
+            return aura
+        end
+    end
+
+    return nil
+end
+
+local function resolveAuraDisposition(auraDefinition, options)
+    local signals = {
+        helpful = false,
+        harmful = false,
+    }
+    local visitedDefinitions = {}
+    local visitedRefs = {}
+
+    local visitAura
+    visitAura = function(definition, reference)
+        if type(definition) ~= "table" then
+            return
+        end
+        if reference and visitedRefs[reference] then
+            return
+        end
+        if visitedDefinitions[definition] then
+            return
+        end
+
+        local explicit = normalizeDisposition(definition.disposition)
+        if definition.disposition == nil then
+            explicit = normalizePolarity(definition.polarity) or "auto"
+        end
+        if explicit == "helpful" then
+            signals.helpful = true
+            return
+        elseif explicit == "harmful" then
+            signals.harmful = true
+            return
+        end
+
+        visitedDefinitions[definition] = true
+        if reference then
+            visitedRefs[reference] = true
+        end
+
+        local targetIsRecipient = true
+        local auraCasterEventId = tonumber(options and options.auraCasterEventId) or 0
+        local auraTargetEventId = tonumber(options and options.auraTargetEventId) or 0
+        local effectKeys = sortedNumericKeys(definition.effects)
+        for index = 1, #effectKeys do
+            addEffectSignals(signals, definition.effects[effectKeys[index].key], function(nestedRef)
+                local nested = resolveNestedAuraDefinition(nestedRef, options)
+                local nestedReference = normalizeRef(nestedRef)
+                visitAura(nested, nestedReference)
+            end, targetIsRecipient)
+        end
+
+        local eventKeys = sortedNumericKeys(definition.events)
+        for eventIndex = 1, #eventKeys do
+            local auraEvent = definition.events[eventKeys[eventIndex].key]
+            if type(auraEvent) == "table" then
+                local triggerTarget = string.lower(ensureString(auraEvent.triggerTarget))
+                -- Static definitions cannot identify which event_source or
+                -- event_other unit is the recipient, so those effects are not
+                -- used for recipient polarity. Include aura_caster only for a
+                -- self-targeted aura.
+                local eventTargetsRecipient = triggerTarget == "aura_target"
+                    or (triggerTarget == "aura_caster"
+                        and auraCasterEventId > 0
+                        and auraCasterEventId == auraTargetEventId)
+                local eventEffectKeys = sortedNumericKeys(auraEvent.effects)
+                for effectIndex = 1, #eventEffectKeys do
+                    addEffectSignals(
+                        signals,
+                        auraEvent.effects[eventEffectKeys[effectIndex].key],
+                        function(nestedRef)
+                            local nested = resolveNestedAuraDefinition(nestedRef, options)
+                            visitAura(nested, normalizeRef(nestedRef))
+                        end,
+                        eventTargetsRecipient
+                    )
+                end
+            end
+        end
+
+        visitedDefinitions[definition] = nil
+        if reference then
+            visitedRefs[reference] = nil
+        end
+    end
+
+    visitAura(auraDefinition)
+
+    -- Mixed effects resolve deterministically as harmful. Authors can select
+    -- helpful/harmful explicitly when the authored intent is not represented
+    -- by the static effect semantics.
+    return signals.harmful and "harmful" or "helpful"
+end
+
+function Aura.ResolveDisposition(auraDefinition, options)
+    return resolveAuraDisposition(auraDefinition, options)
+end
+
+function Aura:ResolveDisposition(options)
+    return resolveAuraDisposition(self, options)
 end
 
 function Aura.FromTable(data)
@@ -638,6 +839,9 @@ end
 
 function Aura:Validate()
     local errors = {}
+    if self.disposition ~= "auto" and self.disposition ~= "helpful" and self.disposition ~= "harmful" then
+        errors[#errors + 1] = "Aura disposition must be Auto, Helpful or Harmful."
+    end
     if self:HasAbsorbEffect() then
         if (tonumber(self.maxStacks) or 1) > 1 then
             errors[#errors + 1] = "Absorb effects require Max Stacks to be 1 in V1."

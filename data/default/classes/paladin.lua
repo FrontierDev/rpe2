@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 69,
+    version = 73,
     dataset = {
         achievements = {},
         auras = {
@@ -292,6 +292,35 @@ Addon.Data.DefaultDatasets:Register({
                 }
             },
             {
+                description = "Increases Shadow Resistance by 60.",
+                duration = 0,
+                effects = {
+                    {
+                        baseAmount = 60,
+                        operation = "flat",
+                        statRef = "f82db71a:itpo751d",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_shadow_antishadow.blp",
+                id = "shdres60",
+                maxStacks = 1,
+                name = "Shadow Resistance Aura",
+                polarity = "helpful",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Shadow Resistance by 60.",
+                    bodyTokens = {},
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
                 description = "Increases Damage Reduction by 3%.",
                 duration = 0,
                 effects = {
@@ -518,14 +547,14 @@ Addon.Data.DefaultDatasets:Register({
                 duration = 10,
                 effects = {
                     {
-                        baseAmount = 10,
+                        baseAmount = 20,
                         operation = "percent",
-                        statRef = "f82db71a:v42albuv",
+                        statRef = "f82db71a:sblkval1",
                         statScaling = {},
                         type = "stat"
                     },
                     {
-                        baseAmount = 2,
+                        baseAmount = 5,
                         operation = "flat",
                         statRef = "f82db71a:p8syz5ba",
                         statScaling = {},
@@ -541,7 +570,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "Increases Armor by 10%. Increases Block Chance by 2%.",
+                    bodyText = "Increases Shield Block Value by 20%. Increases Block Chance by 5%.",
                     bodyTokens = {},
                     stackingText = "",
                     stackingTokens = {},
@@ -744,12 +773,12 @@ Addon.Data.DefaultDatasets:Register({
                         combatEventId = "on_auto_attack_hit",
                         effects = {
                             {
-                                amountMode = "max_percent",
+                                amountMode = "base_percent",
                                 baseHealing = 3,
                                 scaleWithRank = false,
                                 statScaling = {
                                     {
-                                        coefficient = 0.1,
+                                        coefficient = 0.05,
                                         statRef = "f82db71a:hj6d4kvy"
                                     }
                                 },
@@ -767,8 +796,17 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "When the affected unit hits with a basic attack, heal yourself for 3% of Max health, increased by 0.1% per Healing Power.",
-                    bodyTokens = {},
+                    bodyText = "When the affected unit hits with a basic attack, heal yourself for {AURA_EVENT_HEAL_1}.",
+                    bodyTokens = {
+                        {
+                            applyMode = "heal_amount",
+                            baseField = "baseHealing",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_HEAL_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -785,12 +823,12 @@ Addon.Data.DefaultDatasets:Register({
                         effects = {
                             {
                                 amount = 3,
-                                amountMode = "max_percent",
+                                amountMode = "base_percent",
                                 resourceRef = "f82db71a:4c8mfm99",
                                 scaleWithRank = false,
                                 statScaling = {
                                     {
-                                        coefficient = 0.1,
+                                        coefficient = 0.005,
                                         statRef = "f82db71a:u7b49vs9"
                                     }
                                 },
@@ -808,8 +846,16 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "When the affected unit hits with a basic attack, restore 3% of Max Mana, increased by 0.1% per Spell Power.",
-                    bodyTokens = {},
+                    bodyText = "When the affected unit hits with a basic attack, restore {AURA_EVENT_RESOURCE_GAIN_1}.",
+                    bodyTokens = {
+                        {
+                            applyMode = "resource_gain_amount",
+                            effectIndex = 1,
+                            eventIndex = 1,
+                            key = "AURA_EVENT_RESOURCE_GAIN_1",
+                            tokenType = "aura_amount"
+                        }
+                    },
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -1378,7 +1424,9 @@ Addon.Data.DefaultDatasets:Register({
                     "b0211ab3:dflctpal",
                     "b0211ab3:antcpal1",
                     "b0211ab3:rdbttrait",
-                    "b0211ab3:dvttrait"
+                    "b0211ab3:dvttrait",
+                    "b0211ab3:shdraura1",
+                    "b0211ab3:shldspec1"
                 }
             }
         },
@@ -7645,7 +7693,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:3ugbrrk0",
                             datasetId = "b0211ab3",
-                            descriptionText = "Increases Armor by 10%. Increases Block Chance by 2%.",
+                            descriptionText = "Increases Shield Block Value by 20%. Increases Block Chance by 5%.",
                             duration = 10,
                             icon = "interface/icons/spell_holy_greaterblessingofsanctuary.blp",
                             nameText = "Blessing of Sanctuary",
@@ -8655,7 +8703,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:gw8r1b8l",
                             datasetId = "b0211ab3",
-                            descriptionText = "When the affected unit hits with a basic attack, heal yourself for 3% of Max health, increased by 0.1% per Healing Power.",
+                            descriptionText = "When the affected unit hits with a basic attack, heal yourself for {AURA_EVENT_HEAL_1}.",
                             duration = 3,
                             icon = "interface/icons/spell_holy_healingaura.blp",
                             nameText = "Seal of Light",
@@ -8668,7 +8716,16 @@ Addon.Data.DefaultDatasets:Register({
                                 reflexive = "yourself",
                                 subject = "you"
                             },
-                            tokens = {}
+                            tokens = {
+                                {
+                                    applyMode = "heal_amount",
+                                    baseField = "baseHealing",
+                                    effectIndex = 1,
+                                    eventIndex = 1,
+                                    key = "AURA_EVENT_HEAL_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
                         }
                     },
                     mainText = "Apply Seal of Light to yourself for 3 turns.",
@@ -8700,7 +8757,7 @@ Addon.Data.DefaultDatasets:Register({
                             resourceRef = "f82db71a:4c8mfm99",
                             statScaling = {
                                 {
-                                    coefficient = 0.1,
+                                    coefficient = 0.005,
                                     statRef = "f82db71a:u7b49vs9"
                                 }
                             },
@@ -8813,8 +8870,15 @@ Addon.Data.DefaultDatasets:Register({
                             tokens = {}
                         }
                     },
-                    mainText = "Restore 10% of Base Mana to yourself, increased by 0.1% per Spell Power. Apply Judgement of the Wise to an enemy for 5 turns.",
-                    tokens = {},
+                    mainText = "Restore {RESOURCE_1} to yourself. Apply Judgement of the Wise to an enemy for 5 turns.",
+                    tokens = {
+                        {
+                            applyMode = "resource_gain_amount",
+                            componentIndex = 1,
+                            key = "RESOURCE_1",
+                            tokenType = "spell_resource_amount"
+                        }
+                    },
                     version = 1
                 },
                 totalTicks = 0,
@@ -8906,7 +8970,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:zwad020u",
                             datasetId = "b0211ab3",
-                            descriptionText = "When the affected unit hits with a basic attack, restore 3% of Max Mana, increased by 0.1% per Spell Power.",
+                            descriptionText = "When the affected unit hits with a basic attack, restore {AURA_EVENT_RESOURCE_GAIN_1}.",
                             duration = 3,
                             icon = "interface/icons/spell_holy_righteousnessaura.blp",
                             nameText = "Seal of Wisdom",
@@ -8919,7 +8983,15 @@ Addon.Data.DefaultDatasets:Register({
                                 reflexive = "yourself",
                                 subject = "you"
                             },
-                            tokens = {}
+                            tokens = {
+                                {
+                                    applyMode = "resource_gain_amount",
+                                    effectIndex = 1,
+                                    eventIndex = 1,
+                                    key = "AURA_EVENT_RESOURCE_GAIN_1",
+                                    tokenType = "aura_amount"
+                                }
+                            }
                         }
                     },
                     mainText = "Apply Seal of Wisdom to yourself for 3 turns.",
@@ -11296,6 +11368,55 @@ Addon.Data.DefaultDatasets:Register({
                 name = "Redoubt",
                 skillBonuses = {},
                 statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {
+                    {
+                        auraRef = "b0211ab3:shdres60",
+                        powerLevel = 0,
+                        stacks = 1,
+                        targetScope = "self",
+                        turns = 0
+                    },
+                    {
+                        auraRef = "b0211ab3:shdres60",
+                        powerLevel = 0,
+                        stacks = 1,
+                        targetScope = "all_allies",
+                        turns = 0
+                    }
+                },
+                category = "Protection",
+                conditions = {},
+                description = "Grants the Paladin and all allies 60 Shadow Resistance while this Trait is active.",
+                events = {},
+                icon = "interface/icons/spell_shadow_antishadow.blp",
+                id = "shdraura1",
+                isEnvironmental = false,
+                name = "Shadow Resistance Aura",
+                skillBonuses = {},
+                statBonuses = {},
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {},
+                category = "Protection",
+                conditions = {},
+                description = "Increases Shield Block Value by 30%.",
+                events = {},
+                icon = "interface/icons/inv_shield_06.blp",
+                id = "shldspec1",
+                isEnvironmental = false,
+                name = "Shield Specialisation",
+                skillBonuses = {},
+                statBonuses = {
+                    {
+                        operation = "percent",
+                        statRef = "f82db71a:sblkval1",
+                        value = 30
+                    }
+                },
                 unlockLevel = 1
             },
             {

@@ -55,8 +55,8 @@ local STACK_BEHAVIOR_ITEMS = {
     { label = "Independent Duration", value = "independent_duration" },
 }
 
-local POLARITY_ITEMS = {
-    { label = "Legacy (automatic)", value = "" },
+local DISPOSITION_ITEMS = {
+    { label = "Automatic", value = "auto" },
     { label = "Helpful", value = "helpful" },
     { label = "Harmful", value = "harmful" },
 }
@@ -357,8 +357,12 @@ function DataEditor:GetAuraInspectorStackBehaviorItems()
     return STACK_BEHAVIOR_ITEMS
 end
 
+function DataEditor:GetAuraInspectorDispositionItems()
+    return DISPOSITION_ITEMS
+end
+
 function DataEditor:GetAuraInspectorPolarityItems()
-    return POLARITY_ITEMS
+    return self:GetAuraInspectorDispositionItems()
 end
 
 function DataEditor:GetAuraInspectorTickTargetModeItems()

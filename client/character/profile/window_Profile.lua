@@ -254,6 +254,11 @@ function ProfileWindow:HandleRuntimeChange(changeSet)
             or revisionChanges.ResolvedProfileRevision ~= nil))
     local skillsChanged = (type(profileChanges) == "table" and profileChanges.skills ~= nil)
         or (type(revisionChanges) == "table" and revisionChanges.SkillRevision ~= nil)
+    local refreshTimer = skillsChanged
+        and startTiming("ProfileWindow:HandleRuntimeChange:skills", 4, {
+            skillsChanged = 1,
+        })
+        or nil
     local achievementsChanged = (type(changeSet.achievements) == "table")
         or (type(revisionChanges) == "table" and revisionChanges.AchievementRevision ~= nil)
     local spellbookChanged = type(revisionChanges) == "table"
@@ -285,6 +290,7 @@ function ProfileWindow:HandleRuntimeChange(changeSet)
     end
 
     if not self:IsVisible() then
+        stopTiming(refreshTimer, { skillsChanged = skillsChanged and 1 or 0, visible = 0 })
         return
     end
 
@@ -297,6 +303,11 @@ function ProfileWindow:HandleRuntimeChange(changeSet)
     then
         self:RefreshTab(activeTabKey)
     end
+    stopTiming(refreshTimer, {
+        skillsChanged = skillsChanged and 1 or 0,
+        visible = 1,
+        refreshed = skillsChanged and activeTabKey == "skills" and 1 or 0,
+    })
 end
 
 function ProfileWindow:EnsureChangeListeners()

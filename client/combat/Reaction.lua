@@ -56,6 +56,45 @@ local function getNowMilliseconds()
     return (GetTime and GetTime() or 0) * 1000
 end
 
+local function startSkillProgressionTiming(entry)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if not timings or type(timings.Start) ~= "function"
+        or (type(timings.IsEnabled) == "function" and not timings:IsEnabled())
+    then
+        return nil
+    end
+
+    local context = type(entry) == "table" and entry.weaponSkillContext or nil
+    return timings:Start("Combat:CompleteHitCheck:weapon-skill-progression", {
+        thresholdMs = 4,
+        context = {
+            contributingWeapons = type(context) == "table" and #(context.contributingWeapons or {}) or 0,
+        },
+    })
+end
+
+local function stopSkillProgressionTiming(timer, results)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        local gained = 0
+        for index = 1, #(results or {}) do
+            if type(results[index]) == "table" and results[index].granted == true then
+                gained = gained + 1
+            end
+        end
+        timings:Stop(timer, {
+            cardinality = {
+                gained = gained,
+                results = #(results or {}),
+            },
+        })
+    end
+end
+
 local function isSpellcastTimingEnabled()
     return type(Addon.Debug) == "table" and Addon.Debug.SpellcastTiming == true
 end
@@ -1650,7 +1689,9 @@ function Combat:CompleteHitCheck(entry, resultToken, reason)
         and type(Client.SkillProgression) == "table"
         and type(Client.SkillProgression.TryGainWeaponSkillsForHit) == "function"
     then
-        Client.SkillProgression:TryGainWeaponSkillsForHit(entry)
+        local progressionTimer = startSkillProgressionTiming(entry)
+        local progressionResults = Client.SkillProgression:TryGainWeaponSkillsForHit(entry)
+        stopSkillProgressionTiming(progressionTimer, progressionResults)
     end
     return true, buildCombatResult(entry, normalizedResult, reason or normalizedResult)
 end

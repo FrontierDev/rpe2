@@ -14,6 +14,7 @@ local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local Dependencies = Database and Database.Dependecies or {}
 local ResourceSync = Addon.Internal and Addon.Internal.Comms and Addon.Internal.Comms.ResourceSync or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local Lookup = Addon.Utils and Addon.Utils.Lookup or {}
 local UI = Addon.UI or {}
 local AuraDescriptionBuilder = Spellcasting.AuraDescriptionBuilder or {}
 local TooltipTemplate = Spellcasting.TooltipTemplate or {}
@@ -975,8 +976,18 @@ local function buildHealSentence(detail, casterUnit, component, rankMultiplier)
     return sentence .. "."
 end
 
-local function resolveResourceEffectAmount(effect, rankMultiplier)
+local function resolveResourceEffectAmount(effect, rankMultiplier, casterUnit)
     local amount = tonumber(type(effect) == "table" and effect.amount or nil) or 0
+    for index = 1, #(type(effect) == "table" and effect.statScaling or {}) do
+        local scaling = effect.statScaling[index]
+        local statRef = type(scaling) == "table" and tostring(scaling.statRef or "") or ""
+        if statRef ~= "" then
+            local statValue = type(Lookup.GetStatValue) == "function"
+                and Lookup.GetStatValue(casterUnit, statRef, 0)
+                or 0
+            amount = amount + ((tonumber(statValue) or 0) * (tonumber(scaling.coefficient) or 0))
+        end
+    end
     if type(effect) == "table" and effect.scaleWithRank == true then
         return Spellcasting.ApplySpellRankMultiplier({ spellRankMultiplier = rankMultiplier }, amount) or amount
     end
@@ -987,13 +998,13 @@ local function formatResourceMagnitude(value)
     return ("%g"):format(tonumber(value) or 0)
 end
 
-local function buildResourceSentence(detail, component, rankMultiplier)
+local function buildResourceSentence(detail, casterUnit, component, rankMultiplier)
     local effect = component and component.effect or nil
     if type(effect) ~= "table" then
         return nil
     end
 
-    local amount = resolveResourceEffectAmount(effect, rankMultiplier)
+    local amount = resolveResourceEffectAmount(effect, rankMultiplier, casterUnit)
     if amount == 0 then
         return nil
     end
@@ -1423,7 +1434,7 @@ local function buildSentence(detail, casterUnit, component, rankMultiplier)
         return buildHealSentence(detail, casterUnit, component, rankMultiplier)
     end
     if effectType == "resource" then
-        return buildResourceSentence(detail, component, rankMultiplier)
+        return buildResourceSentence(detail, casterUnit, component, rankMultiplier)
     end
     if effectType == "apply_aura" then
         return buildApplyAuraSentence(detail, component)
@@ -1645,14 +1656,14 @@ local function resolveSpellTemplateComponent(detail, token)
     return type(Combat.NormalizeComponent) == "function" and Combat:NormalizeComponent(rawComponent) or rawComponent
 end
 
-local function resolveSpellResourceTemplateToken(detail, token, rankMultiplier)
+local function resolveSpellResourceTemplateToken(detail, casterUnit, token, rankMultiplier)
     local component = resolveSpellTemplateComponent(detail, token)
     local effect = type(component) == "table" and component.effect or nil
     if type(effect) ~= "table" then
         return nil
     end
 
-    local amount = resolveResourceEffectAmount(effect, rankMultiplier)
+    local amount = resolveResourceEffectAmount(effect, rankMultiplier, casterUnit)
     local amountMode = tostring(effect.amountMode or "flat")
     local resourceName = resolveResourceName(effect.resourceRef)
     local applyMode = tostring(token and token.applyMode or "")
@@ -1699,7 +1710,7 @@ local function resolveSpellTemplateToken(detail, casterUnit, token, rankMultipli
         return formatValueRange(minimum, maximum)
     end
     if applyMode == "resource_gain_amount" or applyMode == "resource_loss_amount" then
-        return resolveSpellResourceTemplateToken(detail, token, rankMultiplier)
+        return resolveSpellResourceTemplateToken(detail, casterUnit, token, rankMultiplier)
     end
 
     return nil

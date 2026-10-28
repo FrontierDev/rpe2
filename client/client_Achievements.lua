@@ -661,13 +661,22 @@ function Achievements:HandleSkillChange(payload)
         }
     end
 
-    return self:ProcessTrigger("skill_gain", {
+    local timer = startTiming("Achievements:HandleSkillChange", 4, {
+        skillRef = skillRef,
+        amount = actualGain,
+    })
+    local result = self:ProcessTrigger("skill_gain", {
         skillRef = skillRef,
         previousLevel = previousLevel,
         updatedLevel = updatedLevel,
         amount = actualGain,
         source = "profile-skill-change",
     })
+    stopTiming(timer, {
+        updated = type(result) == "table" and tonumber(result.updated) or 0,
+        completed = type(result) == "table" and tonumber(result.completed) or 0,
+    })
+    return result
 end
 
 function Achievements:Initialize()

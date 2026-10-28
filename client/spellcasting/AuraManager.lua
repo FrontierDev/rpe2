@@ -904,27 +904,12 @@ local function normalizeStackBehavior(value)
     return "refresh_duration"
 end
 
-local function isAuraDefinitionHarmful(auraDefinition)
+local function isAuraDefinitionHarmful(auraDefinition, context)
     if type(auraDefinition) ~= "table" then
         return false
     end
 
-    local polarity = string.lower(tostring(auraDefinition.polarity or ""))
-    if polarity == "harmful" then
-        return true
-    elseif polarity == "helpful" then
-        return false
-    end
-
-    local effectKeys = sortedNumericKeys(auraDefinition.effects)
-    for index = 1, #effectKeys do
-        local effect = auraDefinition.effects[effectKeys[index].key]
-        if type(effect) == "table" and tostring(effect.type or "") == "damage" then
-            return true
-        end
-    end
-
-    return false
+    return AuraManager:ResolveAuraDisposition(auraDefinition, context) == "harmful"
 end
 
 local function auraDefinitionAppliesControl(auraDefinition)
@@ -2229,7 +2214,8 @@ local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry
     local auraIcon = tostring(type(auraDefinition) == "table" and auraDefinition.icon or "") ~= ""
         and tostring(auraDefinition.icon)
         or (type(client.GetCombatLogFallbackIcon) == "function" and client:GetCombatLogFallbackIcon() or "Interface\\Icons\\INV_Misc_QuestionMark")
-    local harmful = isAuraDefinitionHarmful(auraDefinition)
+    local sourceEntry = currentEntry or previousState
+    local harmful = isAuraDefinitionHarmful(auraDefinition, sourceEntry)
     local gained = nextStacks > previousStacks
     local changeAmount = math.abs(nextStacks - previousStacks)
     local detailText = nil
@@ -2246,7 +2232,6 @@ local function publishAuraCombatLog(client, eventState, previousEntry, nextEntry
     local accentColorToken = gained
         and (harmful and "danger" or "success")
         or (harmful and "success" or "danger")
-    local sourceEntry = currentEntry or previousState
     local casterUnit = findEventUnit(eventState, sourceEntry and sourceEntry.casterEventId or 0)
     local targetUnit = findEventUnit(eventState, targetEventId)
 
@@ -2451,6 +2436,31 @@ function AuraManager:ResolveAuraDefinition(auraRef, context)
     end
 
     return nil, nil, nil
+end
+
+function AuraManager:ResolveAuraDisposition(auraDefinition, context)
+    if type(AuraClass) ~= "table" or type(AuraClass.ResolveDisposition) ~= "function" then
+        return "helpful"
+    end
+
+    local options = {}
+    if type(context) == "table" then
+        for key, value in pairs(context) do
+            options[key] = value
+        end
+    end
+    options.auraCasterEventId = options.auraCasterEventId or options.casterEventId
+    options.auraTargetEventId = options.auraTargetEventId or options.targetEventId
+
+    options.resolveAura = options.resolveAura or function(auraRef)
+        local _, nestedAura = self:ResolveAuraDefinition(auraRef, {
+            datasetId = options.datasetId,
+            dataset = options.dataset,
+        })
+        return nestedAura
+    end
+
+    return AuraClass.ResolveDisposition(auraDefinition, options)
 end
 
 function AuraManager:ResolveEffectAmount(context, effect, baseField)
@@ -3149,7 +3159,7 @@ function AuraManager:GetUnitAuras(client, eventState, unitEventId)
                 icon = tostring(type(auraDefinition) == "table" and auraDefinition.icon or "") ~= ""
                     and tostring(auraDefinition.icon)
                     or "Interface\\Icons\\INV_Misc_QuestionMark",
-                isHarmful = isAuraDefinitionHarmful(auraDefinition),
+                isHarmful = isAuraDefinitionHarmful(auraDefinition, entry),
                 stacks = math.max(0, math.floor(tonumber(entry.stacks) or 0)),
                 turnsRemaining = turnsRemaining,
                 durationTurns = durationTurns,

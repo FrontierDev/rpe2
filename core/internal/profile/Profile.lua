@@ -67,13 +67,35 @@ local function getElapsedMilliseconds(startedAt)
     return math.max(0, getTimingMilliseconds() - started)
 end
 
+local function startProfileTiming(label, thresholdMs, context)
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Start) == "function" then
+        if type(timings.IsEnabled) == "function" and not timings:IsEnabled() then
+            return nil
+        end
+        return timings:Start(label, {
+            thresholdMs = thresholdMs,
+            context = context,
+        })
+    end
+    return nil
+end
+
+local function stopProfileTiming(timer, cardinality)
+    if not timer then
+        return
+    end
+
+    local timings = Addon.Debug and Addon.Debug.Timings or nil
+    if timings and type(timings.Stop) == "function" then
+        timings:Stop(timer, { cardinality = cardinality })
+    end
+end
+
 local function logProfileInternal(message, ...)
     local debugObject = Addon.Debug or {}
     if RECIPE_PROFILE_INTERNAL_TRACE ~= true then
         return
-    end
-    if type(debugObject.SetLevelEnabled) == "function" and type(debugObject.IsLevelEnabled) == "function" and not debugObject.IsLevelEnabled("internal") then
-        debugObject.SetLevelEnabled("internal", true)
     end
     if type(debugObject.Internal) == "function" then
         debugObject.Internal(message, ...)
@@ -502,7 +524,9 @@ end
 local function getProfileResolverRevisionKey()
     return table.concat({
         tostring(getProfileRuntimeRevision()),
+        tostring(getProfileRevision("InventoryRevision")),
         tostring(getProfileRevision("ProfileStateRevision")),
+        tostring(getProfileRevision("SkillRevision")),
         tostring(getProfileRevision("ProfileStatsRevision")),
         tostring(getProfileRevision("ProfileResourcesRevision")),
         tostring(getProfileRevision("EquipmentRevision")),
@@ -928,23 +952,48 @@ local function getCachedResolvedWeaponSkillLookup(options)
         return rows, buildResolvedWeaponSkillRowsByWeaponType(rows)
     end
 
-    local revision = getProfileConfigurationRevision()
+    local cacheKey = table.concat({
+        tostring(getProfileConfigurationRevision()),
+        getProfileResolverRevisionKey(),
+    }, ":")
     local cache = Profile.ResolvedWeaponSkillLookupCache
     if type(cache) == "table"
-        and tonumber(cache.revision) == revision
+        and tostring(cache.key or "") == cacheKey
         and type(cache.rows) == "table"
         and type(cache.rowsByWeaponTypeRef) == "table"
     then
+        local timer = startProfileTiming("Profile:ResolvedWeaponSkillLookup", 4, {
+            cacheHit = 1,
+            skillRevision = getProfileRevision("SkillRevision"),
+        })
+        stopProfileTiming(timer, {
+            cacheHit = 1,
+            rows = #cache.rows,
+        })
         return cache.rows, cache.rowsByWeaponTypeRef
     end
 
+    local timer = startProfileTiming("Profile:ResolvedWeaponSkillLookup", 4, {
+        cacheHit = 0,
+        configurationRevision = getProfileConfigurationRevision(),
+        skillRevision = getProfileRevision("SkillRevision"),
+    })
     local rows = Resolver.ListResolvedSkills and Resolver.ListResolvedSkills(options) or {}
     local rowsByWeaponTypeRef = buildResolvedWeaponSkillRowsByWeaponType(rows)
     Profile.ResolvedWeaponSkillLookupCache = {
-        revision = revision,
+        key = cacheKey,
         rows = rows,
         rowsByWeaponTypeRef = rowsByWeaponTypeRef,
     }
+    stopProfileTiming(timer, {
+        cacheHit = 0,
+        rows = #rows,
+        weaponTypes = (function()
+            local count = 0
+            for _ in pairs(rowsByWeaponTypeRef) do count = count + 1 end
+            return count
+        end)(),
+    })
     return rows, rowsByWeaponTypeRef
 end
 
@@ -2636,6 +2685,22 @@ function Profile.GetResolvedSkillRowsByRefs(skillRefs, options)
         end
     end
     return rows
+end
+
+function Profile.GetSkillMetadataByRefs(skillRefs, options)
+    if Resolver.GetSkillMetadataByRefs then
+        return Resolver.GetSkillMetadataByRefs(skillRefs, options)
+    end
+
+    return {}
+end
+
+function Profile.GetSkillMetadataByWeaponType(options)
+    if Resolver.GetSkillMetadataByWeaponType then
+        return Resolver.GetSkillMetadataByWeaponType(options)
+    end
+
+    return {}
 end
 
 function Profile.GetResolvedSkillRow(skillRef, options)

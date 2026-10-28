@@ -435,6 +435,17 @@ for index = 1, #infiniteTooltip do
 end
 assertEqual(infiniteTooltipRight, " ", "infinite Aura tooltips avoid numeric duration text")
 
+local automaticDamageApplied = AuraManager:UpsertAura(Addon.Client, {
+    eventState = eventState,
+    dataset = auraDataset,
+    auraRef = "ranktest:ranked-dot",
+    casterEventId = caster.eventID,
+    targetEventId = target.eventID,
+    stacks = 1,
+    turns = 3,
+})
+assertEqual(automaticDamageApplied, true, "automatic damage Aura applies")
+
 local helpfulDamageApplied = AuraManager:UpsertAura(Addon.Client, {
     eventState = eventState,
     dataset = auraDataset,
@@ -462,6 +473,7 @@ for index = 1, #polarityRows do
 end
 assertEqual(polarityByRef["ranktest:helpful-damage"], false, "explicit helpful polarity overrides damage-only fallback")
 assertEqual(polarityByRef["ranktest:harmful-control"], true, "explicit harmful polarity classifies control Aura as harmful")
+assertEqual(polarityByRef["ranktest:ranked-dot"], true, "automatic damage Aura is classified as harmful")
 local helpfulDamageRow
 for index = 1, #polarityRows do
     if polarityRows[index].auraRef == "ranktest:helpful-damage" then

@@ -33,7 +33,6 @@ local CRAFTING_RECIPE_SYNC_OVERSCAN = 4
 local CRAFTING_RECIPE_ASYNC_BATCH_SIZE = 12
 local CRAFTING_TRAINER_SYNC_OVERSCAN = 4
 local CRAFTING_TRAINER_ASYNC_BATCH_SIZE = 12
-local CRAFTING_UI_INTERNAL_TRACE = false
 
 local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
@@ -130,12 +129,6 @@ local function setWeightedVisibility(element, visible, height, expandHeight, wei
     setElementVisibility(element, visible, height)
 end
 
-local function logSkillsInfo(message, ...)
-    if Debug and type(Debug.Info) == "function" then
-        Debug.Info(message, ...)
-    end
-end
-
 local function getTimingMilliseconds()
     if type(debugprofilestop) == "function" then
         return tonumber(debugprofilestop()) or 0
@@ -152,15 +145,12 @@ local function getElapsedMilliseconds(startedAt)
 end
 
 local function logSkillsInternal(message, ...)
-    if CRAFTING_UI_INTERNAL_TRACE ~= true then
+    if not Debug or type(Debug.Internal) ~= "function"
+        or (type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal"))
+    then
         return
     end
-    if Debug and type(Debug.SetLevelEnabled) == "function" and type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal") then
-        Debug.SetLevelEnabled("internal", true)
-    end
-    if Debug and type(Debug.Internal) == "function" then
-        Debug.Internal(message, ...)
-    end
+    Debug.Internal(message, ...)
 end
 
 local function getSkillRuleValue(ruleKey, fallback)
@@ -427,17 +417,19 @@ local function colorizeText(text, item)
 end
 
 local function getCraftingRecipeLevelColor(detail)
-    local skillLevel = math.max(0, tonumber(detail and detail.skillLevel) or 0)
-    local requiredLevel = math.max(0, tonumber(detail and detail.requiredSkillLevel) or 0)
-    local delta = skillLevel - requiredLevel
-
-    if delta < 0 then
+    local info = Crafting and type(Crafting.GetRecipeSkillUpInfo) == "function"
+        and Crafting:GetRecipeSkillUpInfo(detail)
+        or { band = "unavailable" }
+    if info.band == "unavailable" then
         return { r = 0.95, g = 0.4, b = 0.4, a = 1 }
     end
-    if delta <= 4 then
+    if info.band == "orange" then
+        return { r = 1.0, g = 0.5, b = 0.1, a = 1 }
+    end
+    if info.band == "yellow" then
         return { r = 1.0, g = 0.82, b = 0.25, a = 1 }
     end
-    if delta <= 14 then
+    if info.band == "green" then
         return { r = 0.33, g = 0.9, b = 0.45, a = 1 }
     end
 
@@ -454,21 +446,6 @@ local function getCraftingSkillUpChance(detail)
     if Crafting and type(Crafting.GetRecipeSkillUpChance) == "function" then
         return Crafting:GetRecipeSkillUpChance(detail)
     end
-
-    local skillLevel = math.max(0, tonumber(detail and detail.skillLevel) or 0)
-    local requiredLevel = math.max(0, tonumber(detail and detail.requiredSkillLevel) or 0)
-    local delta = skillLevel - requiredLevel
-
-    if delta < 0 then
-        return 100
-    end
-    if delta <= 4 then
-        return 75
-    end
-    if delta <= 14 then
-        return 35
-    end
-
     return 0
 end
 
@@ -571,8 +548,7 @@ local function showCraftCountPopup(page, detail)
         inputText = "1",
         requireInput = true,
         onConfirm = function(spec)
-            local count = math.max(1, math.floor(tonumber(spec and spec.inputText or "1") or 1))
-            Crafting:QueueRecipe(detail.recipeRef, count)
+            Crafting:QueueRecipe(detail.recipeRef, spec and spec.inputText or "")
         end,
     })
 end
@@ -1093,6 +1069,9 @@ function SkillsPage:BuildCraftingRecipeListRows(details, totalRecipeCount)
     for index = 1, #details do
         local detail = details[index]
         local category = tostring(detail.category ~= "" and detail.category or "General")
+        if tostring(detail.recipeRef or "") == selectedRecipeRef then
+            recipeFound = true
+        end
         if category ~= currentCategory then
             currentCategory = category
             rows[#rows + 1] = {
@@ -1108,13 +1087,12 @@ function SkillsPage:BuildCraftingRecipeListRows(details, totalRecipeCount)
                 recipeRef = detail.recipeRef,
                 detail = detail,
             }
-            if tostring(detail.recipeRef or "") == selectedRecipeRef then
-                recipeFound = true
-            end
         end
     end
 
-    if not recipeFound and selectedRecipeRef == "" then
+    if not recipeFound and selectedRecipeRef ~= "" and (tonumber(totalRecipeCount) or 0) <= #details then
+        self.SelectedRecipeRef = details[1] and details[1].recipeRef or nil
+    elseif not recipeFound and selectedRecipeRef == "" then
         self.SelectedRecipeRef = details[1] and details[1].recipeRef or nil
     end
 
@@ -1214,6 +1192,9 @@ function SkillsPage:QueueCraftingRecipeSessionBatch(session)
             getElapsedMilliseconds(startedAt)
         )
         page:ApplyCraftingRecipeSessionRows(activeSession, false)
+        if page.SelectedRecipeRef and page.GetSelectedCraftingRecipeDetail then
+            page:RefreshCraftingView(page:GetSelectedSkillRow(), false)
+        end
         page:QueueCraftingRecipeSessionBatch(activeSession)
     end
 
@@ -1255,6 +1236,9 @@ function SkillsPage:BeginCraftingRecipeSession(row)
     }
 
     self.CraftingRecipeSession = session
+    if tostring(self.CraftingRecipeListSkillRef or "") ~= tostring(session.skillRef or "") then
+        self.SelectedRecipeRef = nil
+    end
     local initialRows, totalCount = Crafting:GetRecipeSummaryRangeForSkill(session.skillRef, 1, self:GetCraftingRecipeInitialBatchSize(), {
         knownOnly = true,
         skillRow = row,
@@ -1473,19 +1457,9 @@ end
 
 function SkillsPage:GetSelectedCraftingRecipeDetail()
     if Crafting and Crafting.BuildRecipeDetails and self.SelectedRecipeRef then
-        local detail = Crafting:BuildRecipeDetails(self.SelectedRecipeRef)
-        if detail then
-            return detail
-        end
+        return Crafting:BuildRecipeDetails(self.SelectedRecipeRef)
     end
-
-    local details = self.CraftingRecipeDetails or self:GetCraftingRecipeDetails()
-    for index = 1, #details do
-        if tostring(details[index].recipeRef or "") == tostring(self.SelectedRecipeRef or "") then
-            return details[index]
-        end
-    end
-    return details[1]
+    return nil
 end
 
 function SkillsPage:GetTrainerRecipeRows()
@@ -1689,6 +1663,7 @@ function SkillsPage:BuildCraftingConversionDialog()
     self.CraftingConversionDialogIconPanel = UI.CreatePanel(header:GetFrame(), "RPEProfileSkillsCraftingConversionDialogIconPanel", {
         width = 28,
         height = 28,
+        expandWidth = false,
         contentInset = 1,
         showBorder = true,
     })
@@ -1707,13 +1682,19 @@ function SkillsPage:BuildCraftingConversionDialog()
     })
     self.CraftingConversionDialogIcon:SetParent(self.CraftingConversionDialogIconPanel:GetContentFrame())
     self.CraftingConversionDialogIcon:Create()
-    self.CraftingConversionDialogIcon:GetFrame():SetAllPoints(self.CraftingConversionDialogIconPanel:GetContentFrame())
+    local iconFrame = self.CraftingConversionDialogIcon:GetFrame()
+    iconFrame:ClearAllPoints()
+    iconFrame:SetSize(26, 26)
+    iconFrame:SetPoint("CENTER", self.CraftingConversionDialogIconPanel:GetContentFrame(), "CENTER")
 
     self.CraftingConversionDialogTitle = UI.CreateText(header:GetFrame(), "RPEProfileSkillsCraftingConversionDialogTitle", "Material", {
-        width = 252,
+        width = 0,
         height = 28,
+        expandWidth = true,
+        weight = 1,
         justifyH = "LEFT",
         justifyV = "MIDDLE",
+        wordWrap = false,
         textColor = UI.ResolveColor(nil, "text.primary"),
     })
     header:AddChild(self.CraftingConversionDialogTitle)
@@ -2163,9 +2144,6 @@ function SkillsPage:RefreshCraftingView(row, refreshRecipeList)
         if Crafting and Crafting.BuildRecipeDetails and self.SelectedRecipeRef then
             detail = Crafting:BuildRecipeDetails(self.SelectedRecipeRef)
         end
-        if not detail then
-            detail = self:GetSelectedCraftingRecipeDetail()
-        end
         if self.CraftingRecipeScroll and self.CraftingRecipeScroll.RefreshRows then
             self.CraftingRecipeScroll:RefreshRows()
         end
@@ -2213,23 +2191,79 @@ function SkillsPage:RefreshCraftingView(row, refreshRecipeList)
             self.CraftingDetailHint:SetText("")
         end
     end
+    local availability = detail and Crafting and Crafting.GetCraftingAvailability
+        and Crafting:GetCraftingAvailability(detail.recipeRef)
+        or nil
     if self.CraftingQueueText and self.CraftingQueueText.SetText then
         if detail then
             local skillUpChance = getCraftingSkillUpChance(detail)
-            self.CraftingQueueText:SetText(("Skill-Up Chance: %d%%"):format(skillUpChance))
+            local queueText = ("Skill-Up Chance: %d%%"):format(skillUpChance)
+            local availabilityReason = availability and availability.canCraft ~= true
+                and tostring(availability.reason or "") or ""
+            local hasOutcome = type(craftState.lastOutcome) == "table"
+            if availabilityReason ~= "" and not hasOutcome then
+                queueText = queueText .. " | " .. availabilityReason
+            end
+            if craftState.active then
+                queueText = ("%s | Crafting %d/%d"):format(
+                    queueText,
+                    tonumber(craftState.active.completedCount) or 0,
+                    tonumber(craftState.active.totalCount) or 0
+                )
+            elseif (tonumber(craftState.queuedCount) or 0) > 0 then
+                queueText = ("%s | Queued: %d"):format(queueText, tonumber(craftState.queuedCount) or 0)
+            elseif hasOutcome then
+                local outcome = craftState.lastOutcome
+                local completedCount = math.max(0, tonumber(outcome.completedCount) or 0)
+                local totalCount = math.max(completedCount, tonumber(outcome.totalCount) or completedCount)
+                local remainingCount = math.max(0, tonumber(outcome.remainingCount) or (totalCount - completedCount))
+                if remainingCount > 0 then
+                    queueText = ("%s | Crafted %d/%d (%d remaining)"):format(
+                        queueText,
+                        completedCount,
+                        totalCount,
+                        remainingCount
+                    )
+                else
+                    queueText = ("%s | Crafted %d item%s"):format(
+                        queueText,
+                        completedCount,
+                        completedCount == 1 and "" or "s"
+                    )
+                end
+                if tostring(craftState.lastError or "") ~= "" then
+                    queueText = queueText .. " | " .. tostring(craftState.lastError)
+                end
+                if tostring(craftState.lastWarning or "") ~= "" then
+                    queueText = queueText .. " | Warning: " .. tostring(craftState.lastWarning)
+                end
+            elseif tostring(craftState.lastError or "") ~= "" then
+                queueText = queueText .. " | " .. tostring(craftState.lastError)
+            elseif tostring(craftState.lastWarning or "") ~= "" then
+                queueText = queueText .. " | Warning: " .. tostring(craftState.lastWarning)
+            end
+            self.CraftingQueueText:SetText(queueText)
         else
-            self.CraftingQueueText:SetText("Skill-Up Chance: --")
+            local queueText = "Skill-Up Chance: --"
+            if tostring(craftState.lastError or "") ~= "" then
+                queueText = queueText .. " | " .. tostring(craftState.lastError)
+            elseif tostring(craftState.lastWarning or "") ~= "" then
+                queueText = queueText .. " | Warning: " .. tostring(craftState.lastWarning)
+            elseif self.CraftingRecipeSession and (tonumber(self.CraftingRecipeSession.totalCount) or 0) > (tonumber(self.CraftingRecipeSession.loadedCount) or 0) then
+                queueText = queueText .. " | Loading recipe details..."
+            end
+            self.CraftingQueueText:SetText(queueText)
         end
     end
 
     self:RefreshCraftingMaterialsTable(detail)
 
-    local canCraft = detail and detail.canCraft == true
+    local canCraft = availability ~= nil and availability.canCraft == true
     if self.CraftingCraftOneButton and self.CraftingCraftOneButton.SetEnabled then
         self.CraftingCraftOneButton:SetEnabled(canCraft)
     end
     if self.CraftingCraftAllButton and self.CraftingCraftAllButton.SetEnabled then
-        local canCraftAll = Crafting and Crafting.GetMaxCraftableCount and detail and Crafting:GetMaxCraftableCount(detail.recipeRef) > 0 or false
+        local canCraftAll = availability and (tonumber(availability.maxCount) or 0) > 0 or false
         self.CraftingCraftAllButton:SetEnabled(canCraftAll)
     end
     if self.CraftingCancelButton and self.CraftingCancelButton.SetEnabled then

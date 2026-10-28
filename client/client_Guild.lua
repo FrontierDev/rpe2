@@ -25,6 +25,7 @@ local DAILY_REWARD_CLAIM_SEMANTICS_RESET_CYCLE = "reset-cycle"
 
 Guild._guildAdminPending = Guild._guildAdminPending or {}
 Guild._guildAdminRequestSequence = tonumber(Guild._guildAdminRequestSequence) or 0
+Guild._itemGainSequence = tonumber(Guild._itemGainSequence) or 0
 
 local function ensureString(value)
     return value == nil and "" or tostring(value)
@@ -561,7 +562,21 @@ function Guild:TryRequisition(guildSettingRef, requisitionId)
 
     local inventory = getInventoryService()
     local beforeQty = getInventoryItemQuantity(inventory, detail.datasetId, detail.itemId, detail.itemTier)
-    local added, record = pcall(inventory.AddItem, { dataset = detail.datasetId, id = detail.itemId, itemTier = detail.itemTier, quantity = detail.quantity })
+    Guild._itemGainSequence = Guild._itemGainSequence + 1
+    local requisitionEventId = ("guild-requisition:%s:%d"):format(
+        tostring(detail.requisitionId or ""),
+        Guild._itemGainSequence
+    )
+    local added, record = pcall(inventory.AddItem, {
+        dataset = detail.datasetId,
+        id = detail.itemId,
+        itemTier = detail.itemTier,
+        quantity = detail.quantity,
+    }, {
+        source = "other-reward",
+        suppressLootNotification = true,
+        eventId = requisitionEventId,
+    })
     local afterQty = getInventoryItemQuantity(inventory, detail.datasetId, detail.itemId, detail.itemTier)
     local awarded = detail.quantity
     local measured = beforeQty ~= nil and afterQty ~= nil
@@ -593,6 +608,16 @@ function Guild:TryRequisition(guildSettingRef, requisitionId)
         end
     end
 
+    local lootNotifications = Client.LootNotifications
+    if lootNotifications and type(lootNotifications.PublishCommittedItemGain) == "function" then
+        lootNotifications:PublishCommittedItemGain(
+            detail.itemRef,
+            awarded,
+            detail.itemTier,
+            "other-reward",
+            requisitionEventId
+        )
+    end
     pcall(self.RefreshWindow, self)
     return true, "ok", {
         guildSettingRef = detail.settingRef,
@@ -746,7 +771,16 @@ local function awardDailyRewardPlan(plan)
         local reward = plan[index]
         if reward.type == "item" then
             local before = getInventoryItemQuantity(inventory, reward.datasetId, reward.itemId, reward.itemTier)
-            local ok, record = pcall(inventory.AddItem, { dataset = reward.datasetId, id = reward.itemId, itemTier = reward.itemTier, quantity = reward.amount })
+            local ok, record = pcall(inventory.AddItem, {
+                dataset = reward.datasetId,
+                id = reward.itemId,
+                itemTier = reward.itemTier,
+                quantity = reward.amount,
+            }, {
+                source = "other-reward",
+                suppressLootNotification = true,
+                eventId = ("guild-daily:%d"):format(index),
+            })
             local after = getInventoryItemQuantity(inventory, reward.datasetId, reward.itemId, reward.itemTier)
             local awarded = before ~= nil and after ~= nil and math.max(0, after - before) or reward.amount
             if awarded > 0 and (before ~= nil and after ~= nil or ok and record) then
@@ -806,6 +840,19 @@ function Guild:ProcessDailyRewards()
             end
         end
         clearDailyRewardTransactionState(status.guildKey)
+        local lootNotifications = Client.LootNotifications
+        if lootNotifications and type(lootNotifications.PublishCommittedItemGain) == "function" then
+            for index = 1, #(transaction.itemAwards or {}) do
+                local award = transaction.itemAwards[index]
+                lootNotifications:PublishCommittedItemGain(
+                    ("%s:%s"):format(tostring(award.datasetId or ""), tostring(award.itemId or "")),
+                    award.amount,
+                    award.itemTier,
+                    "other-reward",
+                    ("guild-daily:%s:%d"):format(tostring(status.dayKey or ""), index)
+                )
+            end
+        end
         pcall(self.RefreshWindow, self)
         return true, "claimed", { dayKey = status.dayKey, guildSettingRef = status.settingRef, rewardCount = #(status.plan or {}) }
     end, function(message) return tostring(message) end)

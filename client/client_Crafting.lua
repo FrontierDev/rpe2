@@ -12,11 +12,38 @@ local Tasks = Addon.Internal and Addon.Internal.Tasks or {}
 local Inventory = Addon.Client and Addon.Client.Inventory or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
 local Debug = Addon.Debug or {}
-local logCraftingInfo
 local logCraftingInternal
 local logConversionTrace
 local CONVERSION_TRACE_LOGGING = false
-local CRAFTING_INTERNAL_TRACE = false
+
+local function captureCraftingError(errorValue)
+    local message = tostring(errorValue)
+    if type(debugstack) == "function" then
+        return ("%s\n%s"):format(message, debugstack(2))
+    end
+    return message
+end
+
+local function logCraftingFailure(phase, recipeRef, errorValue, outputCommitted, completedCount)
+    local message = captureCraftingError(errorValue)
+    local formatted = (
+        "Crafting diagnostic: recipeRef=%s phase=%s outputCommitted=%s completedCount=%d\n%s"
+    ):format(
+        tostring(recipeRef or ""),
+        tostring(phase or "unknown"),
+        outputCommitted == true and "true" or "false",
+        math.max(0, math.floor(tonumber(completedCount) or 0)),
+        message
+    )
+    if Debug and type(Debug.Error) == "function" then
+        Debug.Error("%s", formatted)
+    elseif Debug and type(Debug.Warn) == "function" then
+        Debug.Warn("%s", formatted)
+    elseif Debug and type(Debug.Internal) == "function" then
+        Debug.Internal("%s", formatted)
+    end
+    return message
+end
 
 local function ensureString(value)
     if value == nil then
@@ -145,6 +172,18 @@ local function getConfigurationRevision()
     return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
 end
 
+local function getCurrentProfileToken()
+    if type(Database.GetActiveProfile) == "function" then
+        local profile = Database.GetActiveProfile()
+        local characterKey = ensureString(profile and profile.characterKey)
+        if characterKey ~= "" then
+            return characterKey
+        end
+    end
+
+    return ""
+end
+
 local function getCurrentCopperAmount()
     if Profile.GetCurrencyAmount then
         return math.max(0, tonumber(Profile.GetCurrencyAmount("copper")) or 0)
@@ -160,22 +199,59 @@ local function getSkillLevelAndCap(skillRef)
     return math.max(0, tonumber(row and row.value) or 0), math.max(0, tonumber(row and row.maxValue) or 0), row
 end
 
-local function getRecipeSkillUpChance(detail)
+local function getRecipeSkillUpInfo(detail)
     local skillLevel = math.max(0, tonumber(detail and detail.skillLevel) or 0)
     local requiredLevel = math.max(0, tonumber(detail and detail.requiredSkillLevel) or 0)
+    local skillCap = math.max(0, tonumber(detail and detail.skillCap) or 0)
     local delta = skillLevel - requiredLevel
+    local chance
+    local band
+    local reason
 
-    if delta < 0 then
-        return 100
-    end
-    if delta <= 4 then
-        return 75
-    end
-    if delta <= 14 then
-        return 35
+    if detail and (detail.isKnown == false or detail.isSkillMet == false or delta < 0) then
+        chance = 0
+        band = "unavailable"
+        reason = detail.isKnown == false and "unlearned" or "skill-locked"
+    elseif skillCap > 0 and skillLevel >= skillCap then
+        chance = 0
+        band = "capped"
+        reason = "capped"
+    elseif delta <= 10 then
+        chance = 100
+        band = "orange"
+    elseif delta <= 20 then
+        chance = 75
+        band = "yellow"
+    elseif delta <= 25 then
+        chance = 35
+        band = "green"
+    else
+        chance = 0
+        band = "grey"
+        reason = "trivial"
     end
 
-    return 0
+    local result = {
+        chance = chance,
+        band = band,
+        reason = reason,
+        skillLevel = skillLevel,
+        requiredSkillLevel = requiredLevel,
+        skillCap = skillCap,
+        delta = delta,
+    }
+    logCraftingInternal(
+        "Crafting skill-up calculation recipe=%s required=%d current=%d cap=%d delta=%d chance=%d band=%s reason=%s",
+        tostring(detail and detail.recipeRef or ""),
+        requiredLevel,
+        skillLevel,
+        skillCap,
+        delta,
+        chance,
+        band,
+        tostring(reason or "eligible")
+    )
+    return result
 end
 
 local function buildRecipeSummaryLiveContext(skillRef, options)
@@ -426,26 +502,30 @@ end
 
 local function removeInventoryItemCount(itemRef, quantity, itemTier)
     local remaining = math.max(1, tonumber(quantity) or 1)
+    local removedTotal = 0
     while remaining > 0 do
         local slotIndex, record = findInventorySlotForItemRef(itemRef, itemTier)
         if not slotIndex or not record or not Inventory.RemoveItem then
-            return false
+            return false, "missing-item", removedTotal
         end
 
         local stackQuantity = math.max(1, tonumber(record.quantity) or 1)
         local removeQuantity = math.min(stackQuantity, remaining)
-        if not Inventory.RemoveItem(slotIndex, removeQuantity) then
-            return false
+        local removed, removeError = Inventory.RemoveItem(slotIndex, removeQuantity)
+        if not removed then
+            return false, removeError or "remove-failed", removedTotal
         end
 
+        local removedQuantity = type(removed) == "table" and removed.quantity or nil
+        removedTotal = removedTotal + math.max(0, tonumber(removedQuantity) or removeQuantity)
         remaining = remaining - removeQuantity
     end
 
-    return true
+    return true, nil, removedTotal
 end
 
 local function getBagSlotCount(bag)
-    if C_Container and C_Container.GetContainerNumSlots then
+    if type(C_Container) == "table" and type(C_Container.GetContainerNumSlots) == "function" then
         return C_Container.GetContainerNumSlots(bag)
     end
     if GetContainerNumSlots then
@@ -455,7 +535,7 @@ local function getBagSlotCount(bag)
 end
 
 local function getContainerItemInfo(bag, slot)
-    if C_Container and C_Container.GetContainerItemInfo then
+    if type(C_Container) == "table" and type(C_Container.GetContainerItemInfo) == "function" then
         return C_Container.GetContainerItemInfo(bag, slot)
     end
     if GetContainerItemInfo then
@@ -482,7 +562,7 @@ local function getBagItemName(info)
             return name
         end
     end
-    if info.itemID and C_Item and C_Item.GetItemInfo then
+    if info.itemID and type(C_Item) == "table" and type(C_Item.GetItemInfo) == "function" then
         local name = C_Item.GetItemInfo(info.itemID)
         if name and name ~= "" then
             return name
@@ -580,24 +660,24 @@ local function consumeBagItemCountAtSlot(slotInfo, desiredCount)
         consumeCount
     )
     if consumeCount < stackCount then
-        if C_Container and C_Container.SplitContainerItem then
+        if type(C_Container) == "table" and type(C_Container.SplitContainerItem) == "function" then
             logConversionTrace("Material conversion calling C_Container.SplitContainerItem(%d, %d, %d)", bag, slot, consumeCount)
             C_Container.SplitContainerItem(bag, slot, consumeCount)
         elseif SplitContainerItem then
             logConversionTrace("Material conversion calling SplitContainerItem(%d, %d, %d)", bag, slot, consumeCount)
             SplitContainerItem(bag, slot, consumeCount)
         else
-            logCraftingInfo("Material conversion failed: no split function available for bag=%d slot=%d", bag, slot)
+            logCraftingInternal("Material conversion failed: no split function available for bag=%d slot=%d", bag, slot)
             return false, "split-unavailable"
         end
-    elseif C_Container and C_Container.PickupContainerItem then
+    elseif type(C_Container) == "table" and type(C_Container.PickupContainerItem) == "function" then
         logConversionTrace("Material conversion calling C_Container.PickupContainerItem(%d, %d)", bag, slot)
         C_Container.PickupContainerItem(bag, slot)
     elseif PickupContainerItem then
         logConversionTrace("Material conversion calling PickupContainerItem(%d, %d)", bag, slot)
         PickupContainerItem(bag, slot)
     else
-        logCraftingInfo("Material conversion failed: no pickup function available for bag=%d slot=%d", bag, slot)
+        logCraftingInternal("Material conversion failed: no pickup function available for bag=%d slot=%d", bag, slot)
         return false, "pickup-unavailable"
     end
 
@@ -610,7 +690,7 @@ local function consumeBagItemCountAtSlot(slotInfo, desiredCount)
     )
     local expectedItemId = tonumber(slotInfo and slotInfo.itemID) or tonumber(info.itemID) or nil
     if cursorType ~= "item" or (expectedItemId and cursorItemId and tonumber(cursorItemId) ~= expectedItemId) then
-        logCraftingInfo(
+        logCraftingInternal(
             "Material conversion failed after pickup: cursorType=%s cursorItemId=%s expectedItemId=%s",
             tostring(cursorType),
             tostring(cursorItemId),
@@ -630,7 +710,7 @@ local function consumeBagItemCountAtSlot(slotInfo, desiredCount)
             if ClearCursor then
                 ClearCursor()
             end
-            logCraftingInfo(
+            logCraftingInternal(
                 "Material conversion failed after delete: cursor remained occupied for bag=%d slot=%d item=%s",
                 bag,
                 slot,
@@ -652,7 +732,7 @@ local function consumeBagItemCountAtSlot(slotInfo, desiredCount)
     if ClearCursor then
         ClearCursor()
     end
-    logCraftingInfo("Material conversion failed: DeleteCursorItem unavailable")
+    logCraftingInternal("Material conversion failed: DeleteCursorItem unavailable")
     return false, "delete-unavailable"
 end
 
@@ -716,32 +796,19 @@ local function refreshVisibleProfileWindow()
     return false
 end
 
-logCraftingInfo = function(message, ...)
-    if Debug and type(Debug.Info) == "function" then
-        Debug.Info(message, ...)
-    end
-end
-
 logCraftingInternal = function(message, ...)
-    if CRAFTING_INTERNAL_TRACE ~= true then
+    if not Debug or type(Debug.Internal) ~= "function"
+        or (type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal"))
+    then
         return
     end
-    if Debug and type(Debug.SetLevelEnabled) == "function" and type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal") then
-        Debug.SetLevelEnabled("internal", true)
-    end
-    if Debug and type(Debug.Internal) == "function" then
-        Debug.Internal(message, ...)
-    end
+    Debug.Internal(message, ...)
 end
 
 logConversionTrace = function(message, ...)
     if CONVERSION_TRACE_LOGGING then
-        logCraftingInfo(message, ...)
+        logCraftingInternal(message, ...)
     end
-end
-
-local function formatQuantityLabel(quantity, itemName)
-    return ("%dx %s"):format(math.max(1, tonumber(quantity) or 1), ensureString(itemName ~= "" and itemName or "Item"))
 end
 
 local function rollQuantity(minimum, maximum)
@@ -772,9 +839,16 @@ Crafting.State = Crafting.State or {
     pendingDetailPrimes = {},
     queue = {},
     active = nil,
+    nextJobId = 0,
+    queueEpoch = 0,
+    queueTask = nil,
+    profileKey = nil,
+    status = "idle",
     listeners = {},
     nextListenerId = 0,
     lastError = "",
+    lastWarning = "",
+    lastOutcome = nil,
     suppressInventoryRefresh = false,
 }
 
@@ -796,6 +870,31 @@ function Crafting:UnregisterListener(listenerId)
 
     self.State.listeners[tonumber(listenerId)] = nil
     return true
+end
+
+function Crafting:RecordPostCommitWarning(phase, recipeRef, errorValue, completedCount, outputCommitted)
+    local warningText = outputCommitted == false
+        and ("Crafting callback %s failed. See the debug log for details."):format(tostring(phase or "unknown"))
+        or ("Craft completed, but %s failed. See the debug log for details."):format(tostring(phase or "ancillary work"))
+    self.State.lastWarning = warningText
+    logCraftingFailure(phase, recipeRef, errorValue, outputCommitted ~= false, completedCount)
+    return warningText
+end
+
+function Crafting:BuildCraftOutcome(job, status)
+    if type(job) ~= "table" then
+        return nil
+    end
+
+    local totalCount = math.max(0, math.floor(tonumber(job.totalCount) or 0))
+    local completedCount = math.max(0, math.floor(tonumber(job.completedCount) or 0))
+    return {
+        recipeRef = job.recipeRef,
+        totalCount = totalCount,
+        completedCount = completedCount,
+        remainingCount = math.max(0, totalCount - completedCount),
+        status = ensureString(status or "complete"),
+    }
 end
 
 function Crafting:RebuildRecipeSkillIndex(targetRevision)
@@ -828,7 +927,12 @@ end
 function Crafting:NotifyChanged(reason)
     local state = self.State
     local changeReason = ensureString(reason)
-    if changeReason == "inventory-change" or changeReason == "craft-complete" or changeReason == "convert-complete" then
+    if changeReason == "inventory-change"
+        or changeReason == "craft-complete"
+        or changeReason == "craft-progress"
+        or changeReason == "craft-blocked"
+        or changeReason == "convert-complete"
+    then
         state.inventoryRevision = math.max(0, tonumber(state.inventoryRevision) or 0) + 1
         state.detailCache = {}
         state.inventoryCountCache = {}
@@ -852,21 +956,77 @@ function Crafting:NotifyChanged(reason)
 
     local payload = self:GetState()
     payload.reason = reason or "update"
+    local outcome = payload.lastOutcome
+    local recipeRef = payload.active and payload.active.recipeRef or outcome and outcome.recipeRef
+    local completedCount = payload.active and payload.active.completedCount or outcome and outcome.completedCount or 0
+    local outputCommitted = changeReason == "skill-gain"
+        or changeReason == "craft-progress"
+        or changeReason == "craft-complete"
+        or outcome ~= nil
     for _, listener in pairs(self.State.listeners or {}) do
-        pcall(listener, payload)
+        local ok, errorValue = xpcall(function()
+            listener(payload)
+        end, captureCraftingError)
+        if not ok then
+            self:RecordPostCommitWarning("crafting listener", recipeRef, errorValue, completedCount, outputCommitted)
+        end
     end
-    refreshVisibleProfileWindow()
+    local refreshOk, refreshError = xpcall(refreshVisibleProfileWindow, captureCraftingError)
+    if not refreshOk then
+        self:RecordPostCommitWarning("UI refresh", recipeRef, refreshError, completedCount, outputCommitted)
+    end
 end
 
 function Crafting:GetState()
     local state = self.State
+    if state.profileKey ~= nil and state.profileKey ~= getCurrentProfileToken() then
+        if not self:CancelCrafting("profile-changed") then
+            state.profileKey = nil
+        end
+        state = self.State
+    end
+
+    local queue = {}
+    local queuedCount = 0
+    for index = 1, #(state.queue or {}) do
+        local job = state.queue[index]
+        local remainingCount = math.max(0, tonumber(job and job.remainingCount) or 0)
+        queuedCount = queuedCount + remainingCount
+        queue[#queue + 1] = {
+            id = job and job.id,
+            recipeRef = job and job.recipeRef,
+            totalCount = job and job.totalCount,
+            completedCount = job and job.completedCount,
+            remainingCount = remainingCount,
+        }
+    end
+
+    local active = nil
+    if type(state.active) == "table" then
+        active = {
+            id = state.active.id,
+            recipeRef = state.active.recipeRef,
+            totalCount = state.active.totalCount,
+            completedCount = state.active.completedCount,
+            remainingCount = math.max(0, tonumber(state.active.remainingCount) or 0),
+        }
+    end
+
     return {
-        active = nil,
-        queue = {},
-        queuedCount = 0,
-        isCrafting = false,
-        dropQueueAfterActive = false,
+        active = active,
+        queue = queue,
+        queuedCount = queuedCount,
+        isCrafting = active ~= nil or queuedCount > 0,
+        status = ensureString(state.status, "idle"),
         lastError = ensureString(state.lastError),
+        lastWarning = ensureString(state.lastWarning),
+        lastOutcome = type(state.lastOutcome) == "table" and {
+            recipeRef = state.lastOutcome.recipeRef,
+            totalCount = state.lastOutcome.totalCount,
+            completedCount = state.lastOutcome.completedCount,
+            remainingCount = state.lastOutcome.remainingCount,
+            status = state.lastOutcome.status,
+        } or nil,
     }
 end
 
@@ -1063,7 +1223,7 @@ function Crafting:ConvertMaterialItemFromBags(itemRef, count)
     )
     if conversion.canConvert ~= true then
         self.State.lastError = "No matching WoW materials can be converted right now."
-        logCraftingInfo("Material conversion blocked: canConvert is false for itemRef=%s", tostring(itemRef or ""))
+        logCraftingInternal("Material conversion blocked: canConvert is false for itemRef=%s", tostring(itemRef or ""))
         self:NotifyChanged("convert-blocked")
         return false
     end
@@ -1071,7 +1231,7 @@ function Crafting:ConvertMaterialItemFromBags(itemRef, count)
     local datasetId, itemId = parseItemRef(itemRef)
     if not datasetId or not itemId or not Inventory.AddItem then
         self.State.lastError = "Invalid material conversion target."
-        logCraftingInfo(
+        logCraftingInternal(
             "Material conversion blocked: invalid target itemRef=%s datasetId=%s itemId=%s addItem=%s",
             tostring(itemRef or ""),
             tostring(datasetId),
@@ -1086,7 +1246,7 @@ function Crafting:ConvertMaterialItemFromBags(itemRef, count)
     local convertCount = math.min(requestedCount, tonumber(conversion.bagCount) or 0)
     if convertCount <= 0 then
         self.State.lastError = "No matching WoW materials can be converted right now."
-        logCraftingInfo(
+        logCraftingInternal(
             "Material conversion blocked: convertCount <= 0 itemRef=%s requested=%d bagCount=%d",
             tostring(itemRef or ""),
             requestedCount,
@@ -1099,7 +1259,7 @@ function Crafting:ConvertMaterialItemFromBags(itemRef, count)
     local convertedCount, deleteReason = deleteBagItemCountByName(conversion.itemName, convertCount)
     convertedCount = math.max(0, math.floor(tonumber(convertedCount) or 0))
     if convertedCount < convertCount then
-        logCraftingInfo(
+        logCraftingInternal(
             "Material conversion stopped after %d successful consumes for item=%s reason=%s",
             convertedCount,
             tostring(conversion.itemName or ""),
@@ -1109,7 +1269,7 @@ function Crafting:ConvertMaterialItemFromBags(itemRef, count)
 
     if convertedCount <= 0 then
         self.State.lastError = "No matching WoW materials could be converted."
-        logCraftingInfo("Material conversion produced zero successful consumes for itemRef=%s", tostring(itemRef or ""))
+        logCraftingInternal("Material conversion produced zero successful consumes for itemRef=%s", tostring(itemRef or ""))
         self:NotifyChanged("convert-blocked")
         return false
     end
@@ -1120,19 +1280,17 @@ function Crafting:ConvertMaterialItemFromBags(itemRef, count)
             dataset = datasetId,
             id = itemId,
             quantity = convertedCount,
-        })
+        }, { source = "other-reward" })
     end, function(err)
         return tostring(err)
     end)
     self.State.suppressInventoryRefresh = false
     if not addOk then
         self.State.lastError = "Failed to grant converted material."
-        logCraftingInfo("Material conversion failed while granting RPE item: %s", tostring(addError))
+        logCraftingInternal("Material conversion failed while granting RPE item: %s", tostring(addError))
         self:NotifyChanged("convert-blocked")
         return false
     end
-    logCraftingInfo("Converted %s into %s.", formatQuantityLabel(convertedCount, conversion.itemName), formatQuantityLabel(convertedCount, outputName))
-
     self.State.lastError = ""
     self:NotifyChanged("convert-complete")
     return true
@@ -1406,6 +1564,9 @@ function Crafting:BuildRecipeDetails(recipeRef)
     local materials = {}
     local canCraft = summary.isKnown == true and summary.isSkillMet == true
     local outputItem = resolveItemDefinition(summary.output and summary.output.itemRef or nil)
+    if not outputItem then
+        canCraft = false
+    end
 
     for index = 1, #requirements do
         local row = requirements[index]
@@ -1575,43 +1736,104 @@ function Crafting:GetTrainerRecipesForSkill(skillRef)
 end
 
 function Crafting:GetMaxCraftableCount(recipeRef)
-    local detail = self:BuildRecipeDetails(recipeRef)
-    if not detail or detail.isKnown ~= true or detail.isSkillMet ~= true then
-        return 0
+    local availability = self:GetCraftingAvailability(recipeRef)
+    return math.max(0, tonumber(availability and availability.maxCount) or 0)
+end
+
+function Crafting:GetCraftingAvailability(recipeRef)
+    local normalizedRef = ensureString(recipeRef)
+    local detail = normalizedRef ~= "" and self:BuildRecipeDetails(normalizedRef) or nil
+    local result = {
+        recipeRef = normalizedRef,
+        detail = detail,
+        canCraft = false,
+        maxCount = 0,
+        reason = "Recipe details are still loading.",
+    }
+    if not detail then
+        return result
+    end
+    if detail.isKnown ~= true then
+        result.reason = "You have not learned that recipe."
+        return result
+    end
+    if detail.isSkillMet ~= true then
+        result.reason = ("Requires %s (%d)."):format(
+            tostring(detail.skillName or "Skill"),
+            tonumber(detail.requiredSkillLevel) or 0
+        )
+        return result
+    end
+    if not detail.output or not detail.output.item then
+        result.reason = "Recipe output is unavailable."
+        return result
     end
 
-    local maxCrafts = nil
+    for index = 1, #(detail.tools or {}) do
+        if detail.tools[index].hasEnough ~= true then
+            result.reason = ("Missing required tool: %s."):format(tostring(detail.tools[index].name or "tool"))
+            return result
+        end
+    end
+    if detail.canCraft ~= true then
+        result.reason = "Insufficient materials."
+        return result
+    end
+
+    local maxCount = nil
     for index = 1, #(detail.materials or {}) do
         local row = detail.materials[index]
         local craftsFromRow = math.floor((tonumber(row.owned) or 0) / math.max(1, tonumber(row.quantity) or 1))
-        if maxCrafts == nil or craftsFromRow < maxCrafts then
-            maxCrafts = craftsFromRow
-        end
+        maxCount = maxCount == nil and craftsFromRow or math.min(maxCount, craftsFromRow)
     end
 
-    return math.max(0, tonumber(maxCrafts) or 0)
+    -- Recipes without consumable materials still need a finite, safe Craft All
+    -- behavior. One unit is the only count we can establish without an
+    -- authored consumption limit.
+    maxCount = maxCount == nil and 1 or math.max(0, maxCount)
+    result.maxCount = maxCount
+    result.canCraft = maxCount > 0
+    if not result.canCraft then
+        result.reason = "Insufficient materials."
+    else
+        result.reason = ""
+    end
+    return result
 end
 
 function Crafting:GetRecipeSkillUpChance(detail)
-    return getRecipeSkillUpChance(detail)
+    return getRecipeSkillUpInfo(detail).chance
+end
+
+function Crafting:GetRecipeSkillUpInfo(detail)
+    return getRecipeSkillUpInfo(detail)
 end
 
 function Crafting:ConsumeRecipeInputsOnce(detail)
     if not detail or detail.canCraft ~= true then
-        return false
+        return false, "recipe-not-craftable", {}
     end
 
+    local consumedRows = {}
     for index = 1, #(detail.materials or {}) do
         local row = detail.materials[index]
-        if not removeInventoryItemCount(row.itemRef, row.quantity, row.itemTier) then
-            self.State.lastError = "Failed to consume required materials."
-            return false
+        local removed, removeError, removedCount = removeInventoryItemCount(row.itemRef, row.quantity, row.itemTier)
+        if (tonumber(removedCount) or 0) > 0 then
+            consumedRows[#consumedRows + 1] = {
+                itemRef = row.itemRef,
+                itemTier = row.itemTier,
+                quantity = removedCount,
+                name = row.name,
+            }
         end
-        logCraftingInfo("Spent %s.", formatQuantityLabel(row.quantity, row.name))
+        if not removed then
+            self.State.lastError = "Failed to consume required materials."
+            return false, removeError or "consume-failed", consumedRows
+        end
     end
 
     self.State.lastError = ""
-    return true
+    return true, consumedRows
 end
 
 function Crafting:GrantRecipeOutputOnce(detail)
@@ -1627,70 +1849,349 @@ function Crafting:GrantRecipeOutputOnce(detail)
     end
 
     local quantity = rollQuantity(detail.output.minQuantity, detail.output.maxQuantity)
-    Inventory.AddItem({
+    local activeJob = self.State and self.State.active or nil
+    local craftEventId = activeJob and activeJob.id and ("craft:%s:%d"):format(
+        tostring(activeJob.id),
+        (tonumber(activeJob.completedCount) or 0) + 1
+    ) or nil
+    local added, addError = Inventory.AddItem({
         dataset = datasetId,
         id = itemId,
         itemTier = detail.output.itemTier,
         quantity = quantity,
-    })
-    logCraftingInfo("Crafted %s.", formatQuantityLabel(quantity, detail.output.name or detail.name))
+    }, { source = "craft-recipe", eventId = craftEventId })
+    if not added then
+        self.State.lastError = "Failed to grant the crafted output: " .. tostring(addError or "unknown error")
+        return false, addError or "output-grant-failed"
+    end
     self.State.lastError = ""
+    return true, {
+        itemRef = detail.output.itemRef,
+        itemTier = detail.output.itemTier,
+        quantity = quantity,
+    }
+end
+
+local function restoreCraftingInputs(consumedRows)
+    if type(consumedRows) ~= "table" or #consumedRows == 0 then
+        return true
+    end
+    if type(Inventory.AddItem) ~= "function" then
+        return false, "inventory-add-unavailable"
+    end
+
+    for index = #consumedRows, 1, -1 do
+        local row = consumedRows[index]
+        local datasetId, itemId = parseItemRef(row and row.itemRef)
+        if not datasetId or not itemId then
+            return false, "invalid-compensation-item"
+        end
+        local restored, restoreError = Inventory.AddItem({
+            dataset = datasetId,
+            id = itemId,
+            itemTier = row.itemTier,
+            quantity = row.quantity,
+        }, { source = "craft-compensation", suppressLootNotification = true })
+        if not restored then
+            return false, restoreError or "compensation-failed"
+        end
+    end
+
     return true
 end
 
-function Crafting:QueueRecipe(recipeRef, count)
-    local requested = math.max(1, normalizeQuantity(count, 1))
-    local detail = self:BuildRecipeDetails(recipeRef)
-    if not detail or detail.isKnown ~= true then
-        self.State.lastError = "You have not learned that recipe."
-        self:NotifyChanged("craft-blocked")
-        return false
-    end
-    if detail.canCraft ~= true then
+function Crafting:ExecuteCraftOnce(detail)
+    if type(detail) ~= "table" or detail.canCraft ~= true then
         self.State.lastError = "Recipe is not currently craftable."
-        self:NotifyChanged("craft-blocked")
         return false
     end
 
-    local completedCount = 0
-    for index = 1, requested do
-        local currentDetail = self:BuildRecipeDetails(recipeRef)
-        if not currentDetail or currentDetail.canCraft ~= true then
-            break
+    -- Recheck every material immediately before mutating inventory. The
+    -- requirement rows are rebuilt from the current inventory revision, so a
+    -- stale queue cannot spend inputs it no longer owns.
+    for index = 1, #(detail.materials or {}) do
+        local row = detail.materials[index]
+        if (tonumber(row.owned) or 0) < (tonumber(row.quantity) or 1) then
+            self.State.lastError = "Insufficient materials."
+            return false
         end
-        if not self:ConsumeRecipeInputsOnce(currentDetail) then
-            break
-        end
-        if not self:GrantRecipeOutputOnce(currentDetail) then
-            break
-        end
-        completedCount = completedCount + 1
+    end
 
-        local progression = Client.SkillProgression
+    local previousSuppressRefresh = self.State.suppressInventoryRefresh
+    local consumedRows = {}
+    local outputCountBefore = countInventoryItem(detail.output.itemRef, detail.output.itemTier)
+    local outputCommitted = false
+    local outputConfirmationWarning = nil
+    self.State.suppressInventoryRefresh = true
+
+    local transactionOk, transactionCommitted, transactionError = xpcall(function()
+        local consumeCallOk, consumeSucceeded, consumeValue, consumeRows = xpcall(function()
+            return self:ConsumeRecipeInputsOnce(detail)
+        end, captureCraftingError)
+        if not consumeCallOk then
+            return false, consumeSucceeded
+        end
+
+        consumedRows = consumeSucceeded == true
+            and (type(consumeValue) == "table" and consumeValue or {})
+            or (type(consumeRows) == "table" and consumeRows or {})
+        if consumeSucceeded ~= true then
+            return false, consumeValue or "consume-failed"
+        end
+
+        local grantCallOk, grantSucceeded, grantValue = xpcall(function()
+            return self:GrantRecipeOutputOnce(detail)
+        end, captureCraftingError)
+        local outputCountAfter = countInventoryItem(detail.output.itemRef, detail.output.itemTier)
+        if grantCallOk and grantSucceeded == true then
+            outputCommitted = true
+            return true
+        end
+
+        if outputCountAfter > outputCountBefore then
+            outputCommitted = true
+            outputConfirmationWarning = grantCallOk
+                and "Output grant reported failure after inventory changed."
+                or "Output grant raised after inventory changed."
+            return true
+        end
+
+        return false, grantCallOk and (grantValue or "output-grant-failed") or grantSucceeded
+    end, captureCraftingError)
+    self.State.suppressInventoryRefresh = previousSuppressRefresh
+
+    if not transactionOk then
+        outputCommitted = false
+    end
+    if transactionOk and transactionCommitted == true and outputCommitted == true then
+        self.State.lastError = ""
+        if outputConfirmationWarning then
+            self:RecordPostCommitWarning("output confirmation", detail.recipeRef, outputConfirmationWarning, self.State.active and self.State.active.completedCount or 0)
+        end
+
+        local progression = Addon.Client and Addon.Client.SkillProgression or nil
         if type(progression) == "table" and type(progression.TryGain) == "function" then
-            progression:TryGain(
-                currentDetail.skillRef,
-                "craft-recipe",
-                self:GetRecipeSkillUpChance(currentDetail),
-                {
-                    recipeRef = currentDetail.recipeRef,
-                    onGain = function()
-                        self:NotifyChanged("skill-gain")
-                    end,
-                }
+            local skillUpInfo = self:GetRecipeSkillUpInfo(detail)
+            local progressionOk, progressionResult = xpcall(function()
+                return progression:TryGain(
+                    detail.skillRef,
+                    "craft-recipe",
+                    skillUpInfo.chance,
+                    {
+                        recipeRef = detail.recipeRef,
+                        onGain = function()
+                            self:NotifyChanged("skill-gain")
+                        end,
+                    }
+                )
+            end, captureCraftingError)
+            logCraftingInternal(
+                "Crafting skill-up roll recipe=%s required=%d current=%d cap=%d chance=%d roll=%s granted=%s result=%s",
+                tostring(detail.recipeRef or ""),
+                skillUpInfo.requiredSkillLevel,
+                skillUpInfo.skillLevel,
+                skillUpInfo.skillCap,
+                skillUpInfo.chance,
+                tostring(progressionOk and type(progressionResult) == "table" and progressionResult.roll or "error"),
+                tostring(progressionOk and type(progressionResult) == "table" and progressionResult.granted == true or false),
+                tostring(progressionOk and type(progressionResult) == "table" and (progressionResult.reason or "completed") or progressionResult)
             )
+            if not progressionOk then
+                self:RecordPostCommitWarning("skill progression", detail.recipeRef, progressionResult, self.State.active and self.State.active.completedCount or 0)
+            elseif type(progressionResult) == "table" and progressionResult.reason == "persistence-failed" then
+                self:RecordPostCommitWarning("skill persistence", detail.recipeRef, progressionResult.reason, self.State.active and self.State.active.completedCount or 0)
+            end
         end
+        return true
     end
 
-    if completedCount <= 0 then
-        if ensureString(self.State.lastError) == "" then
-            self.State.lastError = "Recipe is not currently craftable."
-        end
-        self:NotifyChanged("craft-blocked")
+    local compensationOk, restored, compensationError = xpcall(function()
+        return restoreCraftingInputs(consumedRows)
+    end, captureCraftingError)
+    if not compensationOk or restored ~= true then
+        local reason = compensationOk and compensationError or restored
+        self.State.lastError = "Crafting failed and required materials could not be restored."
+        logCraftingFailure("input compensation", detail.recipeRef, reason or "compensation-failed", false, self.State.active and self.State.active.completedCount or 0)
+    else
+        self.State.lastError = transactionOk
+            and ("Crafting failed: " .. tostring(transactionError or "output-grant-failed"))
+            or "Crafting failed unexpectedly. See the debug log for details."
+        logCraftingFailure("craft transaction", detail.recipeRef, transactionError or "craft-failed", false, self.State.active and self.State.active.completedCount or 0)
+    end
+    return false
+end
+
+function Crafting:ScheduleQueueStep(epoch)
+    local state = self.State
+    if state.queueTask ~= nil or state.active == nil then
         return false
     end
 
-    self:NotifyChanged("craft-complete")
+    local callback = function()
+        self:ProcessQueueStep(epoch)
+    end
+    if type(Tasks.Enqueue) == "function" then
+        state.queueTask = Tasks:Enqueue(callback)
+        return true
+    end
+    if type(C_Timer) == "table" and type(C_Timer.After) == "function" then
+        state.queueTask = true
+        C_Timer.After(0, callback)
+        return true
+    end
+
+    state.lastError = "Crafting task queue is unavailable."
+    state.status = "blocked"
+    return false
+end
+
+function Crafting:ProcessQueueStep(epoch)
+    local state = self.State
+    state.queueTask = nil
+    if tonumber(epoch) ~= tonumber(state.queueEpoch) or state.active == nil then
+        return false
+    end
+    if state.profileKey ~= getCurrentProfileToken() then
+        self:CancelCrafting("profile-changed")
+        return false
+    end
+
+    local job = state.active
+    local availability = self:GetCraftingAvailability(job.recipeRef)
+    if not availability.canCraft then
+        state.lastError = availability.reason
+        state.status = "blocked"
+        if type(job) == "table" and (tonumber(job.completedCount) or 0) > 0 then
+            state.lastOutcome = self:BuildCraftOutcome(job, "blocked")
+        end
+        state.active = nil
+        self:NotifyChanged("craft-blocked")
+        if #state.queue > 0 then
+            state.status = "queued"
+            self:NotifyChanged("queue-progress")
+            self:StartNextCraftJob()
+        end
+        return false
+    end
+
+    if not self:ExecuteCraftOnce(availability.detail) then
+        state.status = "blocked"
+        state.lastOutcome = (tonumber(job.completedCount) or 0) > 0
+            and self:BuildCraftOutcome(job, "blocked")
+            or nil
+        state.active = nil
+        self:NotifyChanged("craft-blocked")
+        if #state.queue > 0 then
+            state.status = "queued"
+            self:NotifyChanged("queue-progress")
+            self:StartNextCraftJob()
+        end
+        return false
+    end
+
+    job.completedCount = (tonumber(job.completedCount) or 0) + 1
+    job.remainingCount = math.max(0, (tonumber(job.remainingCount) or 0) - 1)
+    state.lastOutcome = self:BuildCraftOutcome(job, job.remainingCount <= 0 and "complete" or "active")
+    self:NotifyChanged("craft-progress")
+    if job.remainingCount <= 0 then
+        state.active = nil
+        state.status = #state.queue > 0 and "queued" or "complete"
+        state.lastOutcome = self:BuildCraftOutcome(job, "complete")
+        self:NotifyChanged("craft-complete")
+        if #state.queue > 0 then
+            self:StartNextCraftJob()
+        end
+    else
+        if not self:ScheduleQueueStep(epoch) then
+            state.active = nil
+            state.status = "blocked"
+            state.lastOutcome = self:BuildCraftOutcome(job, "blocked")
+            self:NotifyChanged("craft-blocked")
+        end
+    end
+    return true
+end
+
+function Crafting:StartNextCraftJob()
+    local state = self.State
+    if state.active ~= nil then
+        return false
+    end
+    local job = table.remove(state.queue, 1)
+    if not job then
+        return false
+    end
+    state.active = job
+    state.status = "active"
+    state.lastOutcome = nil
+    self:NotifyChanged("craft-active")
+    if self:ScheduleQueueStep(state.queueEpoch) then
+        return true
+    end
+    state.active = nil
+    state.status = "blocked"
+    self:NotifyChanged("craft-blocked")
+    return false
+end
+
+function Crafting:QueueRecipe(recipeRef, count)
+    local normalizedRef = ensureString(recipeRef)
+    local state = self.State
+    if state.profileKey ~= nil and state.profileKey ~= getCurrentProfileToken() then
+        self:CancelCrafting("profile-changed")
+        state = self.State
+    end
+    state.lastError = ""
+    state.lastWarning = ""
+    state.lastOutcome = nil
+    local reject = function(message, reason)
+        state.lastError = message
+        if state.active == nil and #(state.queue or {}) == 0 then
+            state.status = "blocked"
+        end
+        self:NotifyChanged(reason or "craft-blocked")
+        return false
+    end
+    local numericCount = tonumber(count)
+    if numericCount == nil or numericCount < 1 or numericCount ~= math.floor(numericCount) then
+        return reject("Enter a whole number of crafts (at least 1).")
+    end
+    local requested = math.floor(numericCount)
+
+    local availability = self:GetCraftingAvailability(normalizedRef)
+    if not availability.canCraft then
+        return reject(availability.reason)
+    end
+    for index = 1, #(state.queue or {}) do
+        if state.queue[index].recipeRef == normalizedRef then
+            return reject("That recipe is already queued.", "queue-duplicate")
+        end
+    end
+    if state.active and state.active.recipeRef == normalizedRef then
+        return reject("That recipe is already being crafted.", "queue-duplicate")
+    end
+
+    local accepted = math.min(requested, availability.maxCount)
+    if accepted <= 0 then
+        return reject(availability.reason)
+    end
+    state.nextJobId = math.max(0, tonumber(state.nextJobId) or 0) + 1
+    state.profileKey = getCurrentProfileToken()
+    state.queue[#state.queue + 1] = {
+        id = state.nextJobId,
+        recipeRef = normalizedRef,
+        totalCount = accepted,
+        completedCount = 0,
+        remainingCount = accepted,
+    }
+    state.lastError = accepted < requested
+        and ("Only %d craft%s available."):format(accepted, accepted == 1 and " is" or "s are")
+        or ""
+    state.status = "queued"
+    self:NotifyChanged("queue-added")
+    if state.active == nil then
+        self:StartNextCraftJob()
+    end
     return true
 end
 
@@ -1745,9 +2246,13 @@ function Crafting:LearnRecipeFromTrainer(recipeRef)
 end
 
 function Crafting:QueueAll(recipeRef)
+    self:GetState()
     local maxCount = self:GetMaxCraftableCount(recipeRef)
     if maxCount <= 0 then
         self.State.lastError = "Nothing craftable."
+        if self.State.active == nil and #(self.State.queue or {}) == 0 then
+            self.State.status = "blocked"
+        end
         self:NotifyChanged("queue-none")
         return false
     end
@@ -1756,12 +2261,27 @@ function Crafting:QueueAll(recipeRef)
 end
 
 function Crafting:CancelCrafting(reason)
-    self.State.lastError = ""
-    return false
+    local state = self.State
+    local hadWork = state.active ~= nil or #(state.queue or {}) > 0
+    if not hadWork then
+        return false
+    end
+    state.queueEpoch = math.max(0, tonumber(state.queueEpoch) or 0) + 1
+    if type(state.active) == "table" and (tonumber(state.active.completedCount) or 0) > 0 then
+        state.lastOutcome = self:BuildCraftOutcome(state.active, "cancelled")
+    end
+    state.queueTask = nil
+    state.queue = {}
+    state.active = nil
+    state.profileKey = nil
+    state.lastError = ""
+    state.status = "cancelled"
+    self:NotifyChanged(reason == "profile-changed" and "profile-changed" or "craft-cancelled")
+    return true
 end
 
 function Crafting:HandleProfileWindowClosed()
-    return false
+    return self:CancelCrafting("profile-closed")
 end
 
 function Crafting:Initialize()
@@ -1776,6 +2296,11 @@ function Crafting:Initialize()
                 return
             end
             Crafting:NotifyChanged("inventory-change")
+        end)
+    end
+    if Profile and type(Profile.RegisterSkillChangeListener) == "function" then
+        self._skillListenerId = Profile.RegisterSkillChangeListener(function()
+            Crafting:NotifyChanged("skill-gain")
         end)
     end
 

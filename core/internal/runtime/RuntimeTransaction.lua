@@ -611,7 +611,6 @@ local function requestChangesRevisions(transaction)
         end
         if profile.skills then
             requestRevision(transaction, "SkillRevision")
-            requestRevision(transaction, "ProfileStateRevision")
         end
     end
 

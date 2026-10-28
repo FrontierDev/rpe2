@@ -9,6 +9,8 @@ local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local ItemTier = Addon.Internal and Addon.Internal.ItemTier or {}
 local Runtime = Addon.Internal and Addon.Internal.Runtime or {}
 local Common = Addon.Utils and Addon.Utils.Common or {}
+local Comms = Addon.Internal and Addon.Internal.Comms or {}
+local Operations = Comms.Operations or {}
 
 local LootNotifications = Client.LootNotifications or {}
 Client.LootNotifications = LootNotifications
@@ -34,6 +36,13 @@ local ACHIEVEMENT_TEXT_COLOR = "ffff00"
 local GUILD_TEXT_COLOR = "40ff40"
 local ACHIEVEMENT_EARNED = "You have earned the achievement %s!"
 local GUILD_ACHIEVEMENT_EARNED = "%s has earned the achievement %s!"
+local ITEM_GAIN_REPORT_OPCODE = type(Operations.GetOpcode) == "function"
+    and Operations:GetOpcode("ITEM_GAIN_REPORT") or nil
+local ITEM_GAIN_CATEGORIES = {
+    crafted = true,
+    received = true,
+    looted = true,
+}
 
 local function trimText(value)
     return tostring(value or ""):gsub("^%s+", ""):gsub("%s+$", "")
@@ -270,6 +279,256 @@ function LootNotifications:NotifyCurrencyGain(currencyRef, amount)
     return emitChatMessage(message)
 end
 
+local function normalizePlayerName(value)
+    local name = type(Common.NormalizeName) == "function"
+        and Common.NormalizeName(value)
+        or trimText(value)
+    if name == "" or name:find("|", 1, true) or name:find("%c") then
+        return ""
+    end
+    return name
+end
+
+local function isSafeEventId(value)
+    local eventId = trimText(value)
+    return eventId ~= ""
+        and #eventId <= 128
+        and eventId:match("^[%w%._:%-]+$") ~= nil
+end
+
+local function normalizeItemGainCategory(source)
+    local normalized = string.lower(trimText(source))
+    if normalized == "craft-recipe" then
+        return "crafted"
+    elseif normalized == "loot-delivery" then
+        return "looted"
+    end
+    return "received"
+end
+
+local function buildAcquisitionMessage(event)
+    local _, name, quality = resolveItem(event.itemRef)
+    if not name then
+        return nil
+    end
+
+    quality = ItemTier.GetEffectiveQuality(quality, event.itemTier)
+    local body = ("[%s] %s %s x%d."):format(
+        event.playerName,
+        event.category,
+        formatItemLink(event.itemRef, name, quality, event.itemTier),
+        event.quantity
+    )
+    local coloredBody = body:gsub("|r", "|r|cff" .. LOOT_TEXT_COLOR)
+    return ("|cff%s%s|r"):format(LOOT_TEXT_COLOR, coloredBody)
+end
+
+local function normalizeAcquisitionEvent(event)
+    if type(event) ~= "table" then
+        return nil
+    end
+
+    local itemRef = trimText(event.itemRef)
+    local datasetId, itemId = itemRef:match("^([^:]+):([^:]+)$")
+    local itemTier
+    if type(ItemTier.Validate) == "function" then
+        itemTier = select(1, ItemTier.Validate(event.itemTier))
+    elseif type(ItemTier.Normalize) == "function" then
+        itemTier = ItemTier.Normalize(event.itemTier)
+    end
+    local numericQuantity = tonumber(event.quantity)
+    local quantity = normalizeQuantity(event.quantity)
+    local playerName = normalizePlayerName(event.playerName)
+    local category = string.lower(trimText(event.category))
+    local eventId = trimText(event.eventId)
+    if not datasetId or not itemId
+        or datasetId:find("[^%w%._%-]") or itemId:find("[^%w%._%-]")
+        or itemRef == "" or itemRef:find("|", 1, true)
+        or numericQuantity == nil or numericQuantity ~= math.floor(numericQuantity)
+        or quantity <= 0 or quantity > 1000000
+        or playerName == "" or not ITEM_GAIN_CATEGORIES[category]
+        or not itemTier or not isSafeEventId(eventId)
+    then
+        return nil
+    end
+
+    return {
+        itemRef = itemRef,
+        itemTier = itemTier,
+        quantity = quantity,
+        category = category,
+        eventId = eventId,
+        playerName = playerName,
+    }
+end
+
+local function acquisitionKey(event)
+    return event.playerName .. ":" .. event.eventId
+end
+
+function LootNotifications:RememberAcquisition(event)
+    self._seenAcquisitionEvents = type(self._seenAcquisitionEvents) == "table"
+        and self._seenAcquisitionEvents or {}
+    self._seenAcquisitionOrder = type(self._seenAcquisitionOrder) == "table"
+        and self._seenAcquisitionOrder or {}
+    local key = acquisitionKey(event)
+    if self._seenAcquisitionEvents[key] then
+        return false
+    end
+
+    self._seenAcquisitionEvents[key] = true
+    self._seenAcquisitionOrder[#self._seenAcquisitionOrder + 1] = key
+    while #self._seenAcquisitionOrder > 256 do
+        local oldest = table.remove(self._seenAcquisitionOrder, 1)
+        self._seenAcquisitionEvents[oldest] = nil
+    end
+    return true
+end
+
+function LootNotifications:RenderAcquisition(event)
+    local normalized = normalizeAcquisitionEvent(event)
+    if not normalized or not resolveItem(normalized.itemRef) then
+        return false
+    end
+    local message = buildAcquisitionMessage(normalized)
+    return message and emitChatMessage(message) or false
+end
+
+function LootNotifications:IsConnectedToActiveServer()
+    local state = Client.State
+    return type(state) == "table"
+        and state.active == true
+        and normalizePlayerName(state.hostName) ~= ""
+        and state.channelId ~= nil and state.channelId ~= ""
+end
+
+function LootNotifications:SendAcquisitionReport(event)
+    local state = Client.State
+    if not self:IsConnectedToActiveServer()
+        or not ITEM_GAIN_REPORT_OPCODE
+        or type(Comms.SendToChannel) ~= "function"
+    then
+        return false
+    end
+
+    local sender = state._sendToChannel or Comms.SendToChannel
+    if type(sender) ~= "function" then
+        return false
+    end
+
+    local playerName = normalizePlayerName(type(Common.GetPlayerName) == "function" and Common.GetPlayerName() or "")
+    if playerName == "" then
+        return false
+    end
+
+    local sent = sender(Comms, state.channelId, ITEM_GAIN_REPORT_OPCODE, {
+        playerName,
+        event.eventId,
+        event.itemRef,
+        event.itemTier,
+        event.quantity,
+        event.category,
+    }, {
+        opcode = ITEM_GAIN_REPORT_OPCODE,
+        scope = "client",
+        onFailed = function()
+            if self:RememberAcquisition(event) then
+                self:RenderAcquisition(event)
+            end
+        end,
+    })
+    return sent == true
+end
+
+function LootNotifications:HandleCommittedAcquisition(event)
+    local normalized = normalizeAcquisitionEvent(event)
+    if not normalized or not resolveItem(normalized.itemRef) then
+        return false
+    end
+
+    if not self:IsConnectedToActiveServer() then
+        if self:RememberAcquisition(normalized) then
+            return self:NotifyItemGain(normalized.itemRef, normalized.quantity, normalized.itemTier)
+        end
+        return false
+    end
+
+    if self:SendAcquisitionReport(normalized) then
+        return true
+    end
+
+    if self:RememberAcquisition(normalized) then
+        return self:RenderAcquisition(normalized)
+    end
+    return false
+end
+
+function LootNotifications:PublishCommittedItemGain(itemRef, quantity, itemTier, source, eventId)
+    self._nextManualEventId = (tonumber(self._nextManualEventId) or 0) + 1
+    local normalizedEventId = trimText(eventId)
+    if normalizedEventId == "" then
+        normalizedEventId = ("manual:%d"):format(self._nextManualEventId)
+    end
+    normalizedEventId = normalizedEventId:gsub("[^%w%._:%-]", "_")
+    return self:HandleCommittedAcquisition({
+        itemRef = itemRef,
+        quantity = quantity,
+        itemTier = itemTier,
+        category = normalizeItemGainCategory(source),
+        eventId = normalizedEventId,
+        playerName = normalizePlayerName(type(Common.GetPlayerName) == "function" and Common.GetPlayerName() or ""),
+    })
+end
+
+function LootNotifications:ConfirmLootDelivery(deliveryId)
+    local key = trimText(deliveryId)
+    local pending = self._pendingLootAcquisitions and self._pendingLootAcquisitions[key]
+    if key == "" or type(pending) ~= "table" then
+        return false
+    end
+
+    self._pendingLootAcquisitions[key] = nil
+    for index = 1, #pending do
+        self:HandleCommittedAcquisition(pending[index])
+    end
+    return true
+end
+
+function LootNotifications:RejectLootDelivery(deliveryId)
+    local key = trimText(deliveryId)
+    if key == "" or type(self._pendingLootAcquisitions) ~= "table" then
+        return false
+    end
+    self._pendingLootAcquisitions[key] = nil
+    return true
+end
+
+function Client:HandleItemGainAnnouncement(arguments, sender, distribution, target)
+    local state = self.State
+    local senderName = normalizePlayerName(sender)
+    local hostName = normalizePlayerName(state and state.hostName)
+    if type(state) ~= "table" or state.active ~= true
+        or distribution ~= "CHANNEL"
+        or tonumber(target) ~= tonumber(state.channelId)
+        or senderName == "" or hostName == "" or senderName ~= hostName
+    then
+        return false
+    end
+
+    local event = normalizeAcquisitionEvent({
+        playerName = arguments and arguments[1],
+        eventId = arguments and arguments[2],
+        itemRef = arguments and arguments[3],
+        itemTier = arguments and arguments[4],
+        quantity = arguments and arguments[5],
+        category = arguments and arguments[6],
+    })
+    if not event or not resolveItem(event.itemRef) or not LootNotifications:RememberAcquisition(event) then
+        return false
+    end
+    return LootNotifications:RenderAcquisition(event)
+end
+
 local function registerItemGainNotifications()
     if LootNotifications._itemGainProcessorId ~= nil
         or type(Runtime.RegisterBeforeCommitProcessor) ~= "function"
@@ -292,8 +551,32 @@ local function registerItemGainNotifications()
             return
         end
 
+        local event = {
+            itemRef = itemRef,
+            itemTier = mutation.itemTier,
+            quantity = quantity,
+            category = normalizeItemGainCategory(mutation.source),
+            eventId = trimText(mutation.eventId),
+            playerName = normalizePlayerName(type(Common.GetPlayerName) == "function" and Common.GetPlayerName() or ""),
+        }
+        if not isSafeEventId(event.eventId) or event.playerName == "" then
+            return
+        end
+
         Runtime:QueueAfterCommit(function()
-            LootNotifications:NotifyItemGain(itemRef, quantity, mutation.itemTier)
+            if event.category == "looted" and trimText(mutation.deliveryId) ~= "" then
+                LootNotifications._pendingLootAcquisitions = type(LootNotifications._pendingLootAcquisitions) == "table"
+                    and LootNotifications._pendingLootAcquisitions or {}
+                local deliveryId = trimText(mutation.deliveryId)
+                local pending = LootNotifications._pendingLootAcquisitions[deliveryId]
+                if type(pending) ~= "table" then
+                    pending = {}
+                    LootNotifications._pendingLootAcquisitions[deliveryId] = pending
+                end
+                pending[#pending + 1] = event
+                return
+            end
+            LootNotifications:HandleCommittedAcquisition(event)
         end)
     end)
 end

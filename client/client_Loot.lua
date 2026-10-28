@@ -471,6 +471,10 @@ local function readReceipt(deliveryId)
 end
 
 local function finishFailedDelivery(payload, receipt, transaction, cause, detail)
+    local lootNotifications = Client.LootNotifications
+    if lootNotifications and type(lootNotifications.RejectLootDelivery) == "function" then
+        lootNotifications:RejectLootDelivery(payload and payload.deliveryId)
+    end
     local rolledBack = rollbackTransaction(transaction)
     receipt.status = rolledBack and "failed" or "recovery-required"
     receipt.failedAt = getNow()
@@ -542,6 +546,10 @@ local function executeDeliveryPlan(payload, hostName, requestFingerprint, plan, 
                 id = reward.itemId,
                 itemTier = reward.itemTier,
                 quantity = reward.requestedAmount,
+            }, {
+                source = "loot-delivery",
+                deliveryId = payload.deliveryId,
+                eventId = ("loot:%s:%d"):format(tostring(payload.deliveryId), index),
             })
             local addedVariant = normalizeInventoryRecord(addedRecord)
             local afterVariants = getInventoryItemVariants(inventory, reward.datasetId, reward.itemId)
@@ -826,6 +834,11 @@ function Client:NotifyLootReceived(response, payload)
         end
     end
 
+    local lootNotifications = self.LootNotifications
+    if lootNotifications and type(lootNotifications.ConfirmLootDelivery) == "function" then
+        lootNotifications:ConfirmLootDelivery(notification.deliveryId)
+    end
+
     return true
 end
 
@@ -938,6 +951,11 @@ function Client:HandleLootDelivery(arguments, sender)
     sendDeliveryResponse(hostName, response)
     if response.success == true and duplicate ~= true then
         self:NotifyLootReceived(response, payload)
+    elseif response.success ~= true then
+        local lootNotifications = self.LootNotifications
+        if lootNotifications and type(lootNotifications.RejectLootDelivery) == "function" then
+            lootNotifications:RejectLootDelivery(payload.deliveryId)
+        end
     end
     return response.success == true, response
 end

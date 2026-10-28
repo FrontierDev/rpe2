@@ -97,9 +97,86 @@ local function collectActivatedResources()
     return entries, byRef
 end
 
-local function collectActivatedSkills()
+local activatedSkillIndexCache = {
+    configurationRevision = -1,
+    entries = nil,
+    byRef = nil,
+    byWeaponTypeRef = nil,
+}
+
+local resolvedSkillStateCache = {
+    key = nil,
+    state = nil,
+}
+
+local skillMetadataStateCache = {
+    key = nil,
+    state = nil,
+}
+
+local function getConfigurationRevision()
+    return math.max(0, math.floor(tonumber(Addon.Internal and Addon.Internal.ConfigurationRevision) or 0))
+end
+
+local function getRuntimeRevision(domain)
+    local runtime = Addon.Internal and Addon.Internal.Runtime or nil
+    if type(runtime) == "table" and type(runtime.GetRevision) == "function" then
+        return math.max(0, math.floor(tonumber(runtime:GetRevision(domain)) or 0))
+    end
+
+    return 0
+end
+
+local function canUseDefaultSkillCache(options)
+    return options == nil or (type(options) == "table" and next(options) == nil)
+end
+
+local function getSkillResolutionCacheKey(options)
+    if not canUseDefaultSkillCache(options) then
+        return nil
+    end
+
+    local presentationKey = type(Profile.GetResolvedPresentationRevisionKey) == "function"
+        and Profile.GetResolvedPresentationRevisionKey()
+        or table.concat({
+            tostring(getRuntimeRevision("SkillRevision")),
+            tostring(getRuntimeRevision("InventoryRevision")),
+            tostring(getRuntimeRevision("ProfileStateRevision")),
+            tostring(getRuntimeRevision("ProfileStatsRevision")),
+            tostring(getRuntimeRevision("EquipmentRevision")),
+            tostring(getRuntimeRevision("ResolvedProfileRevision")),
+            tostring(getRuntimeRevision("EventRuntimeRevision")),
+        }, ":")
+
+    return table.concat({ tostring(getConfigurationRevision()), tostring(presentationKey or "") }, ":")
+end
+
+local function getSkillMetadataCacheKey(options)
+    if not canUseDefaultSkillCache(options) then
+        return nil
+    end
+
+    return table.concat({
+        tostring(getConfigurationRevision()),
+        tostring(getRuntimeRevision("SkillRevision")),
+        tostring(getRuntimeRevision("ProfileStateRevision")),
+        tostring(getRuntimeRevision("ResolvedProfileRevision")),
+    }, ":")
+end
+
+local function getActivatedSkillIndex()
+    local configurationRevision = getConfigurationRevision()
+    if activatedSkillIndexCache.configurationRevision == configurationRevision
+        and type(activatedSkillIndexCache.entries) == "table"
+        and type(activatedSkillIndexCache.byRef) == "table"
+    then
+        return activatedSkillIndexCache
+    end
+
     local datasets = Addon.Internal.Registry and Addon.Internal.Registry.GetActivatedDatasets and Addon.Internal.Registry:GetActivatedDatasets() or {}
     local entries = {}
+    local byRef = {}
+    local byWeaponTypeRef = {}
 
     for datasetIndex = 1, #datasets do
         local dataset = datasets[datasetIndex]
@@ -114,12 +191,28 @@ local function collectActivatedSkills()
                         dataset = dataset,
                         skill = skill,
                     }
+                    byRef[ref] = entries[#entries]
+                    if tostring(skill.skillType or "") == "weapon" then
+                        local weaponTypeRef = ensureString(skill.weaponTypeRef)
+                        if weaponTypeRef ~= "" then
+                            byWeaponTypeRef[weaponTypeRef] = byWeaponTypeRef[weaponTypeRef] or {}
+                            byWeaponTypeRef[weaponTypeRef][#byWeaponTypeRef[weaponTypeRef] + 1] = entries[#entries]
+                        end
+                    end
                 end
             end
         end
     end
 
-    return entries
+    activatedSkillIndexCache.configurationRevision = configurationRevision
+    activatedSkillIndexCache.entries = entries
+    activatedSkillIndexCache.byRef = byRef
+    activatedSkillIndexCache.byWeaponTypeRef = byWeaponTypeRef
+    return activatedSkillIndexCache
+end
+
+local function collectActivatedSkills()
+    return getActivatedSkillIndex().entries
 end
 
 local function buildProfileStatBonusMap()
@@ -2304,28 +2397,22 @@ end
 
 local function requestedSkillEntries(skillRefs)
     local requestedRefs = type(skillRefs) == "table" and skillRefs or {}
-    local requestedSet = {}
     local requestedEntries = {}
     local needsResolvedStats = false
-    local entries = collectActivatedSkills()
+    local skillIndex = getActivatedSkillIndex()
 
     for index = 1, #requestedRefs do
         local skillRef = ensureString(requestedRefs[index])
         if skillRef ~= "" then
-            requestedSet[skillRef] = true
-        end
-    end
-
-    for index = 1, #entries do
-        local entry = entries[index]
-        local entryRef = ensureString(entry and entry.ref)
-        if requestedSet[entryRef] then
-            requestedEntries[#requestedEntries + 1] = entry
-            local skill = entry and entry.skill or nil
-            local skillType = ensureString(skill and skill.skillType)
-            local derivedStatRef = ensureString(skill and skill.derivedStatRef)
-            if skillType ~= "weapon" and skillType ~= "crafting" and skillType ~= "language" and derivedStatRef ~= "" then
-                needsResolvedStats = true
+            local entry = skillIndex.byRef[skillRef]
+            if entry then
+                requestedEntries[#requestedEntries + 1] = entry
+                local skill = entry and entry.skill or nil
+                local skillType = ensureString(skill and skill.skillType)
+                local derivedStatRef = ensureString(skill and skill.derivedStatRef)
+                if skillType ~= "weapon" and skillType ~= "crafting" and skillType ~= "language" and derivedStatRef ~= "" then
+                    needsResolvedStats = true
+                end
             end
         end
     end
@@ -2333,27 +2420,98 @@ local function requestedSkillEntries(skillRefs)
     return requestedEntries, needsResolvedStats
 end
 
-function Resolver.ListResolvedSkills(options)
-    local entries = collectActivatedSkills()
-    local resolvedStatsByRef = buildResolvedStatsByRef(Resolver.ListResolvedStats(options))
-    local storedLevels = buildProfileSkillLevelMap()
-    local permanentBonuses = buildProfileSkillPermanentBonusMap()
-    local itemBonuses = buildItemSkillBonusMap()
-    local traitBonuses = buildTraitSkillBonusMap()
-    local raceBonuses = buildOriginSkillBonusMap("races")
-    local classBonuses = buildOriginSkillBonusMap("classes")
-    local auraContext = resolveLocalAuraContext(options)
-    local level = getProfileLevel()
-    local weaponMultiplier = tonumber(getRulesetRuleValue("skills", "weapon_skill_level_multiplier", 5)) or 5
-    local rows = {}
+local function getSkillMetadataState(options)
+    local cacheKey = getSkillMetadataCacheKey(options)
+    if cacheKey ~= nil
+        and tostring(skillMetadataStateCache.key or "") == cacheKey
+        and type(skillMetadataStateCache.state) == "table"
+    then
+        return skillMetadataStateCache.state
+    end
 
-    for index = 1, #entries do
-        local entry = entries[index]
-        local row = buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, permanentBonuses, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
+    local skillIndex = getActivatedSkillIndex()
+    local state = {
+        entries = skillIndex.entries,
+        byRef = skillIndex.byRef,
+        byWeaponTypeRef = skillIndex.byWeaponTypeRef,
+        storedLevels = buildProfileSkillLevelMap(),
+        level = getProfileLevel(),
+        weaponMultiplier = tonumber(getRulesetRuleValue("skills", "weapon_skill_level_multiplier", 5)) or 5,
+    }
+    if cacheKey ~= nil then
+        skillMetadataStateCache.key = cacheKey
+        skillMetadataStateCache.state = state
+    end
+    return state
+end
+
+local function buildResolvedSkillState(options)
+    local metadataState = getSkillMetadataState(options)
+    return {
+        entries = metadataState.entries,
+        byRef = metadataState.byRef,
+        storedLevels = metadataState.storedLevels,
+        permanentBonuses = buildProfileSkillPermanentBonusMap(),
+        itemBonuses = buildItemSkillBonusMap(),
+        traitBonuses = buildTraitSkillBonusMap(),
+        raceBonuses = buildOriginSkillBonusMap("races"),
+        classBonuses = buildOriginSkillBonusMap("classes"),
+        auraContext = resolveLocalAuraContext(options),
+        level = metadataState.level,
+        weaponMultiplier = metadataState.weaponMultiplier,
+        resolvedStatsByRef = nil,
+    }
+end
+
+local function getResolvedSkillState(options)
+    local cacheKey = getSkillResolutionCacheKey(options)
+    if cacheKey ~= nil
+        and tostring(resolvedSkillStateCache.key or "") == cacheKey
+        and type(resolvedSkillStateCache.state) == "table"
+    then
+        return resolvedSkillStateCache.state
+    end
+
+    local state = buildResolvedSkillState(options)
+    if cacheKey ~= nil then
+        resolvedSkillStateCache.key = cacheKey
+        resolvedSkillStateCache.state = state
+    end
+    return state
+end
+
+local function ensureResolvedSkillStats(state, options)
+    if state.resolvedStatsByRef == nil then
+        state.resolvedStatsByRef = buildResolvedStatsByRef(Resolver.ListResolvedStats(options))
+    end
+    return state.resolvedStatsByRef
+end
+
+local function buildSkillRows(entries, state, options, needsResolvedStats)
+    local resolvedStatsByRef = needsResolvedStats and ensureResolvedSkillStats(state, options) or state.resolvedStatsByRef
+    local rows = {}
+    for index = 1, #(entries or {}) do
+        local row = buildResolvedSkillRow(
+            entries[index],
+            resolvedStatsByRef,
+            state.storedLevels,
+            state.permanentBonuses,
+            state.itemBonuses,
+            state.traitBonuses,
+            state.raceBonuses,
+            state.classBonuses,
+            state.auraContext,
+            state.level,
+            state.weaponMultiplier
+        )
         if row then
             rows[#rows + 1] = row
         end
     end
+    return rows
+end
+
+local function sortResolvedSkillRows(rows)
 
     table.sort(rows, function(left, right)
         local leftOrder = SKILL_TYPE_ORDER[left.skillType] or 999
@@ -2372,27 +2530,80 @@ function Resolver.ListResolvedSkills(options)
     return rows
 end
 
+local function buildSkillMetadata(entry, storedLevels, level, weaponMultiplier)
+    local skill = entry and entry.skill or nil
+    local skillType = ensureString(skill and skill.skillType)
+    if type(skill) ~= "table" or not isSkillTypeEnabled(skillType) then
+        return nil
+    end
+
+    local maxValue
+    if skillType == "weapon" then
+        maxValue = math.max(0, math.floor((tonumber(level) or 0) * (tonumber(weaponMultiplier) or 0)))
+    else
+        maxValue = getFixedSkillCap(skillType)
+    end
+
+    local storedValue = math.max(0, math.floor(tonumber(storedLevels and storedLevels[entry.ref]) or 0))
+    return {
+        ref = entry.ref,
+        datasetId = entry.dataset and entry.dataset.id or nil,
+        skillId = skill.id,
+        name = ensureString(skill.name) ~= "" and ensureString(skill.name) or ensureString(skill.id),
+        skillType = skillType ~= "" and skillType or "noncombat",
+        weaponTypeRef = skillType == "weapon" and ensureString(skill.weaponTypeRef) or nil,
+        rollable = skill.rollable == true,
+        storedValue = storedValue,
+        maxValue = maxValue,
+        skill = skill,
+    }
+end
+
+function Resolver.GetSkillMetadataByRefs(skillRefs, options)
+    local requestedRefs = type(skillRefs) == "table" and skillRefs or {}
+    local state = getSkillMetadataState(options)
+    local metadata = {}
+    for index = 1, #requestedRefs do
+        local skillRef = ensureString(requestedRefs[index])
+        local entry = state.byRef[skillRef]
+        local row = entry and buildSkillMetadata(entry, state.storedLevels, state.level, state.weaponMultiplier) or nil
+        if row then
+            metadata[#metadata + 1] = row
+        end
+    end
+    return metadata
+end
+
+function Resolver.GetSkillMetadataByWeaponType(options)
+    local state = getSkillMetadataState(options)
+    local metadataByWeaponTypeRef = {}
+    for weaponTypeRef, entries in pairs(state.byWeaponTypeRef or {}) do
+        local bucket = {}
+        for index = 1, #entries do
+            local row = buildSkillMetadata(entries[index], state.storedLevels, state.level, state.weaponMultiplier)
+            if row then
+                bucket[#bucket + 1] = row
+            end
+        end
+        metadataByWeaponTypeRef[weaponTypeRef] = bucket
+    end
+    return metadataByWeaponTypeRef
+end
+
+function Resolver.ListResolvedSkills(options)
+    local state = getResolvedSkillState(options)
+    local rows = buildSkillRows(state.entries, state, options, true)
+    return sortResolvedSkillRows(rows)
+end
+
 function Resolver.GetResolvedSkillRowsByRefs(skillRefs, options)
     local requestedRefs = type(skillRefs) == "table" and skillRefs or {}
     local entries, needsResolvedStats = requestedSkillEntries(requestedRefs)
-    local resolvedStatsByRef = needsResolvedStats and buildResolvedStatsByRef(Resolver.ListResolvedStats(options)) or {}
-    local storedLevels = buildProfileSkillLevelMap()
-    local permanentBonuses = buildProfileSkillPermanentBonusMap()
-    local itemBonuses = buildItemSkillBonusMap()
-    local traitBonuses = buildTraitSkillBonusMap()
-    local raceBonuses = buildOriginSkillBonusMap("races")
-    local classBonuses = buildOriginSkillBonusMap("classes")
-    local auraContext = resolveLocalAuraContext(options)
-    local level = getProfileLevel()
-    local weaponMultiplier = tonumber(getRulesetRuleValue("skills", "weapon_skill_level_multiplier", 5)) or 5
+    local state = getResolvedSkillState(options)
+    local resolvedRows = buildSkillRows(entries, state, options, needsResolvedStats)
     local rowsByRef = {}
-
-    for index = 1, #entries do
-        local entry = entries[index]
-        local row = buildResolvedSkillRow(entry, resolvedStatsByRef, storedLevels, permanentBonuses, itemBonuses, traitBonuses, raceBonuses, classBonuses, auraContext, level, weaponMultiplier)
-        if row then
-            rowsByRef[row.ref] = row
-        end
+    for index = 1, #resolvedRows do
+        rowsByRef[resolvedRows[index].ref] = resolvedRows[index]
     end
 
     local resolved = {}

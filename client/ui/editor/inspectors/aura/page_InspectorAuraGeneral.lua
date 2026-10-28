@@ -23,9 +23,6 @@ local function hasStoredAuraTooltipTemplate(aura)
 end
 
 local function logInternal(message, ...)
-    if type(Debug.SetLevelEnabled) == "function" and type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal") then
-        Debug.SetLevelEnabled("internal", true)
-    end
     if type(Debug.Internal) == "function" then
         Debug.Internal(message, ...)
     end
@@ -155,22 +152,23 @@ function DataEditor:BuildAuraInspectorGeneralPage(page)
     self.AuraInspectorTagsInput:SetScript("OnEditFocusLost", commitTags)
     root:AddChild(self.AuraInspectorTagsInput)
 
-    root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorPolarityLabel", "Polarity"))
-    self.AuraInspectorPolarityDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorAuraInspectorPolarityDropdown", {
+    root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorDispositionLabel", "Disposition"))
+    self.AuraInspectorDispositionDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorAuraInspectorDispositionDropdown", {
         width = self.AuraInspectorFieldWidth,
         height = 18,
-        items = self:GetAuraInspectorPolarityItems(),
+        items = self:GetAuraInspectorDispositionItems(),
         onValueChanged = function(value)
             if self._refreshingAuraInspector then
                 return
             end
 
             self:CommitSelectedAura(function(aura)
-                aura.polarity = (value == "helpful" or value == "harmful") and value or nil
+                aura.disposition = value
             end)
         end,
     })
-    root:AddChild(self.AuraInspectorPolarityDropdown)
+    self.AuraInspectorPolarityDropdown = self.AuraInspectorDispositionDropdown
+    root:AddChild(self.AuraInspectorDispositionDropdown)
 
     root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorTickTargetModeLabel", "Tick Target Mode"))
     self.AuraInspectorTickTargetModeDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorAuraInspectorTickTargetModeDropdown", {

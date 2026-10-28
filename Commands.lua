@@ -152,12 +152,13 @@ function Commands:Print(message, level, ...)
         return Debug.Warn(message, ...)
     end
 
-    if Debug.Info then
-        return Debug.Info(message, ...)
-    end
-
     local text = select("#", ...) > 0 and string.format(message, ...) or tostring(message)
-    print(text)
+    if DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function" then
+        DEFAULT_CHAT_FRAME:AddMessage(text)
+    elseif print then
+        print(text)
+    end
+    return true
 end
 
 function Commands:RegisterCommand(path, handler, options)
@@ -315,6 +316,30 @@ Commands:RegisterCommand({ "debug", "internal" }, function(context)
     return true
 end, {
     description = "Show or hide RPE INTERNAL messages. Use /rpe debug internal on or off.",
+})
+
+Commands:RegisterCommand({ "debug", "info" }, function(context)
+    local requestedState = context and context.args and context.args[1] or nil
+    local enabled = nil
+
+    if requestedState == "on" or requestedState == "1" or requestedState == "true" then
+        enabled = true
+    elseif requestedState == "off" or requestedState == "0" or requestedState == "false" then
+        enabled = false
+    elseif Debug.IsLevelEnabled then
+        enabled = not Debug.IsLevelEnabled("info")
+    else
+        enabled = true
+    end
+
+    if Debug.SetLevelEnabled then
+        Debug.SetLevelEnabled("info", enabled)
+    end
+
+    context.router:Print("Info debug messages %s.", nil, enabled and "shown" or "hidden")
+    return true
+end, {
+    description = "Show or hide INFO debug messages. Use /rpe debug info on or off.",
 })
 
 Commands:RegisterCommand({ "debug", "perf" }, function(context)

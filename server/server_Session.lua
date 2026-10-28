@@ -10,6 +10,7 @@ local Common = Addon.Utils.Common
 local Comms = Addon.Internal.Comms
 local Operations = Comms.Operations
 local Registry = Addon.Internal.Registry or {}
+local ItemTier = Addon.Internal.ItemTier or {}
 local ResourceSync = Comms.ResourceSync or {}
 local Debug = Addon.Debug or {}
 
@@ -22,6 +23,7 @@ local SERVER_STOP_OPCODE = Operations:GetOpcode("SERVER_STOP")
 local SERVER_QUERY_OPCODE = Operations:GetOpcode("SERVER_QUERY")
 local RESOURCE_DELTA_OPCODE = Operations:GetOpcode("RESOURCE_DELTA")
 local SKILL_ROLL_RESULT_OPCODE = Operations:GetOpcode("SKILL_ROLL_RESULT")
+local ITEM_GAIN_ANNOUNCEMENT_OPCODE = Operations:GetOpcode("ITEM_GAIN_ANNOUNCEMENT")
 local MAX_START_ATTEMPTS = 5
 local START_RETRY_DELAY = 1.5
 local THREAT_UPDATE_RECORD_SEPARATOR = string.char(30)
@@ -462,6 +464,81 @@ function Server:HandleSkillRollBroadcast(arguments, sender, distribution, target
     end
 
     return Comms:SendToChannel(state.channelId, SKILL_ROLL_RESULT_OPCODE, arguments, buildSendMetadata(SKILL_ROLL_RESULT_OPCODE))
+end
+
+local ITEM_GAIN_CATEGORIES = {
+    crafted = true,
+    received = true,
+    looted = true,
+}
+
+local function isSafeItemGainValue(value, maximumLength)
+    local text = tostring(value or "")
+    return text ~= ""
+        and #text <= maximumLength
+        and not text:find("|", 1, true)
+        and not text:find("%c")
+        and text:match("^[%w%._:%-]+$") ~= nil
+end
+
+local function validateItemGainRef(value)
+    local reference = tostring(value or "")
+    local datasetId, itemId = reference:match("^([^:]+):([^:]+)$")
+    if not datasetId or not itemId
+        or not isSafeItemGainValue(datasetId, 48)
+        or not isSafeItemGainValue(itemId, 96)
+    then
+        return nil
+    end
+    if type(Registry.ResolveItemReference) == "function" then
+        local ok, _, item = pcall(Registry.ResolveItemReference, Registry, reference)
+        if not ok or type(item) ~= "table" then
+            return nil
+        end
+    end
+    return reference
+end
+
+function Server:HandleItemGainReport(arguments, sender, distribution, target)
+    local state = self.State
+    local senderName = Common.NormalizeName(sender)
+    local claimedName = Common.NormalizeName(arguments and arguments[1] or nil)
+    local eventId = arguments and arguments[2] or nil
+    local itemRef = validateItemGainRef(arguments and arguments[3] or nil)
+    local itemTier
+    if type(ItemTier.Validate) == "function" then
+        itemTier = select(1, ItemTier.Validate(arguments and arguments[4] or nil))
+    elseif type(ItemTier.Normalize) == "function" then
+        itemTier = ItemTier.Normalize(arguments and arguments[4] or nil)
+    else
+        itemTier = tostring(arguments and arguments[4] or "normal")
+    end
+    local quantity = tonumber(arguments and arguments[5])
+    local category = tostring(arguments and arguments[6] or "")
+    if type(state) ~= "table" or state.active ~= true
+        or distribution ~= "CHANNEL"
+        or tonumber(target) ~= tonumber(state.channelId)
+        or senderName == "" or claimedName == "" or senderName ~= claimedName
+        or not state.clientsByName or state.clientsByName[senderName] == nil
+        or not isSafeItemGainValue(eventId, 128)
+        or not itemRef
+        or not itemTier
+        or quantity == nil or quantity < 1 or quantity > 1000000 or quantity ~= math.floor(quantity)
+        or not ITEM_GAIN_CATEGORIES[category]
+        or not ITEM_GAIN_ANNOUNCEMENT_OPCODE
+        or type(Comms.SendToChannel) ~= "function"
+    then
+        return false
+    end
+
+    return Comms:SendToChannel(state.channelId, ITEM_GAIN_ANNOUNCEMENT_OPCODE, {
+        senderName,
+        tostring(eventId),
+        itemRef,
+        itemTier,
+        quantity,
+        category,
+    }, buildSendMetadata(ITEM_GAIN_ANNOUNCEMENT_OPCODE))
 end
 
 function Server:HandleClientConnect(arguments, sender)

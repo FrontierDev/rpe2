@@ -217,9 +217,10 @@ function DataEditor:RefreshAuraInspectorPage()
         self.AuraInspectorTagsInput:SetText(UI.Utils.JoinCommaSeparatedList(aura and aura.tags or nil))
         self:SetAuraInspectorTextElementEnabled(self.AuraInspectorTagsInput, hasAura)
     end
-    if self.AuraInspectorPolarityDropdown then
-        self.AuraInspectorPolarityDropdown:SetSelectedValue(aura and aura.polarity or "", true)
-        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorPolarityDropdown, hasAura)
+    local dispositionDropdown = self.AuraInspectorDispositionDropdown or self.AuraInspectorPolarityDropdown
+    if dispositionDropdown then
+        dispositionDropdown:SetSelectedValue(aura and (aura.disposition or aura.polarity) or "auto", true)
+        self:SetAuraInspectorDropdownEnabled(dispositionDropdown, hasAura)
     end
     local tickTargetMode = aura and aura.tickTargetMode or "single"
     if self.AuraInspectorTickTargetModeDropdown then

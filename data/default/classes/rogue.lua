@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 35,
+    version = 37,
     dataset = {
         achievements = {},
         auras = {
@@ -38,7 +38,7 @@ Addon.Data.DefaultDatasets:Register({
                 duration = 3,
                 effects = {
                     {
-                        amount = 20,
+                        amount = 25,
                         amountMode = "flat",
                         resourceRef = "f82db71a:c3gaf7dd",
                         statScaling = {},
@@ -4186,7 +4186,7 @@ Addon.Data.DefaultDatasets:Register({
                     }
                 },
                 conditions = {},
-                cooldown = 10,
+                cooldown = 5,
                 cooldownGroup = "",
                 cooldownScalesWithHaste = false,
                 description = "",
@@ -4692,7 +4692,7 @@ Addon.Data.DefaultDatasets:Register({
                         effect = {
                             auraRef = "23d5dce2:8o3v4oj0",
                             basePower = 0,
-                            duration = 1,
+                            duration = 3,
                             stacks = 1,
                             targetEvents = {},
                             type = "apply_aura"
@@ -4735,7 +4735,7 @@ Addon.Data.DefaultDatasets:Register({
                             auraRef = "23d5dce2:8o3v4oj0",
                             datasetId = "23d5dce2",
                             descriptionText = "Restores {AURA_RESOURCE_GAIN_1} each turn.",
-                            duration = 1,
+                            duration = 3,
                             icon = "interface/icons/spell_shadow_shadowworddominate.blp",
                             nameText = "Adrenaline Rush",
                             powerLevel = 0,
@@ -4757,7 +4757,7 @@ Addon.Data.DefaultDatasets:Register({
                             }
                         }
                     },
-                    mainText = "Apply Adrenaline Rush to yourself for 1 turn.",
+                    mainText = "Apply Adrenaline Rush to yourself for 3 turns.",
                     tokens = {},
                     version = 1
                 },

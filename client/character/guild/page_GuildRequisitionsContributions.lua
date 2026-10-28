@@ -203,6 +203,8 @@ end
 local function awardConcreteRewards(rewards)
     local inventory = inventoryService()
     local transaction = newRewardTransaction()
+    Guild._itemGainSequence = (tonumber(Guild._itemGainSequence) or 0) + 1
+    local awardSequence = Guild._itemGainSequence
     local currencySnapshots = {}
     for index = 1, #(rewards or {}) do
         local reward = rewards[index]
@@ -225,12 +227,28 @@ local function awardConcreteRewards(rewards)
             end
             local itemTier = normalizeItemTier(reward.itemTier)
             local before = inventoryQuantity(inventory, datasetId, itemId, itemTier)
-            local ok, record = pcall(inventory.AddItem, { dataset = datasetId, id = itemId, itemTier = itemTier, quantity = reward.amount })
+            local eventId = ("guild-requisition-loot:%d:%d"):format(awardSequence, index)
+            local ok, record = pcall(inventory.AddItem, {
+                dataset = datasetId,
+                id = itemId,
+                itemTier = itemTier,
+                quantity = reward.amount,
+            }, {
+                source = "other-reward",
+                suppressLootNotification = true,
+                eventId = eventId,
+            })
             local after = inventoryQuantity(inventory, datasetId, itemId, itemTier)
             local measured = before ~= nil and after ~= nil
             local awarded = measured and math.max(0, after - before) or reward.amount
             if awarded > 0 and ((ok and record) or measured) then
-                transaction.itemAwards[#transaction.itemAwards + 1] = { datasetId = datasetId, itemId = itemId, itemTier = itemTier, amount = awarded }
+                transaction.itemAwards[#transaction.itemAwards + 1] = {
+                    datasetId = datasetId,
+                    itemId = itemId,
+                    itemTier = itemTier,
+                    amount = awarded,
+                    eventId = eventId,
+                }
             end
             if not ok or not record or (measured and awarded < reward.amount) then
                 return false, transaction:Rollback() and "item-award-failed" or "rollback-failed", transaction
@@ -446,6 +464,19 @@ function Guild:TryRequisition(guildSettingRef, requisitionId)
         end
     end
 
+    local lootNotifications = Client.LootNotifications
+    if lootNotifications and type(lootNotifications.PublishCommittedItemGain) == "function" then
+        for index = 1, #(rewardTransaction.itemAwards or {}) do
+            local award = rewardTransaction.itemAwards[index]
+            lootNotifications:PublishCommittedItemGain(
+                ("%s:%s"):format(tostring(award.datasetId or ""), tostring(award.itemId or "")),
+                award.amount,
+                award.itemTier,
+                "other-reward",
+                award.eventId
+            )
+        end
+    end
     pcall(self.RefreshWindow, self)
     return true, "ok", {
         guildSettingRef = detail.settingRef,

@@ -23,11 +23,16 @@ Debug.Levels = Debug.Levels or {
 }
 
 Debug.EnabledLevels = Debug.EnabledLevels or {
-    info = true,
+    info = false,
     warn = true,
     error = true,
     internal = false,
 }
+-- INFO is developer diagnostics, not a gameplay notification channel.  Do not
+-- retain the historical default across reloads; it must be enabled deliberately.
+Debug.EnabledLevels.info = false
+Debug.EnabledLevels.warn = true
+Debug.EnabledLevels.error = true
 
 Debug.CommsTracing = Debug.CommsTracing == true
 Debug.ResourceTracing = Debug.ResourceTracing == true

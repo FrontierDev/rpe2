@@ -5,7 +5,6 @@ Addon.Internal = Addon.Internal or {}
 Addon.Utils = Addon.Utils or {}
 
 local Client = Addon.Client
-local Debug = Addon.Debug or {}
 local Common = Addon.Utils.Common or {}
 local Lookup = Addon.Utils.Lookup or {}
 local Registry = Addon.Internal.Registry or {}
@@ -106,11 +105,16 @@ local function resolveSpellName(spellRef)
     return type(spellRef) == "string" and spellRef or "unknown-spell"
 end
 
-local function emitTargetingInfo(message, ...)
-    if Debug and Debug.Info then
-        return Debug.Info(message, ...)
+local function emitTargetingError(message)
+    local text = tostring(message or "Targeting failed.")
+    if UIErrorsFrame and type(UIErrorsFrame.AddMessage) == "function" then
+        UIErrorsFrame:AddMessage(text, 1, 0.2, 0.2, 1)
+        return true
     end
-
+    if DEFAULT_CHAT_FRAME and type(DEFAULT_CHAT_FRAME.AddMessage) == "function" then
+        DEFAULT_CHAT_FRAME:AddMessage(text, 1, 0.2, 0.2)
+        return true
+    end
     return false
 end
 
@@ -989,9 +993,6 @@ function Client:CancelSpellTargeting(reason)
         self:HideTargetingWidget()
     end
 
-    if reason and reason ~= "" then
-        emitTargetingInfo("Targeting cancelled: %s.", tostring(reason))
-    end
     return true
 end
 
@@ -1663,11 +1664,10 @@ function Client:ActivateSpellReference(spellRef, options)
             and group.policy
             and (group.policy.requiresTarget == true or targetType == "all_allies")
         then
-            emitTargetingInfo(
-                "No valid %s targets for %s.",
+            emitTargetingError(("No valid %s targets for %s."):format(
                 string.lower(tostring(group.label or "target")),
                 tostring(resolveSpellName(spellRef))
-            )
+            ))
             return false, "cast-rejected"
         end
         if #candidates > 0 or targetType == "all_allies" then

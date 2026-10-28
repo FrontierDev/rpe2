@@ -339,6 +339,25 @@ local function resolveAmount(options, effect, baseField)
     return math.floor((tonumber(amount) or 0) + 0.5)
 end
 
+-- Percentage tooltip tokens need the scaled percentage itself, rather than the
+-- resource amount produced after that percentage is applied. Reuse the Aura
+-- resolver with a flat display copy so power, stat, rank, and stack scaling
+-- remain exactly aligned with effect execution.
+local function resolveScaledAmount(options, effect, baseField)
+    local auraManager = Spellcasting.AuraManager or nil
+    if type(auraManager) ~= "table" or type(auraManager.ResolveEffectAmount) ~= "function" then
+        return 0
+    end
+
+    local displayEffect = {}
+    for key, value in pairs(type(effect) == "table" and effect or {}) do
+        displayEffect[key] = value
+    end
+    displayEffect.amountMode = "flat"
+
+    return tonumber(auraManager:ResolveEffectAmount(buildAuraEffectContext(options), displayEffect, baseField)) or 0
+end
+
 local function resolveAuraThreatDescription(auraDefinition)
     local hasHighThreat = false
     local hasModerateThreat = false
@@ -1414,11 +1433,12 @@ local function resolveAuraTemplateToken(auraDefinition, token, options)
         local numericAmount = math.abs(amount)
         if applyMode == "damage_amount" or applyMode == "heal_amount" or applyMode == "absorb_amount" then
             local amountMode = tostring(effect.amountMode or "flat")
+            local scaledAmount = math.abs(resolveScaledAmount(options, effect, tostring(token.baseField or "baseAmount")))
             if amountMode == "base_percent" then
-                return ("%g%% of Base"):format(math.abs(tonumber(effect[token.baseField or "baseAmount"]) or 0))
+                return ("%g%% of Base"):format(scaledAmount)
             end
             if amountMode == "max_percent" then
-                return ("%g%% of Max"):format(math.abs(tonumber(effect[token.baseField or "baseAmount"]) or 0))
+                return ("%g%% of Max"):format(scaledAmount)
             end
             return tostring(math.floor(numericAmount))
         end
@@ -1436,15 +1456,15 @@ local function resolveAuraTemplateToken(auraDefinition, token, options)
     end
 
     if applyMode == "resource_gain_amount" or applyMode == "resource_loss_amount" then
-        local amount = tonumber(effect.amount) or 0
+        local amount = resolveScaledAmount(options, effect, "amount")
         local amountMode = tostring(effect.amountMode or "flat")
         local resourceName = resolveResourceName(effect.resourceRef)
         if applyMode == "resource_gain_amount" then
             if amountMode == "base_percent" then
-                return ("%g%% of Base %s"):format(math.abs(tonumber(effect.amount) or 0), resourceName)
+                return ("%g%% of Base %s"):format(math.abs(amount), resourceName)
             end
             if amountMode == "max_percent" then
-                return ("%g%% of Max %s"):format(math.abs(tonumber(effect.amount) or 0), resourceName)
+                return ("%g%% of Max %s"):format(math.abs(amount), resourceName)
             end
             return ("%d %s"):format(math.floor(amount), resourceName)
         end

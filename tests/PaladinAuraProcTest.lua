@@ -171,7 +171,7 @@ assertEqual(firstAuraEffect(sealOfLight).statScaling[1].statRef, "f82db71a:hj6d4
 assertEqual(firstAuraEffect(sealOfLight).statScaling[1].coefficient, 0.1, "Seal of Light Healing Power coefficient")
 assertEqual(firstAuraEffect(sealOfWisdom).scaleWithRank, false, "Seal of Wisdom disables Aura rank scaling")
 assertEqual(firstAuraEffect(sealOfWisdom).statScaling[1].statRef, "f82db71a:u7b49vs9", "Seal of Wisdom scales with Spell Power")
-assertEqual(firstAuraEffect(sealOfWisdom).statScaling[1].coefficient, 0.1, "Seal of Wisdom Spell Power coefficient")
+assertEqual(firstAuraEffect(sealOfWisdom).statScaling[1].coefficient, 0.01, "Seal of Wisdom Spell Power coefficient")
 assertEqual(firstAuraEffect(judgementOfLight).scaleWithRank, false, "Judgement of Light disables Aura rank scaling")
 assertEqual(firstAuraEffect(judgementOfWise).scaleWithRank, false, "Judgement of the Wise disables Aura rank scaling")
 assertEqual(sealOfLight.events[1].triggerTarget, "aura_caster", "Seal of Light heals its wearer")
@@ -191,9 +191,11 @@ end
 assertEqual(judgementDirectResource.amount, 10, "Judgement of Wisdom restores 10% base mana")
 assertEqual(judgementDirectResource.amountMode, "base_percent", "Judgement of Wisdom uses base mana")
 assertEqual(judgementDirectResource.statScaling[1].statRef, "f82db71a:u7b49vs9", "Judgement of Wisdom scales with Spell Power")
-assertEqual(judgementDirectResource.statScaling[1].coefficient, 0.1, "Judgement of Wisdom Spell Power coefficient")
-assertTrue(string.find(judgementOfWisdom.tooltipTemplateData.mainText, "Restore 10% of Base Mana", 1, true) ~= nil,
-    "Judgement of Wisdom tooltip states 10% base mana")
+assertEqual(judgementDirectResource.statScaling[1].coefficient, 0.01, "Judgement of Wisdom Spell Power coefficient")
+assertTrue(string.find(judgementOfWisdom.tooltipTemplateData.mainText, "{RESOURCE_1}", 1, true) ~= nil,
+    "Judgement of Wisdom tooltip uses a dynamic resource token")
+assertEqual(#sealOfLight.tooltipTemplateData.bodyTokens, 1, "Seal of Light Aura tooltip uses an amount token")
+assertEqual(#sealOfWisdom.tooltipTemplateData.bodyTokens, 1, "Seal of Wisdom Aura tooltip uses an amount token")
 
 local function newUnit(eventID, name, healthCurrent, healthMax, manaCurrent, manaMax)
     return {
@@ -247,9 +249,9 @@ assertEqual(sealLightResult.resourceDeltas[1].resourceRef, healthRef, "Seal of L
 assertEqual(paladin.resources[2].currentValue, 940, "Seal of Light heals the wearer")
 
 local _, sealWisdomResult = executeAuraEffect(sealOfWisdom, paladin, paladin, eventState)
-assertEqual(sealWisdomResult.amount, 100, "Seal of Wisdom uses wearer max mana and Spell Power without rank scaling")
+assertEqual(sealWisdomResult.amount, 64, "Seal of Wisdom uses wearer max mana and Spell Power without rank scaling")
 assertEqual(sealWisdomResult.resourceDeltas[1].resourceRef, manaRef, "Seal of Wisdom targets mana")
-assertEqual(paladin.resources[1].currentValue, 500, "Seal of Wisdom restores the wearer")
+assertEqual(paladin.resources[1].currentValue, 464, "Seal of Wisdom restores the wearer")
 
 local _, judgementLightResult = executeAuraEffect(judgementOfLight, paladin, enemy, eventState)
 assertEqual(judgementLightResult.amount, 20, "Judgement of Light uses attacker max health")
@@ -257,7 +259,7 @@ assertEqual(paladin.resources[2].currentValue, 960, "Judgement of Light heals th
 
 local _, judgementWiseResult = executeAuraEffect(judgementOfWise, paladin, enemy, eventState)
 assertEqual(judgementWiseResult.amount, 40, "Judgement of the Wise uses attacker max mana")
-assertEqual(paladin.resources[1].currentValue, 540, "Judgement of the Wise restores the attacker")
+assertEqual(paladin.resources[1].currentValue, 504, "Judgement of the Wise restores the attacker")
 
 local directApplied, directResult = AuraManager:GetEffect("resource").Execute(AuraManager, {
     client = Client,
@@ -266,8 +268,8 @@ local directApplied, directResult = AuraManager:GetEffect("resource").Execute(Au
     targetUnit = paladin,
 }, judgementDirectResource)
 assertTrue(directApplied, "Judgement of Wisdom direct mana effect applies")
-assertEqual(directResult.amount, 48, "Judgement of Wisdom uses base mana and Spell Power rather than max mana")
-assertEqual(paladin.resources[1].currentValue, 588, "Judgement of Wisdom restores 10% of base mana with Spell Power scaling")
+assertEqual(directResult.amount, 41, "Judgement of Wisdom uses base mana and Spell Power rather than max mana")
+assertEqual(paladin.resources[1].currentValue, 545, "Judgement of Wisdom restores 10% of base mana with Spell Power scaling")
 
 local unsupportedTarget = newUnit(3, "Controlled NPC", 900, 1000, 100, 1000)
 unsupportedTarget.isPlayer = false

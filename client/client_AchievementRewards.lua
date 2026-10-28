@@ -718,6 +718,10 @@ local function executeRewardPlan(achievementRef, state, plan)
                 dataset = reward.datasetId,
                 id = reward.itemId,
                 quantity = reward.amount,
+            }, {
+                source = "other-reward",
+                suppressLootNotification = true,
+                eventId = ("achievement:%s:%d"):format(tostring(achievementRef), index),
             })
             local addedVariant = normalizeInventoryRecord(addedRecord)
             local afterVariants = getInventoryItemVariants(
@@ -816,6 +820,22 @@ local function executeRewardPlan(achievementRef, state, plan)
 
     local success, reason, result = finishSuccessfulTransaction(achievementRef, state, plan)
     if success then
+        local lootNotifications = Client.LootNotifications
+        if lootNotifications and type(lootNotifications.PublishCommittedItemGain) == "function" then
+            for index = 1, #(transaction.itemAwards or {}) do
+                local award = transaction.itemAwards[index]
+                local variant = award and award.variant
+                if type(variant) == "table" then
+                    lootNotifications:PublishCommittedItemGain(
+                        ("%s:%s"):format(tostring(variant.dataset or ""), tostring(variant.id or "")),
+                        award.amount,
+                        variant.itemTier,
+                        "other-reward",
+                        ("achievement:%s:%d"):format(tostring(achievementRef), index)
+                    )
+                end
+            end
+        end
         return success, reason, result
     end
 

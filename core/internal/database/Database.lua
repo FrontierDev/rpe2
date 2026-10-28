@@ -4299,9 +4299,28 @@ function Database.SetProfileSkillLevel(skillRef, value)
 
     local profile = Database.GetOrCreateActiveProfile()
     profile.skillLevels = normalizeProfileSkillLevels(profile.skillLevels)
-    profile.skillLevels[normalizedSkillRef] = math.max(0, math.floor(tonumber(value) or 0))
-    notifyConfigurationChanged("profile-skills")
-    return profile.skillLevels[normalizedSkillRef]
+    local previousLevel = math.max(0, math.floor(tonumber(profile.skillLevels[normalizedSkillRef]) or 0))
+    local updatedLevel = math.max(0, math.floor(tonumber(value) or 0))
+    if previousLevel == updatedLevel then
+        return updatedLevel
+    end
+
+    local timer = startTiming("Database:SetProfileSkillLevel", 4, {
+        skillRef = normalizedSkillRef,
+        previousLevel = previousLevel,
+        updatedLevel = updatedLevel,
+    })
+    local result = runProfileRuntimeMutation(
+        "profile-skill",
+        "profile.skills",
+        { [normalizedSkillRef] = true },
+        function()
+            profile.skillLevels[normalizedSkillRef] = updatedLevel
+            return updatedLevel, true
+        end
+    )
+    stopTiming(timer)
+    return result
 end
 
 function Database.ClearProfileSkillLevel(skillRef)

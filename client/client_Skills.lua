@@ -564,7 +564,7 @@ function Client:RollSkill(skillRef, options)
         return nil, "missing-event-unit"
     end
 
-    local modifier, modifierError = resolveSkillModifier(normalizedSkillRef, skill, eventState, eventUnit)
+    local modifier, modifierError, resolvedRow = resolveSkillModifier(normalizedSkillRef, skill, eventState, eventUnit)
     if modifier == nil then
         return nil, modifierError or "unresolved-modifier"
     end
@@ -605,7 +605,8 @@ function Client:RollSkill(skillRef, options)
             normalizedSkillRef,
             "noncombat-roll",
             progression:GetRulesetChance("noncombat_skill_gain_chance_on_roll", 0),
-            options
+            options,
+            resolvedRow
         )
     end
     return result

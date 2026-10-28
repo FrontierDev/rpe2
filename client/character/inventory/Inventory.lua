@@ -49,6 +49,7 @@ Inventory.RuntimeByCharacter = Inventory.RuntimeByCharacter or {}
 Inventory._fallbackRevision = tonumber(Inventory._fallbackRevision) or 0
 Inventory.ItemDefinitionIndexCache = Inventory.ItemDefinitionIndexCache or {}
 Inventory.ItemDefinitionIndexRevision = tonumber(Inventory.ItemDefinitionIndexRevision) or -1
+Inventory._nextGainEventId = tonumber(Inventory._nextGainEventId) or 0
 
 local function ensureTable(value)
     if type(value) == "table" then
@@ -1062,6 +1063,13 @@ local function addItemInternal(normalized, itemDefinition, options)
     end
 
     state.itemCount = #items
+    Inventory._nextGainEventId = Inventory._nextGainEventId + 1
+    local source = type(options) == "table" and tostring(options.source or "inventory-add") or "inventory-add"
+    local eventId = type(options) == "table" and options.eventId or nil
+    if eventId == nil or tostring(eventId) == "" then
+        eventId = ("inventory:%d"):format(Inventory._nextGainEventId)
+    end
+
     markInventoryMutation("add", {
         dataset = normalized.dataset,
         itemId = normalized.id,
@@ -1073,7 +1081,9 @@ local function addItemInternal(normalized, itemDefinition, options)
         addedRefs = { getItemRef(normalized.dataset, normalized.id) },
         slots = affectedSlots,
         addedStackCount = addedStackCount,
-        source = type(options) == "table" and tostring(options.source or "inventory-add") or "inventory-add",
+        source = source,
+        eventId = tostring(eventId),
+        deliveryId = type(options) == "table" and options.deliveryId or nil,
         suppressLootNotification = type(options) == "table" and options.suppressLootNotification == true,
     }, CANONICAL_ADD_NOTIFICATION)
 

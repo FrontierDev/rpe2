@@ -50,9 +50,6 @@ local function hasStoredSpellTooltipTemplate(spell)
 end
 
 local function logInternal(message, ...)
-    if type(Debug.SetLevelEnabled) == "function" and type(Debug.IsLevelEnabled) == "function" and not Debug.IsLevelEnabled("internal") then
-        Debug.SetLevelEnabled("internal", true)
-    end
     if type(Debug.Internal) == "function" then
         Debug.Internal(message, ...)
     end
