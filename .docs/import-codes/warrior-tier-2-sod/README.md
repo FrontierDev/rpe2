@@ -1,6 +1,6 @@
 # Season of Discovery Warrior Tier 2 — RPE Import Codes
 
-This folder contains standalone RPE dataset-entry import codes for all 16 Warrior Tier 2 **Draconic** pieces from Season of Discovery:
+This folder contains standalone RPE dataset-entry import codes for all 16 Warrior Tier 2 **Draconic** pieces from Season of Discovery, plus two separate Item Set bonus entries:
 
 - **Unstoppable Wrath** — melee DPS, 8 pieces.
 - **Immoveable Wrath** — tank, 8 pieces.
@@ -20,10 +20,20 @@ The codes target the Warrior dataset `sb4b9ef3`, use the current `RPE_DATASET_EN
 - Tank Defense bonuses map directly to RPE **Defense Rating**.
 - The source Draconic tank pieces used here do not carry Shield Block Value, so no Block Chance approximation is required.
 
+## Item Set bonuses
+
+The 8-piece armor sets each unlock **2-, 4-, and 6-piece** bonuses (there is no SoD 8-piece bonus). The two Item Set entries below match the existing armor `itemSetKey` values. They are **not armor pieces** and must be imported once each into the same Warrior dataset.
+
+These bonuses are **functional RPE adaptations** rather than exact copies of SoD spell mechanics. In particular, the current Item Set event model cannot filter by a specific triggering spell, reset spell cooldowns, support three-swing attack-speed Flurry, or enforce per-target 30-second retaliation cooldowns. The adaptation and original source effects are documented beside each code block.
+
+**Compatibility:** The `dev` branch's game runtime does not yet contain the `itemSets` collection/import support present on `main`. These import codes use the supported `itemSets` schema from `main`; merging that implementation into `dev` (or importing into an equivalent build) is required before the codes will run. Do not mistake adding these documentation files for adding runtime support.
+
 ## Files
 
-- `unstoppable-wrath-dps.md`
-- `immoveable-wrath-tank.md`
+- `unstoppable-wrath-dps.md` — eight DPS armor pieces
+- `immoveable-wrath-tank.md` — eight tank armor pieces
+- `unstoppable-wrath-set-bonuses.md` — **one DPS Item Set import**
+- `immoveable-wrath-set-bonuses.md` — **one tank Item Set import**
 
 ## Reference sources
 
