@@ -56,6 +56,29 @@ local function normalizePositiveIntegerOrNil(value)
     return nil
 end
 
+local function normalizeAuraDuration(value, fallback)
+    local numericValue = tonumber(value)
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
+        numericValue = tonumber(fallback) or 1
+    end
+
+    if numericValue == 0 then
+        return 0
+    end
+
+    local normalized = math.floor(numericValue)
+    if normalized < 1 then
+        return math.max(1, math.floor(tonumber(fallback) or 1))
+    end
+
+    return normalized
+end
+
 local function normalizeCooldownChannelId(value)
     local numeric = tonumber(value)
     if numeric == nil
@@ -584,6 +607,7 @@ local function buildDefaultEffect(effectType)
             amount = 0,
             amountMode = "flat",
             scaleWithRank = false,
+            statScaling = {},
             targetEvents = {},
         }
     end
@@ -652,7 +676,7 @@ local function normalizeEffect(value)
     if effect.type == "apply_aura" then
         effect.auraRef = normalizeRef(data.auraRef)
         effect.stacks = math.max(1, math.floor(tonumber(data.stacks) or 1))
-        effect.duration = tonumber(data.duration) or 12
+        effect.duration = normalizeAuraDuration(data.duration, 12)
         effect.basePower = tonumber(data.basePower) or 0
         effect.targetEvents = normalizeEventList(data.targetEvents)
         return effect
@@ -710,6 +734,7 @@ local function normalizeEffect(value)
     effect.amountMode = normalizeResourceCostAmountMode(data.amountMode)
     if effect.type == "resource" then
         effect.scaleWithRank = normalizeBool(data.scaleWithRank, false)
+        effect.statScaling = normalizeStatScaling(data.statScaling)
     end
     effect.targetEvents = normalizeEventList(data.targetEvents)
     return effect

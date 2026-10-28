@@ -35,6 +35,20 @@ local function normalizePositiveInteger(value)
     return numeric > 0 and numeric or nil
 end
 
+local function normalizeAuraDuration(value)
+    local numeric = tonumber(value)
+    if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge then
+        return nil
+    end
+    if numeric == 0 then
+        return 0
+    end
+    if numeric < 0 or numeric ~= math.floor(numeric) then
+        return nil
+    end
+    return numeric
+end
+
 local function normalizeNonNegativeNumber(value)
     local numeric = tonumber(value)
     if numeric == nil or numeric ~= numeric or numeric == math.huge or numeric == -math.huge or numeric < 0 then
@@ -260,7 +274,7 @@ local function serializeAuraRecord(entry)
         math.floor(tonumber(entry and entry.targetEventId) or 0),
         tostring(entry and entry.auraRef or ""),
         math.max(1, math.floor(tonumber(entry and entry.stacks) or 1)),
-        math.max(1, math.floor(tonumber(entry and entry.turnsRemaining) or 1)),
+        normalizeAuraDuration(entry and entry.turnsRemaining) or 1,
         tonumber(entry and entry.powerLevel) or 0,
         normalizeNonNegativeNumber(entry and entry.rankMultiplier) or 1,
         serializeAuraRuntimeStates(entry and entry.effectState),
@@ -284,7 +298,7 @@ local function deserializeAuraRecord(payload)
         targetEventId = targetEventId,
         auraRef = auraRef,
         stacks = math.max(1, math.floor(tonumber(fields[4]) or 1)),
-        turnsRemaining = math.max(1, math.floor(tonumber(fields[5]) or 1)),
+        turnsRemaining = normalizeAuraDuration(fields[5]) or 1,
         powerLevel = tonumber(fields[6]) or 0,
         rankMultiplier = #fields >= 8 and (normalizeNonNegativeNumber(fields[7]) or 1) or 1,
         effectState = deserializeAuraRuntimeStates(runtimeStateField) or {},

@@ -102,6 +102,28 @@ local markDescription = Addon.Client.Spellcasting.AuraDescriptionBuilder:BuildGe
 assertTrue(markDescription:find("2%% of Max", 1, false) ~= nil, "Mark of Blood matches Judgement of the Light healing")
 assertTrue(markDescription:find("0%% of Max", 1, false) == nil, "Mark of Blood does not render zero percentage healing")
 
+local areaAuraSection = Addon.Client.Spellcasting.AuraDescriptionBuilder:BuildTooltipSection("area", {
+    datasetId = "test",
+    dataset = {
+        id = "test",
+        auras = {
+            {
+                id = "area",
+                name = "Area Aura",
+                description = "Applies a periodic effect.",
+                effects = {},
+                tickTargetMode = "nearby_players",
+                tickRadiusYards = 12,
+            },
+        },
+    },
+})
+assertTrue(areaAuraSection ~= nil, "area tick Aura tooltip section is generated")
+assertTrue(areaAuraSection.descriptionText:find("nearby players within 12 yards", 1, true) ~= nil,
+    "area tick Aura tooltip describes its player radius")
+assertTrue(areaAuraSection.descriptionText:find("active raid%-marker group", 1, false) ~= nil,
+    "area tick Aura tooltip describes its NPC marker group")
+
 local equipmentRevision = 1
 local equippedCount = 1
 local itemSet = {

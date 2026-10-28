@@ -7,6 +7,7 @@ Addon.Client.UI.Editor = Addon.Client.UI.Editor or {}
 local DataEditor = Addon.Client.UI.Editor
 local UI = Addon.UI or {}
 local TooltipTemplate = Addon.Client and Addon.Client.Spellcasting and Addon.Client.Spellcasting.TooltipTemplate or nil
+local AuraClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Aura or nil
 
 local function hasStoredAuraTooltipTemplate(aura)
     if type(aura) ~= "table" then
@@ -216,9 +217,39 @@ function DataEditor:RefreshAuraInspectorPage()
         self.AuraInspectorTagsInput:SetText(UI.Utils.JoinCommaSeparatedList(aura and aura.tags or nil))
         self:SetAuraInspectorTextElementEnabled(self.AuraInspectorTagsInput, hasAura)
     end
+    if self.AuraInspectorPolarityDropdown then
+        self.AuraInspectorPolarityDropdown:SetSelectedValue(aura and aura.polarity or "", true)
+        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorPolarityDropdown, hasAura)
+    end
+    local tickTargetMode = aura and aura.tickTargetMode or "single"
+    if self.AuraInspectorTickTargetModeDropdown then
+        self.AuraInspectorTickTargetModeDropdown:SetSelectedValue(tickTargetMode, true)
+        self:SetAuraInspectorDropdownEnabled(self.AuraInspectorTickTargetModeDropdown, hasAura)
+    end
+    if self.AuraInspectorTickRadiusInput then
+        self.AuraInspectorTickRadiusInput:SetText(aura and aura.tickRadiusYards and tostring(aura.tickRadiusYards) or "")
+        self:SetAuraInspectorTextElementEnabled(self.AuraInspectorTickRadiusInput, hasAura and tickTargetMode == "nearby_players")
+    end
+    if self.AuraInspectorTickValidationText then
+        local validation = aura and AuraClass and AuraClass.New and AuraClass:New(aura):Validate() or nil
+        local tickError = ""
+        if validation and validation.valid ~= true then
+            for index = 1, #(validation.errors or {}) do
+                if tostring(validation.errors[index]):find("tick", 1, true) then
+                    tickError = tostring(validation.errors[index])
+                    break
+                end
+            end
+        end
+        self.AuraInspectorTickValidationText:SetText(tickError ~= "" and ("Warning: " .. tickError) or "")
+    end
     if self.AuraInspectorDurationInput then
         self.AuraInspectorDurationInput:SetText(tostring(aura and aura.duration or 1))
-        self:SetAuraInspectorTextElementEnabled(self.AuraInspectorDurationInput, hasAura)
+        self:SetAuraInspectorTextElementEnabled(self.AuraInspectorDurationInput, hasAura and tonumber(aura and aura.duration) ~= 0)
+    end
+    if self.AuraInspectorInfiniteDurationCheckbox then
+        self.AuraInspectorInfiniteDurationCheckbox:SetChecked(aura and tonumber(aura.duration) == 0 or false, true)
+        self:SetAuraInspectorCheckboxEnabled(self.AuraInspectorInfiniteDurationCheckbox, hasAura)
     end
     if self.AuraInspectorStackBehaviorDropdown then
         self.AuraInspectorStackBehaviorDropdown:SetSelectedValue(aura and aura.stackBehavior or "refresh_duration", true)
@@ -341,7 +372,11 @@ function DataEditor:RefreshAuraInspectorPage()
     end
     if self.AuraInspectorApplyAuraDurationInput then
         self.AuraInspectorApplyAuraDurationInput:SetText(tostring(effect and effect.duration or 12))
-        self:SetAuraInspectorTextElementEnabled(self.AuraInspectorApplyAuraDurationInput, effect ~= nil and isApplyAura)
+        self:SetAuraInspectorTextElementEnabled(self.AuraInspectorApplyAuraDurationInput, effect ~= nil and isApplyAura and tonumber(effect and effect.duration) ~= 0)
+    end
+    if self.AuraInspectorApplyAuraInfiniteDurationCheckbox then
+        self.AuraInspectorApplyAuraInfiniteDurationCheckbox:SetChecked(effect and isApplyAura and tonumber(effect.duration) == 0 or false, true)
+        self:SetAuraInspectorCheckboxEnabled(self.AuraInspectorApplyAuraInfiniteDurationCheckbox, effect ~= nil and isApplyAura)
     end
     if self.AuraInspectorBasePowerInput then
         self.AuraInspectorBasePowerInput:SetText(tostring(effect and effect.basePower or 0))
@@ -471,7 +506,11 @@ function DataEditor:RefreshAuraInspectorPage()
     end
     if self.AuraInspectorEventAuraDurationInput then
         self.AuraInspectorEventAuraDurationInput:SetText(tostring(eventEffect and eventEffect.duration or 12))
-        self:SetAuraInspectorTextElementEnabled(self.AuraInspectorEventAuraDurationInput, eventEffect ~= nil and isEventApplyAura)
+        self:SetAuraInspectorTextElementEnabled(self.AuraInspectorEventAuraDurationInput, eventEffect ~= nil and isEventApplyAura and tonumber(eventEffect and eventEffect.duration) ~= 0)
+    end
+    if self.AuraInspectorEventAuraInfiniteDurationCheckbox then
+        self.AuraInspectorEventAuraInfiniteDurationCheckbox:SetChecked(eventEffect and isEventApplyAura and tonumber(eventEffect.duration) == 0 or false, true)
+        self:SetAuraInspectorCheckboxEnabled(self.AuraInspectorEventAuraInfiniteDurationCheckbox, eventEffect ~= nil and isEventApplyAura)
     end
     if self.AuraInspectorEventBasePowerInput then
         self.AuraInspectorEventBasePowerInput:SetText(tostring(eventEffect and eventEffect.basePower or 0))

@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 61,
+    version = 69,
     dataset = {
         achievements = {},
         auras = {
@@ -260,7 +260,7 @@ Addon.Data.DefaultDatasets:Register({
                         damageSchoolRefs = {},
                         statScaling = {
                             {
-                                coefficient = 8,
+                                coefficient = 1,
                                 statRef = "f82db71a:ygjno50i"
                             }
                         },
@@ -286,6 +286,35 @@ Addon.Data.DefaultDatasets:Register({
                             tokenType = "aura_amount"
                         }
                     },
+                    stackingText = "",
+                    stackingTokens = {},
+                    version = 1
+                }
+            },
+            {
+                description = "Increases Damage Reduction by 3%.",
+                duration = 0,
+                effects = {
+                    {
+                        baseAmount = 3,
+                        operation = "flat",
+                        statRef = "f82db71a:pu05li08",
+                        statScaling = {},
+                        type = "stat"
+                    }
+                },
+                events = {},
+                icon = "interface/icons/spell_holy_devotionaura.blp",
+                id = "dvtaura1",
+                maxStacks = 1,
+                name = "Devotion Aura",
+                polarity = "helpful",
+                stackBehavior = "refresh_duration",
+                tags = {},
+                tooltipTemplate = true,
+                tooltipTemplateData = {
+                    bodyText = "Increases Damage Reduction by 3%.",
+                    bodyTokens = {},
                     stackingText = "",
                     stackingTokens = {},
                     version = 1
@@ -319,7 +348,7 @@ Addon.Data.DefaultDatasets:Register({
                     },
                     {
                         chance = 100,
-                        combatEventId = "on_melee_hit",
+                        combatEventId = "on_auto_attack_hit",
                         effects = {
                             {
                                 auraRef = "b0211ab3:fbar2e8d",
@@ -340,7 +369,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a melee attack, apply Righteous Indignation to yourself for 2 turns.",
+                    bodyText = "When the affected unit hits with a basic attack, the target takes {AURA_EVENT_DAMAGE_1} Holy damage. When the affected unit hits with a basic attack, apply Righteous Indignation to yourself for 2 turns.",
                     bodyTokens = {
                         {
                             applyMode = "damage_amount",
@@ -717,10 +746,11 @@ Addon.Data.DefaultDatasets:Register({
                             {
                                 amountMode = "max_percent",
                                 baseHealing = 3,
+                                scaleWithRank = false,
                                 statScaling = {
                                     {
                                         coefficient = 0.1,
-                                        statRef = "f82db71a:u7b49vs9"
+                                        statRef = "f82db71a:hj6d4kvy"
                                     }
                                 },
                                 type = "heal"
@@ -737,7 +767,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "When the affected unit hits with a basic attack, heal yourself for 3% of Max health.",
+                    bodyText = "When the affected unit hits with a basic attack, heal yourself for 3% of Max health, increased by 0.1% per Healing Power.",
                     bodyTokens = {},
                     stackingText = "",
                     stackingTokens = {},
@@ -757,6 +787,13 @@ Addon.Data.DefaultDatasets:Register({
                                 amount = 3,
                                 amountMode = "max_percent",
                                 resourceRef = "f82db71a:4c8mfm99",
+                                scaleWithRank = false,
+                                statScaling = {
+                                    {
+                                        coefficient = 0.1,
+                                        statRef = "f82db71a:u7b49vs9"
+                                    }
+                                },
                                 type = "resource"
                             }
                         },
@@ -771,7 +808,7 @@ Addon.Data.DefaultDatasets:Register({
                 tags = {},
                 tooltipTemplate = true,
                 tooltipTemplateData = {
-                    bodyText = "When the affected unit hits with a basic attack, restore 3% of Max Mana.",
+                    bodyText = "When the affected unit hits with a basic attack, restore 3% of Max Mana, increased by 0.1% per Spell Power.",
                     bodyTokens = {},
                     stackingText = "",
                     stackingTokens = {},
@@ -790,6 +827,7 @@ Addon.Data.DefaultDatasets:Register({
                             {
                                 amountMode = "max_percent",
                                 baseHealing = 2,
+                                scaleWithRank = false,
                                 statScaling = {},
                                 type = "heal"
                             }
@@ -825,6 +863,7 @@ Addon.Data.DefaultDatasets:Register({
                                 amount = 2,
                                 amountMode = "max_percent",
                                 resourceRef = "f82db71a:4c8mfm99",
+                                scaleWithRank = false,
                                 type = "resource"
                             }
                         },
@@ -1338,7 +1377,8 @@ Addon.Data.DefaultDatasets:Register({
                     "b0211ab3:prcpldn1",
                     "b0211ab3:dflctpal",
                     "b0211ab3:antcpal1",
-                    "b0211ab3:rdbttrait"
+                    "b0211ab3:rdbttrait",
+                    "b0211ab3:dvttrait"
                 }
             }
         },
@@ -8615,7 +8655,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:gw8r1b8l",
                             datasetId = "b0211ab3",
-                            descriptionText = "When the affected unit hits with a basic attack, heal yourself for 3% of Max health.",
+                            descriptionText = "When the affected unit hits with a basic attack, heal yourself for 3% of Max health, increased by 0.1% per Healing Power.",
                             duration = 3,
                             icon = "interface/icons/spell_holy_healingaura.blp",
                             nameText = "Seal of Light",
@@ -8658,6 +8698,12 @@ Addon.Data.DefaultDatasets:Register({
                             amount = 10,
                             amountMode = "base_percent",
                             resourceRef = "f82db71a:4c8mfm99",
+                            statScaling = {
+                                {
+                                    coefficient = 0.1,
+                                    statRef = "f82db71a:u7b49vs9"
+                                }
+                            },
                             targetEvents = {},
                             type = "resource"
                         },
@@ -8767,7 +8813,7 @@ Addon.Data.DefaultDatasets:Register({
                             tokens = {}
                         }
                     },
-                    mainText = "Restore 10% of Base Mana to yourself. Apply Judgement of the Wise to an enemy for 5 turns.",
+                    mainText = "Restore 10% of Base Mana to yourself, increased by 0.1% per Spell Power. Apply Judgement of the Wise to an enemy for 5 turns.",
                     tokens = {},
                     version = 1
                 },
@@ -8860,7 +8906,7 @@ Addon.Data.DefaultDatasets:Register({
                         {
                             auraRef = "b0211ab3:zwad020u",
                             datasetId = "b0211ab3",
-                            descriptionText = "When the affected unit hits with a basic attack, restore 3% of Max Mana.",
+                            descriptionText = "When the affected unit hits with a basic attack, restore 3% of Max Mana, increased by 0.1% per Spell Power.",
                             duration = 3,
                             icon = "interface/icons/spell_holy_righteousnessaura.blp",
                             nameText = "Seal of Wisdom",
@@ -9055,7 +9101,7 @@ Addon.Data.DefaultDatasets:Register({
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {
-                            alwaysHits = false,
+                            alwaysHits = true,
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
@@ -10125,7 +10171,7 @@ Addon.Data.DefaultDatasets:Register({
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {
-                            alwaysHits = false,
+                            alwaysHits = true,
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
@@ -11277,6 +11323,35 @@ Addon.Data.DefaultDatasets:Register({
                         value = -10
                     }
                 },
+                unlockLevel = 1
+            },
+            {
+                automaticAuras = {
+                    {
+                        auraRef = "b0211ab3:dvtaura1",
+                        powerLevel = 0,
+                        stacks = 1,
+                        targetScope = "self",
+                        turns = 0
+                    },
+                    {
+                        auraRef = "b0211ab3:dvtaura1",
+                        powerLevel = 0,
+                        stacks = 1,
+                        targetScope = "all_allies",
+                        turns = 0
+                    }
+                },
+                category = "Protection",
+                conditions = {},
+                description = "Grants the Paladin and all allies 3% Damage Reduction while this Trait is active.",
+                events = {},
+                icon = "interface/icons/spell_holy_devotionaura.blp",
+                id = "dvttrait",
+                isEnvironmental = false,
+                name = "Devotion Aura",
+                skillBonuses = {},
+                statBonuses = {},
                 unlockLevel = 1
             },
             {

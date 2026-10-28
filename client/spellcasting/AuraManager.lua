@@ -18,6 +18,8 @@ local Dependencies = Database.Dependecies or {}
 local Comms = Addon.Internal.Comms or {}
 local Operations = Comms.Operations or {}
 local AuraClass = Database.Classes and Database.Classes.Aura or nil
+local Event = Database.Classes and Database.Classes.Event or nil
+local Spatial = Client.AutopilotSpatial or {}
 
 local function getEventUnitDisplayName(unit, fallback)
     if type(unit) == "table" then
@@ -907,6 +909,13 @@ local function isAuraDefinitionHarmful(auraDefinition)
         return false
     end
 
+    local polarity = string.lower(tostring(auraDefinition.polarity or ""))
+    if polarity == "harmful" then
+        return true
+    elseif polarity == "helpful" then
+        return false
+    end
+
     local effectKeys = sortedNumericKeys(auraDefinition.effects)
     for index = 1, #effectKeys do
         local effect = auraDefinition.effects[effectKeys[index].key]
@@ -940,19 +949,63 @@ local function isBossUnit(unit)
 end
 
 local function normalizeTurnCount(turnCount)
-    if Spellcasting.NormalizeTurnCount then
-        local normalized = Spellcasting.NormalizeTurnCount(turnCount)
-        if normalized ~= nil then
-            return normalized
-        end
-    end
-
     local numericTurns = tonumber(turnCount)
-    if numericTurns == nil or numericTurns <= 0 then
+    if numericTurns == nil
+        or numericTurns ~= numericTurns
+        or numericTurns == math.huge
+        or numericTurns == -math.huge
+        or numericTurns < 0
+    then
         return nil
     end
 
+    if numericTurns == 0 then
+        return 0
+    end
+
+    if Spellcasting.NormalizeTurnCount then
+        local normalized = Spellcasting.NormalizeTurnCount(turnCount)
+        if normalized ~= nil and tonumber(normalized) and tonumber(normalized) > 0 then
+            return math.max(1, math.ceil(tonumber(normalized)))
+        end
+    end
+
     return math.max(1, math.ceil(numericTurns))
+end
+
+local function normalizeAuraDurationValue(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
+        return nil
+    end
+
+    if numericValue == 0 then
+        return 0
+    end
+
+    return math.max(1, math.floor(numericValue))
+end
+
+local function auraEntryHasInfiniteDuration(entry)
+    if type(entry) ~= "table" then
+        return false
+    end
+
+    if entry.stackBehavior == "independent_duration" and type(entry.stackTurns) == "table" then
+        for index = 1, #entry.stackTurns do
+            if tonumber(entry.stackTurns[index]) == 0 then
+                return true
+            end
+        end
+        return false
+    end
+
+    return tonumber(entry.turnsRemaining) == 0
 end
 
 local function normalizeAuraRankMultiplier(value)
@@ -1087,7 +1140,7 @@ local function normalizeAuraApplyEntry(entry)
         targetEventId = targetEventId,
         auraRef = auraRef,
         stacks = math.max(1, math.floor(tonumber(entry.stacks) or 1)),
-        turns = math.max(1, math.floor(tonumber(entry.turns or entry.turnsRemaining) or 1)),
+        turns = normalizeAuraDurationValue(entry.turns ~= nil and entry.turns or entry.turnsRemaining) or 1,
         powerLevel = tonumber(entry.powerLevel) or 0,
         rankMultiplier = normalizeAuraRankMultiplier(entry.rankMultiplier),
         fullState = entry.fullState == true or tostring(entry.fullState or "") == "1",
@@ -1378,6 +1431,11 @@ local function performAuraDisplayRefresh(reason, eventState, targetEventId, impa
     local numericTargetEventId = tonumber(targetEventId) or 0
     local localEventId = resolveLocalEventId(eventState)
     local affectsLocal = localEventId > 0 and localEventId == numericTargetEventId
+    local controlContext = type(Client.GetActionBarControlContext) == "function"
+        and Client:GetActionBarControlContext(eventState)
+        or nil
+    local activeActionBarEventId = tonumber(controlContext and controlContext.activeEventUnit and controlContext.activeEventUnit.eventID) or 0
+    local affectsActionBar = activeActionBarEventId > 0 and activeActionBarEventId == numericTargetEventId
 
     if numericTargetEventId > 0 then
         if type(Client.MarkEventWidgetPortraitsDirty) == "function" then
@@ -1405,6 +1463,14 @@ local function performAuraDisplayRefresh(reason, eventState, targetEventId, impa
         elseif type(Client.QueueTargetingWidgetRefresh) == "function" then
             Client:QueueTargetingWidgetRefresh(refreshReason)
         end
+        if type(Client.MarkActionBarCompanionBarsDirty) == "function" then
+            Client:MarkActionBarCompanionBarsDirty(refreshReason)
+        elseif type(Client.QueueActionBarCompanionBarsRefresh) == "function" then
+            Client:QueueActionBarCompanionBarsRefresh(refreshReason)
+        end
+    end
+
+    if affectsActionBar and not affectsLocal then
         if type(Client.MarkActionBarCompanionBarsDirty) == "function" then
             Client:MarkActionBarCompanionBarsDirty(refreshReason)
         elseif type(Client.QueueActionBarCompanionBarsRefresh) == "function" then
@@ -2010,6 +2076,28 @@ local function findEventUnit(eventState, eventId)
     return nil
 end
 
+local function isActiveAuraUnit(unit)
+    if type(Event) == "table" and type(Event.IsUnitActive) == "function" then
+        return Event.IsUnitActive(unit) == true
+    end
+
+    return type(unit) == "table" and unit.active ~= false
+end
+
+local function normalizeAuraTickRadius(value)
+    local radius = tonumber(value)
+    if radius == nil
+        or radius ~= radius
+        or radius == math.huge
+        or radius == -math.huge
+        or radius <= 0
+    then
+        return nil
+    end
+
+    return radius
+end
+
 local function cloneAuraTickerState(entry)
     if type(entry) ~= "table" then
         return nil
@@ -2389,20 +2477,49 @@ function AuraManager:ResolveEffectAmount(context, effect, baseField)
 
     local stacks = math.max(1, math.floor(tonumber(auraEntry and auraEntry.stacks) or 1))
 
-    -- Handle percentage modes
+    -- Handle percentage modes using the resource that owns the effect. Heal
+    -- effects receive the canonical health ref through their execution context;
+    -- they do not carry a resourceRef of their own.
     if amountMode == "base_percent" or amountMode == "max_percent" then
-        local resourceRef = tostring(effect.resourceRef or "")
+        local resourceRef = type(effect) == "table" and effect.type == "heal"
+            and tostring((type(context) == "table" and context.healthResourceRef) or "")
+            or tostring(effect and effect.resourceRef or "")
         local resourceValue = 0
 
-        if type(targetUnit) == "table" and targetUnit.resources ~= nil then
-            local resources = targetUnit.resources or {}
-            for index = 1, #resources do
-                local entry = resources[index]
-                if type(entry) == "table" and tostring(entry.ref or "") == resourceRef then
-                    resourceValue = tonumber(entry.maxValue) or tonumber(entry.currentValue) or 0
-                    break
-                end
+        if amountMode == "base_percent" then
+            local client = type(context) == "table" and context.client or Addon.Client
+            local eventState = type(context) == "table" and context.eventState or nil
+            local localUnit = type(client) == "table" and type(client.ResolveLocalEventUnit) == "function"
+                and client:ResolveLocalEventUnit(eventState)
+                or nil
+            local targetEventId = tonumber(type(targetUnit) == "table" and targetUnit.eventID or nil)
+            local localEventId = tonumber(type(localUnit) == "table" and localUnit.eventID or nil)
+            local isLocalPlayer = type(targetUnit) == "table"
+                and targetUnit.isPlayer == true
+                and ((localUnit == targetUnit) or (targetEventId and localEventId and targetEventId == localEventId))
+
+            if isLocalPlayer and type(Profile.GetResolvedBaseResourceValue) == "function" then
+                resourceValue = tonumber((Profile.GetResolvedBaseResourceValue(resourceRef, {
+                    includeAuraBonuses = false,
+                }))) or 0
+            elseif type(Debug) == "table" and type(Debug.Internal) == "function" then
+                Debug.Internal(
+                    "Aura percentage effect skipped: base resource unavailable ref=%s targetEventId=%s.",
+                    resourceRef,
+                    tostring(targetEventId or 0)
+                )
             end
+        elseif type(targetUnit) == "table" and type(Lookup.GetResourceEntry) == "function" then
+            local resourceEntry = Lookup.GetResourceEntry(targetUnit, resourceRef)
+            resourceValue = tonumber(resourceEntry and resourceEntry.maxValue)
+                or tonumber(resourceEntry and resourceEntry.currentValue)
+                or 0
+        end
+
+        if amountMode == "base_percent" and resourceValue <= 0 then
+            resourceValue = 0
+        elseif amountMode == "max_percent" and resourceValue < 0 then
+            resourceValue = 0
         end
 
         baseAmount = math.max(0, math.ceil(resourceValue * baseAmount / 100))
@@ -3016,6 +3133,14 @@ function AuraManager:GetUnitAuras(client, eventState, unitEventId)
                 auraDefinition = resolvedAuraDefinition
             end
 
+            local turnsRemaining = math.max(0, math.floor(tonumber(entry.turnsRemaining) or 0))
+            local isInfinite = auraEntryHasInfiniteDuration(entry)
+            local configuredDuration = math.max(0, math.floor(tonumber(type(auraDefinition) == "table" and auraDefinition.duration) or 0))
+            local appliedDuration = math.max(0, math.floor(tonumber(entry.durationTurns) or 0))
+            local durationTurns = isInfinite and 0
+                or appliedDuration > 0 and math.max(turnsRemaining, appliedDuration)
+                or math.max(turnsRemaining, configuredDuration)
+
             rows[#rows + 1] = {
                 auraKey = entry.auraKey,
                 auraRef = entry.auraRef,
@@ -3026,7 +3151,9 @@ function AuraManager:GetUnitAuras(client, eventState, unitEventId)
                     or "Interface\\Icons\\INV_Misc_QuestionMark",
                 isHarmful = isAuraDefinitionHarmful(auraDefinition),
                 stacks = math.max(0, math.floor(tonumber(entry.stacks) or 0)),
-                turnsRemaining = math.max(0, math.floor(tonumber(entry.turnsRemaining) or 0)),
+                turnsRemaining = turnsRemaining,
+                durationTurns = durationTurns,
+                isInfinite = isInfinite,
                 powerLevel = tonumber(entry.powerLevel) or 0,
                 rankMultiplier = normalizeAuraRankMultiplier(entry.rankMultiplier),
                 casterEventId = tonumber(entry.casterEventId) or 0,
@@ -3095,7 +3222,9 @@ function AuraManager:BuildUnitAuraTooltipLines(client, eventState, unitEventId)
         lines[#lines + 1] = {
             icon = row.icon,
             left = label,
-            right = ("%d turn%s"):format(turnsRemaining, turnsRemaining == 1 and "" or "s"),
+            right = row.isInfinite == true
+                and " "
+                or ("%d turn%s"):format(turnsRemaining, turnsRemaining == 1 and "" or "s"),
             colorToken = colorToken,
             rightColorToken = colorToken,
         }
@@ -3120,11 +3249,14 @@ function AuraManager:BuildUnitAuraSignature(client, eventState, unitEventId)
     for index = 1, #rows do
         local row = rows[index]
         parts[#parts + 1] = table.concat({
+            tostring(row.auraKey or ""),
             tostring(row.auraRef or ""),
             tostring(row.icon or ""),
             tostring(row.isHarmful == true and 1 or 0),
             tostring(tonumber(row.stacks) or 0),
             tostring(tonumber(row.turnsRemaining) or 0),
+            tostring(tonumber(row.durationTurns) or 0),
+            tostring(row.isInfinite == true and 1 or 0),
             tostring(tonumber(row.powerLevel) or 0),
             tostring(normalizeAuraRankMultiplier(row.rankMultiplier)),
             tostring(tonumber(row.casterEventId) or 0),
@@ -3269,6 +3401,9 @@ end
 
 function AuraManager:UpsertAura(client, payload)
     local eventState = payload and payload.eventState or nil
+    if type(eventState) ~= "table" or eventState.active ~= true or eventState.ending == true then
+        return false, nil
+    end
     local eventId = type(eventState) == "table" and eventState.id or nil
     local bucket = self:GetEventAuraBucket(client, eventId, true)
     if not bucket then
@@ -3376,6 +3511,10 @@ function AuraManager:UpsertAura(client, payload)
             end
             entry.stacks = #entry.stackTurns
             entry.turnsRemaining = maxTurns
+            entry.durationTurns = math.max(
+                tonumber(entry.durationTurns) or 0,
+                math.max(0, math.floor(tonumber(turnsRemaining) or 0))
+            )
         else
             if replaceState then
                 entry.stacks = math.min(maxStacks, stacksToApply)
@@ -3383,6 +3522,7 @@ function AuraManager:UpsertAura(client, payload)
                 entry.stacks = math.min(maxStacks, math.max(1, tonumber(entry.stacks) or 1) + stacksToApply)
             end
             entry.turnsRemaining = turnsRemaining
+            entry.durationTurns = math.max(0, math.floor(tonumber(turnsRemaining) or 0))
             entry.stackTurns = nil
         end
 
@@ -3410,6 +3550,7 @@ function AuraManager:UpsertAura(client, payload)
         targetEventId = tonumber(payload.targetEventId) or 0,
         stacks = math.min(maxStacks, stacksToApply),
         turnsRemaining = turnsRemaining,
+        durationTurns = math.max(0, math.floor(tonumber(turnsRemaining) or 0)),
         powerLevel = powerLevel,
         rankMultiplier = rankMultiplier,
         stackBehavior = stackBehavior,
@@ -4060,18 +4201,24 @@ end
 function AuraManager:QueueAuraApply(client, context, entry, payload)
     local sessionState = type(context) == "table" and context.sessionState or nil
     local eventState = type(context) == "table" and context.eventState or nil
-    if not sessionState or sessionState.active ~= true or not eventState or eventState.active ~= true or type(entry) ~= "table" then
+    if not sessionState
+        or sessionState.active ~= true
+        or not eventState
+        or eventState.active ~= true
+        or eventState.ending == true
+        or type(entry) ~= "table"
+    then
         return false
     end
 
     local rawStacks = tonumber(type(payload) == "table" and payload.stacks or nil) or tonumber(entry.stacks) or 1
-    local rawTurns = tonumber(type(payload) == "table" and payload.turns or nil) or tonumber(entry.turnsRemaining) or 1
-    if rawStacks <= 0 or rawTurns <= 0 then
+    local rawTurns = type(payload) == "table" and payload.turns ~= nil and payload.turns or entry.turnsRemaining
+    local turnsToApply = normalizeAuraDurationValue(rawTurns)
+    if rawStacks <= 0 or turnsToApply == nil then
         return false
     end
 
     local stacksToApply = math.max(1, math.floor(rawStacks))
-    local turnsToApply = math.max(1, math.floor(rawTurns))
     local powerLevel = tonumber(type(payload) == "table" and payload.powerLevel or entry.powerLevel) or 0
     local rankMultiplier = normalizeAuraRankMultiplier(
         type(payload) == "table" and payload.rankMultiplier or entry.rankMultiplier
@@ -5099,6 +5246,88 @@ function AuraManager:TickAura(client, eventState, entry, casterUnit, targetUnit)
     return changed
 end
 
+function AuraManager:ResolveAuraTickTargets(client, eventState, entry, casterUnit, anchorUnit, auraDefinition)
+    if type(anchorUnit) ~= "table" then
+        return {}
+    end
+
+    if type(auraDefinition) ~= "table" or auraDefinition.tickTargetMode ~= "nearby_players" then
+        return { anchorUnit }
+    end
+
+    if not isActiveAuraUnit(anchorUnit) then
+        return {}
+    end
+
+    local anchorEventId = math.floor(tonumber(entry and entry.targetEventId or anchorUnit.eventID) or 0)
+    if anchorEventId <= 0 then
+        return {}
+    end
+
+    local targetsByEventId = {}
+    local function addTarget(unit)
+        local eventId = math.floor(tonumber(unit and unit.eventID) or 0)
+        if eventId > 0 and not targetsByEventId[eventId] then
+            targetsByEventId[eventId] = unit
+        end
+    end
+
+    local units = type(eventState) == "table" and eventState.units or {}
+    if anchorUnit.isPlayer == true then
+        local radius = normalizeAuraTickRadius(auraDefinition.tickRadiusYards)
+        if radius == nil
+            or type(client) ~= "table"
+            or type(client.GetAutopilotSpatialRuntime) ~= "function"
+            or type(Spatial.DistanceBetweenCachedUnits) ~= "function"
+        then
+            return {}
+        end
+
+        local runtime = client:GetAutopilotSpatialRuntime(eventState)
+        if type(runtime) ~= "table" then
+            return {}
+        end
+
+        for index = 1, #units do
+            local candidate = units[index]
+            if type(candidate) == "table"
+                and candidate.isPlayer == true
+                and isActiveAuraUnit(candidate)
+            then
+                local distance = Spatial.DistanceBetweenCachedUnits(runtime, eventState, anchorUnit, candidate)
+                if distance ~= nil and distance <= radius then
+                    addTarget(candidate)
+                end
+            end
+        end
+    else
+        local anchorRaidMarker = math.max(0, math.floor(tonumber(anchorUnit.raidMarker) or 0))
+        for index = 1, #units do
+            local candidate = units[index]
+            local candidateEventId = math.floor(tonumber(candidate and candidate.eventID) or 0)
+            local candidateRaidMarker = math.max(0, math.floor(tonumber(candidate and candidate.raidMarker) or 0))
+            if type(candidate) == "table"
+                and candidate.isPlayer ~= true
+                and candidateEventId > 0
+                and isActiveAuraUnit(candidate)
+                and ((anchorRaidMarker > 0 and candidateRaidMarker == anchorRaidMarker)
+                    or (anchorRaidMarker == 0 and candidateEventId == anchorEventId))
+            then
+                addTarget(candidate)
+            end
+        end
+    end
+
+    local targets = {}
+    for _, unit in pairs(targetsByEventId) do
+        targets[#targets + 1] = unit
+    end
+    table.sort(targets, function(left, right)
+        return (tonumber(left and left.eventID) or 0) < (tonumber(right and right.eventID) or 0)
+    end)
+    return targets
+end
+
 function AuraManager:HandleCombatEvent(client, context)
     local eventState = type(context) == "table" and context.eventState or nil
     local recipientEventId = tonumber(type(context) == "table" and context.recipientEventId or nil) or 0
@@ -5323,8 +5552,9 @@ function AuraManager:AdvanceAuraDurations(entry)
         local keptTurns = {}
         local maxTurns = 0
         for index = 1, #(entry.stackTurns or {}) do
-            local nextTurns = (tonumber(entry.stackTurns[index]) or 0) - 1
-            if nextTurns > 0 then
+            local currentTurns = tonumber(entry.stackTurns[index])
+            local nextTurns = currentTurns == 0 and 0 or (currentTurns or 0) - 1
+            if currentTurns == 0 or nextTurns > 0 then
                 keptTurns[#keptTurns + 1] = nextTurns
                 maxTurns = math.max(maxTurns, nextTurns)
             end
@@ -5333,6 +5563,10 @@ function AuraManager:AdvanceAuraDurations(entry)
         entry.stacks = #keptTurns
         entry.turnsRemaining = maxTurns
         return entry.stacks <= 0
+    end
+
+    if tonumber(entry.turnsRemaining) == 0 then
+        return false
     end
 
     entry.turnsRemaining = math.max(0, (tonumber(entry.turnsRemaining) or 0) - 1)
@@ -5362,6 +5596,12 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
     local currentTickNumber = math.max(1, math.floor(tonumber(targetTickNumber) or tonumber(eventState.tickNumber) or 1))
     local casterUnit = findEventUnit(eventState, entry.casterEventId)
     local targetUnit = findEventUnit(eventState, entry.targetEventId)
+    local auraDefinition = entry.definition
+    local _, resolvedAuraDefinition = self:ResolveAuraDefinition(entry.auraRef, { datasetId = entry.datasetId })
+    if type(resolvedAuraDefinition) == "table" then
+        auraDefinition = resolvedAuraDefinition
+        entry.definition = resolvedAuraDefinition
+    end
     local localPlayerEventId = resolveLocalEventId(eventState)
     local localPlayerDerivedStateImpact = nil
     local changed = false
@@ -5381,7 +5621,7 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
         if localPlayerDerivedStateImpact and localPlayerEventId > 0 then
             queueLocalPlayerAuraDerivedStateRefresh(eventState, localPlayerEventId, localPlayerDerivedStateImpact)
         end
-        refreshAuraDisplays("aura-advance", eventState, localPlayerEventId, localPlayerDerivedStateImpact)
+        refreshAuraDisplays("aura-advance", eventState, entry.targetEventId, localPlayerDerivedStateImpact)
         if timer then
             stopTiming(timer, { activeAuras = countAuraEntries(bucket), dueAuras = 1, targetCount = 1 })
         end
@@ -5399,8 +5639,14 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
         return false
     end
 
+    local tickTargets = {}
     if shouldExecuteLocalAuraTick(client, eventState, casterUnit) then
-        self:TickAura(client, eventState, entry, casterUnit, targetUnit)
+        tickTargets = self:ResolveAuraTickTargets(client, eventState, entry, casterUnit, targetUnit, auraDefinition)
+        for index = 1, #tickTargets do
+            if self:TickAura(client, eventState, entry, casterUnit, tickTargets[index]) then
+                changed = true
+            end
+        end
     end
     local previousDurationEntry = cloneAuraTickerState(entry)
     if self:AdvanceAuraDurations(entry) then
@@ -5429,14 +5675,14 @@ function AuraManager:AdvanceAuraEntry(client, eventId, auraKey, targetTurnNumber
         if localPlayerDerivedStateImpact and localPlayerEventId > 0 then
             queueLocalPlayerAuraDerivedStateRefresh(eventState, localPlayerEventId, localPlayerDerivedStateImpact)
         end
-        refreshAuraDisplays("aura-advance", eventState, localPlayerEventId, localPlayerDerivedStateImpact)
+        refreshAuraDisplays("aura-advance", eventState, entry.targetEventId, localPlayerDerivedStateImpact)
     end
 
     if timer then
         stopTiming(timer, {
             activeAuras = countAuraEntries(bucket),
             dueAuras = 1,
-            targetCount = 1,
+            targetCount = #tickTargets,
         })
     end
     return changed
@@ -6182,7 +6428,12 @@ function AuraManager:ValidateInboundAuraPayload(client, sender, channelName, eve
         return nil
     end
 
-    if type(eventId) ~= "string" or eventId == "" or eventId ~= eventState.id then
+    if type(eventId) ~= "string"
+        or eventId == ""
+        or eventId ~= eventState.id
+        or eventState.active ~= true
+        or eventState.ending == true
+    then
         return nil
     end
 
@@ -6209,6 +6460,11 @@ function AuraManager:ValidateInboundAuraPayload(client, sender, channelName, eve
         return nil
     end
 
+    local normalizedTurns = turns == nil and nil or normalizeAuraDurationValue(turns)
+    if turns ~= nil and normalizedTurns == nil then
+        return nil
+    end
+
     return {
         sessionState = sessionState,
         eventState = eventState,
@@ -6221,7 +6477,7 @@ function AuraManager:ValidateInboundAuraPayload(client, sender, channelName, eve
         auraRef = normalizedAuraRef,
         sender = normalizedSender,
         stacks = math.max(1, math.floor(tonumber(stacks) or 1)),
-        turns = math.max(1, math.floor(tonumber(turns) or 1)),
+        turns = normalizedTurns,
         powerLevel = tonumber(powerLevel) or 0,
         rankMultiplier = normalizeAuraRankMultiplier(rankMultiplier),
     }
@@ -6337,6 +6593,7 @@ function AuraManager:HandleAuraApplyBatch(client, arguments, sender)
 
     local changed = false
     local localPlayerDerivedStateImpact = nil
+    local changedTargetEventIds = {}
     local eventState = type(client.GetEventState) == "function" and client:GetEventState() or nil
     local localPlayerEventId = resolveLocalEventId(eventState)
     for index = 1, #entries do
@@ -6371,6 +6628,9 @@ function AuraManager:HandleAuraApplyBatch(client, arguments, sender)
                 end
             end
             changed = applied or changed
+            if applied then
+                changedTargetEventIds[tonumber(payload.targetEventId) or 0] = true
+            end
         end
     end
 
@@ -6378,7 +6638,15 @@ function AuraManager:HandleAuraApplyBatch(client, arguments, sender)
         if localPlayerDerivedStateImpact and localPlayerEventId > 0 then
             queueLocalPlayerAuraDerivedStateRefresh(eventState, localPlayerEventId, localPlayerDerivedStateImpact)
         end
-        refreshAuraDisplays("aura-apply-batch-inbound", eventState, localPlayerEventId, localPlayerDerivedStateImpact)
+        local refreshTargetEventId = localPlayerEventId
+        local controlContext = type(client.GetActionBarControlContext) == "function"
+            and client:GetActionBarControlContext(eventState)
+            or nil
+        local activeActionBarEventId = tonumber(controlContext and controlContext.activeEventUnit and controlContext.activeEventUnit.eventID) or 0
+        if activeActionBarEventId > 0 and changedTargetEventIds[activeActionBarEventId] then
+            refreshTargetEventId = activeActionBarEventId
+        end
+        refreshAuraDisplays("aura-apply-batch-inbound", eventState, refreshTargetEventId, localPlayerDerivedStateImpact)
     end
     return changed
 end
@@ -6407,6 +6675,7 @@ function AuraManager:HandleAuraDispelBatch(client, arguments, sender)
 
     local changed = false
     local localPlayerDerivedStateImpact = nil
+    local changedTargetEventIds = {}
     local eventState = type(client.GetEventState) == "function" and client:GetEventState() or nil
     local localPlayerEventId = resolveLocalEventId(eventState)
     for index = 1, #entries do
@@ -6434,6 +6703,9 @@ function AuraManager:HandleAuraDispelBatch(client, arguments, sender)
                 end
             end
             changed = removed or changed
+            if removed then
+                changedTargetEventIds[tonumber(payload.targetEventId) or 0] = true
+            end
         end
     end
 
@@ -6441,7 +6713,15 @@ function AuraManager:HandleAuraDispelBatch(client, arguments, sender)
         if localPlayerDerivedStateImpact and localPlayerEventId > 0 then
             queueLocalPlayerAuraDerivedStateRefresh(eventState, localPlayerEventId, localPlayerDerivedStateImpact)
         end
-        refreshAuraDisplays("aura-dispel-batch-inbound", eventState, localPlayerEventId, localPlayerDerivedStateImpact)
+        local refreshTargetEventId = localPlayerEventId
+        local controlContext = type(client.GetActionBarControlContext) == "function"
+            and client:GetActionBarControlContext(eventState)
+            or nil
+        local activeActionBarEventId = tonumber(controlContext and controlContext.activeEventUnit and controlContext.activeEventUnit.eventID) or 0
+        if activeActionBarEventId > 0 and changedTargetEventIds[activeActionBarEventId] then
+            refreshTargetEventId = activeActionBarEventId
+        end
+        refreshAuraDisplays("aura-dispel-batch-inbound", eventState, refreshTargetEventId, localPlayerDerivedStateImpact)
     end
     return changed
 end

@@ -391,7 +391,7 @@ function DataEditor:BuildAuraInspectorEffectsPage(page)
     self.AuraInspectorAuraStacksGroup:AddChild(self.AuraInspectorAuraStacksInput)
     attachMouseWheel(self.AuraInspectorAuraStacksInput)
 
-    self.AuraInspectorApplyAuraDurationGroup = createGroup("RPEDataEditorAuraInspectorApplyAuraDurationGroup", "Duration", 18)
+    self.AuraInspectorApplyAuraDurationGroup = createGroup("RPEDataEditorAuraInspectorApplyAuraDurationGroup", "Duration", 38)
     self.AuraInspectorApplyAuraDurationInput = UI.CreateTextInput(self.AuraInspectorApplyAuraDurationGroup:GetFrame(), "RPEDataEditorAuraInspectorApplyAuraDurationInput", {
         width = self.AuraInspectorFieldWidth,
         height = self.AuraInspectorControlHeight,
@@ -400,6 +400,27 @@ function DataEditor:BuildAuraInspectorEffectsPage(page)
     })
     self.AuraInspectorApplyAuraDurationGroup:AddChild(self.AuraInspectorApplyAuraDurationInput)
     attachMouseWheel(self.AuraInspectorApplyAuraDurationInput)
+    self.AuraInspectorApplyAuraInfiniteDurationCheckbox = self:CreateAuraInspectorCheckbox(
+        self.AuraInspectorApplyAuraDurationGroup:GetFrame(),
+        "RPEDataEditorAuraInspectorApplyAuraInfiniteDurationCheckbox",
+        "Infinite (until event ends)",
+        false,
+        function(checked)
+            if self._refreshingAuraInspector then
+                return
+            end
+
+            self:CommitSelectedAuraInspectorEffect(function(effect)
+                if checked == true then
+                    effect.duration = 0
+                    return
+                end
+                effect.duration = self:NormalizeAuraDuration(self.AuraInspectorApplyAuraDurationInput:GetText(), 12)
+            end)
+            self:RefreshAuraInspectorPage()
+        end
+    )
+    self.AuraInspectorApplyAuraDurationGroup:AddChild(self.AuraInspectorApplyAuraInfiniteDurationCheckbox)
 
     self.AuraInspectorBasePowerGroup = createGroup("RPEDataEditorAuraInspectorBasePowerGroup", "Base Power", 18)
     self.AuraInspectorBasePowerInput = UI.CreateTextInput(self.AuraInspectorBasePowerGroup:GetFrame(), "RPEDataEditorAuraInspectorBasePowerInput", {
@@ -621,7 +642,7 @@ function DataEditor:BuildAuraInspectorEffectsPage(page)
     end)
     bindInput("AuraInspectorApplyAuraDurationInput", function()
         self:CommitSelectedAuraInspectorEffect(function(effect)
-            effect.duration = math.max(1, math.floor(tonumber(self.AuraInspectorApplyAuraDurationInput:GetText()) or 12))
+            effect.duration = self:NormalizeAuraDuration(self.AuraInspectorApplyAuraDurationInput:GetText(), 12)
         end)
     end)
     bindInput("AuraInspectorBasePowerInput", function()

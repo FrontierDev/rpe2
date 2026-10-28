@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 33,
+    version = 35,
     dataset = {
         achievements = {},
         auras = {
@@ -4365,7 +4365,7 @@ Addon.Data.DefaultDatasets:Register({
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {
-                            alwaysHits = false,
+                            alwaysHits = true,
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,
@@ -6401,7 +6401,7 @@ Addon.Data.DefaultDatasets:Register({
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {
-                            alwaysHits = false,
+                            alwaysHits = true,
                             amountMode = "flat",
                             applyAura = false,
                             auraStacks = 1,

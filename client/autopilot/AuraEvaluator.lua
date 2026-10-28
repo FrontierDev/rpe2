@@ -94,8 +94,16 @@ local function normalizeTurnCount(value, fallback)
     if numericValue == nil then
         numericValue = tonumber(fallback)
     end
-    if numericValue == nil or numericValue <= 0 then
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
         return 1
+    end
+    if numericValue == 0 then
+        return 0
     end
     return math.max(1, math.ceil(numericValue))
 end
@@ -149,11 +157,20 @@ function Evaluator.ShouldSuppressProjectedAuraRefresh(previousState, application
     end
 
     local remaining = math.max(0, math.floor(tonumber(previousState.turnsRemaining) or 0))
-    if remaining <= 0 or math.max(0, math.floor(tonumber(previousState.stacks) or 0)) <= 0 then
+    local stackCount = math.max(0, math.floor(tonumber(previousState.stacks) or 0))
+    if stackCount <= 0 then
         return false
     end
 
     local duration = normalizeTurnCount(application.duration, resolvedProfile.duration)
+    if remaining == 0 and duration == 0 then
+        return normalizeRankMultiplier(application.rankMultiplier)
+            == normalizeRankMultiplier(previousState.rankMultiplier)
+            and (tonumber(application.powerLevel) or 0) == (tonumber(previousState.powerLevel) or 0)
+    end
+    if remaining <= 0 then
+        return false
+    end
     local refreshWindow = math.max(1, math.ceil(duration * 0.2))
     if remaining <= refreshWindow then
         return false
@@ -693,9 +710,7 @@ local function buildIndependentStackTurns(state)
     if type(state.stackTurns) == "table" and #state.stackTurns > 0 then
         for index = 1, #state.stackTurns do
             local value = math.max(0, math.floor(tonumber(state.stackTurns[index]) or 0))
-            if value > 0 then
-                turns[#turns + 1] = value
-            end
+            turns[#turns + 1] = value
         end
         return turns
     end
@@ -717,7 +732,7 @@ local function getActiveStackCountAtOccurrence(state, occurrenceIndex)
         local count = 0
         local stackTurns = buildIndependentStackTurns(state)
         for index = 1, #stackTurns do
-            if stackTurns[index] >= k then
+            if stackTurns[index] == 0 or stackTurns[index] >= k then
                 count = count + 1
             end
         end
@@ -739,11 +754,15 @@ local function getOccurrenceCount(state)
         local maxTurns = 0
         local stackTurns = buildIndependentStackTurns(state)
         for index = 1, #stackTurns do
+            if stackTurns[index] == 0 then
+                return math.huge
+            end
             maxTurns = math.max(maxTurns, stackTurns[index])
         end
         return maxTurns
     end
-    return math.max(0, math.floor(tonumber(state.turnsRemaining) or 0))
+    local turnsRemaining = math.max(0, math.floor(tonumber(state.turnsRemaining) or 0))
+    return turnsRemaining == 0 and math.huge or turnsRemaining
 end
 
 -- Returns only provably deterministic future owner occurrences from frozen
@@ -767,7 +786,8 @@ function Evaluator.ClassifyDeterministicFutureOccurrences(state)
         and (profile.hasPeriodicDamage == true or profile.hasPeriodicHealing == true)
     then
         local count = getOccurrenceCount(state)
-        for occurrenceIndex = 1, count do
+        local finiteCount = count ~= math.huge
+        for occurrenceIndex = 1, finiteCount and count or 0 do
             local activeStacks = getActiveStackCountAtOccurrence(state, occurrenceIndex)
             if activeStacks > 0 then
                 occurrences[#occurrences + 1] = {
@@ -785,6 +805,7 @@ function Evaluator.ClassifyDeterministicFutureOccurrences(state)
         cadence = "owner_occurrence",
         deterministicCombatEventIds = {},
         occurrences = occurrences,
+        isInfinite = getOccurrenceCount(state) == math.huge,
     }
 end
 

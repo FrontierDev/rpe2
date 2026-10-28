@@ -28,17 +28,12 @@ AuraManager:RegisterEffect({
     Execute = function(self, context, effect)
         local targetUnit = type(context) == "table" and context.targetUnit or nil
         local healthResourceRef = type(context) == "table" and context.healthResourceRef or nil
-        local Combat = getCombat()
-        if type(targetUnit) == "table" and (type(healthResourceRef) ~= "string" or healthResourceRef == "") then
-            local resources = targetUnit.resources
-            for index = 1, #(resources or {}) do
-                local entry = resources[index]
-                if type(entry) == "table" and type(entry.resourceRef) == "string" and entry.resourceRef ~= "" then
-                    healthResourceRef = entry.resourceRef
-                    break
-                end
-            end
+        if type(healthResourceRef) ~= "string" or healthResourceRef == "" then
+            healthResourceRef = type(Spellcasting.GetHealthResourceRef) == "function"
+                and Spellcasting.GetHealthResourceRef()
+                or nil
         end
+        local Combat = getCombat()
 
         if type(targetUnit) ~= "table" or type(healthResourceRef) ~= "string" or healthResourceRef == "" or not Combat then
             if Debug.AuraTracing == true and type(Debug.Info) == "function" then

@@ -9,6 +9,8 @@ local auraDataset = {
     auras = {
         { id = "ward", name = "Ward", duration = 4, maxStacks = 1, effects = {} },
         { id = "legacy", name = "Legacy", duration = 4, maxStacks = 1, effects = {} },
+        { id = "helpful-damage", name = "Helpful Damage", duration = 4, polarity = "helpful", effects = { { type = "damage" } } },
+        { id = "harmful-control", name = "Harmful Control", duration = 4, polarity = "harmful", effects = {} },
         {
             id = "ranked-dot",
             name = "Ranked Dot",
@@ -23,6 +25,14 @@ local auraDataset = {
                     statScaling = { { statRef = "might", coefficient = 1 } },
                 },
             },
+        },
+        {
+            id = "mixed-duration",
+            name = "Mixed Duration",
+            duration = 2,
+            maxStacks = 2,
+            stackBehavior = "independent_duration",
+            effects = {},
         },
     },
 }
@@ -157,11 +167,51 @@ local function loadAddonFile(path)
     return chunk(nil, Addon)
 end
 
+loadAddonFile("core/classes/Aura.lua")
 loadAddonFile("client/spellcasting/AuraManager.lua")
 local AuraManager = Addon.Client.Spellcasting.AuraManager
 AuraManager.QueueAuraApply = function()
     return true
 end
+
+local AuraClass = Addon.Internal.Database.Classes.Aura
+local infiniteDefinition = AuraClass:New({
+    id = "infinite",
+    duration = 0,
+    effects = {
+        { type = "apply_aura", auraRef = "ranktest:ward", duration = 0 },
+    },
+})
+assertEqual(infiniteDefinition.duration, 0, "Aura model preserves infinite duration")
+assertEqual(infiniteDefinition.effects[1].duration, 0, "nested Aura effect preserves infinite duration")
+local infiniteRoundTrip = AuraClass.FromTable(infiniteDefinition:ToTable())
+assertEqual(infiniteRoundTrip.duration, 0, "Aura table round-trip preserves infinite duration")
+assertEqual(infiniteRoundTrip.effects[1].duration, 0, "nested Aura table round-trip preserves infinite duration")
+local resourceScalingAura = AuraClass:New({
+    events = {
+        {
+            combatEventId = "on_auto_attack_hit",
+            effects = {
+                {
+                    type = "resource",
+                    resourceRef = "mana",
+                    amount = 3,
+                    statScaling = { { statRef = "might", coefficient = 0.1 } },
+                },
+            },
+        },
+    },
+})
+assertEqual(resourceScalingAura.events[1].effects[1].statScaling[1].statRef, "might",
+    "Aura Resource stat scaling normalizes")
+assertEqual(resourceScalingAura.events[1].effects[1].statScaling[1].coefficient, 0.1,
+    "Aura Resource stat scaling coefficient normalizes")
+assertEqual(AuraClass.FromTable(resourceScalingAura:ToTable()).events[1].effects[1].statScaling[1].statRef, "might",
+    "Aura Resource stat scaling serializes")
+local harmfulPolarity = AuraClass:New({ polarity = "harmful" }):ToTable()
+assertEqual(harmfulPolarity.polarity, "harmful", "Aura polarity round-trip preserves harmful disposition")
+local invalidPolarity = AuraClass:New({ polarity = "unknown" }):ToTable()
+assertEqual(invalidPolarity.polarity, nil, "Aura polarity normalization preserves legacy fallback for unknown values")
 
 caster = {
     eventID = 1,
@@ -338,6 +388,137 @@ local legacySnapshot = encodeFields({
 local decodedLegacy, legacyDecodeError = rejoin.DeserializeSnapshot(toHex(legacySnapshot))
 assert(decodedLegacy, legacyDecodeError)
 assertEqual(decodedLegacy.auras[1].rankMultiplier, 1, "protocol four Aura snapshots default to rank one")
+
+local infiniteApplied, infiniteEntry = AuraManager:UpsertAura(Addon.Client, {
+    eventState = eventState,
+    dataset = auraDataset,
+    auraRef = "ranktest:ward",
+    casterEventId = caster.eventID,
+    targetEventId = target.eventID,
+    stacks = 1,
+    turns = 0,
+})
+assertEqual(infiniteApplied, true, "explicit zero-duration Aura applies")
+assertEqual(infiniteEntry.turnsRemaining, 0, "explicit zero-duration Aura remains infinite")
+for _ = 1, 5 do
+    AuraManager:AdvanceAuraDurations(infiniteEntry)
+end
+assertEqual(infiniteEntry.stacks, 1, "infinite Aura survives repeated turn advancement")
+local infiniteRows = AuraManager:GetUnitAuras(Addon.Client, eventState, target.eventID)
+local infiniteRow
+for index = 1, #infiniteRows do
+    if infiniteRows[index].auraRef == infiniteEntry.auraRef then
+        infiniteRow = infiniteRows[index]
+        break
+    end
+end
+assertEqual(infiniteRow.isInfinite, true, "unit Aura rows expose an explicit infinite flag")
+assertEqual(infiniteRow.durationTurns, 0, "infinite Aura rows do not expose a finite duration total")
+local infiniteWireApplied = AuraManager:HandleAuraApply(Addon.Client, {
+    "ranktest",
+    eventState.id,
+    caster.eventID,
+    target.eventID,
+    "ranktest:ward",
+    1,
+    0,
+    0,
+}, "Caster")
+assertEqual(infiniteWireApplied, true, "single Aura packets preserve an explicit zero duration")
+local infiniteTooltip = AuraManager:BuildUnitAuraTooltipLines(Addon.Client, eventState, target.eventID)
+local infiniteTooltipRight
+for index = 1, #infiniteTooltip do
+    if infiniteTooltip[index].left == infiniteRow.name then
+        infiniteTooltipRight = infiniteTooltip[index].right
+        break
+    end
+end
+assertEqual(infiniteTooltipRight, " ", "infinite Aura tooltips avoid numeric duration text")
+
+local helpfulDamageApplied = AuraManager:UpsertAura(Addon.Client, {
+    eventState = eventState,
+    dataset = auraDataset,
+    auraRef = "ranktest:helpful-damage",
+    casterEventId = caster.eventID,
+    targetEventId = target.eventID,
+    stacks = 1,
+    turns = 4,
+})
+assertEqual(helpfulDamageApplied, true, "explicit helpful polarity Aura applies")
+local harmfulControlApplied = AuraManager:UpsertAura(Addon.Client, {
+    eventState = eventState,
+    dataset = auraDataset,
+    auraRef = "ranktest:harmful-control",
+    casterEventId = caster.eventID,
+    targetEventId = target.eventID,
+    stacks = 1,
+    turns = 4,
+})
+assertEqual(harmfulControlApplied, true, "explicit harmful polarity Aura applies")
+local polarityRows = AuraManager:GetUnitAuras(Addon.Client, eventState, target.eventID)
+local polarityByRef = {}
+for index = 1, #polarityRows do
+    polarityByRef[polarityRows[index].auraRef] = polarityRows[index].isHarmful == true
+end
+assertEqual(polarityByRef["ranktest:helpful-damage"], false, "explicit helpful polarity overrides damage-only fallback")
+assertEqual(polarityByRef["ranktest:harmful-control"], true, "explicit harmful polarity classifies control Aura as harmful")
+local helpfulDamageRow
+for index = 1, #polarityRows do
+    if polarityRows[index].auraRef == "ranktest:helpful-damage" then
+        helpfulDamageRow = polarityRows[index]
+        break
+    end
+end
+assertEqual(helpfulDamageRow.durationTurns, 4, "Aura rows retain the applied duration for progress display")
+
+local mixedFiniteApplied, mixedEntry = AuraManager:UpsertAura(Addon.Client, {
+    eventState = eventState,
+    dataset = auraDataset,
+    auraRef = "ranktest:mixed-duration",
+    casterEventId = caster.eventID,
+    targetEventId = target.eventID,
+    stacks = 1,
+    turns = 2,
+})
+assertEqual(mixedFiniteApplied, true, "finite independent-duration Aura applies")
+local mixedInfiniteApplied = AuraManager:UpsertAura(Addon.Client, {
+    eventState = eventState,
+    dataset = auraDataset,
+    auraRef = "ranktest:mixed-duration",
+    casterEventId = caster.eventID,
+    targetEventId = target.eventID,
+    stacks = 1,
+    turns = 0,
+})
+assertEqual(mixedInfiniteApplied, true, "infinite independent-duration stack applies")
+AuraManager:AdvanceAuraDurations(mixedEntry)
+assertEqual(mixedEntry.stacks, 2, "mixed finite and infinite stacks coexist after one turn")
+AuraManager:AdvanceAuraDurations(mixedEntry)
+assertEqual(mixedEntry.stacks, 1, "finite independent stack expires without removing infinite stack")
+assertEqual(mixedEntry.stackTurns[1], 0, "remaining independent stack keeps the infinite marker")
+
+local encodedInfinite = rejoin.SerializeSnapshot({
+    auras = { infiniteEntry },
+    casts = {},
+    meters = { currentTurn = 1, damage = {}, healing = {}, threat = {} },
+})
+local decodedInfinite, infiniteDecodeError = rejoin.DeserializeSnapshot(encodedInfinite)
+assert(decodedInfinite, infiniteDecodeError)
+assertEqual(decodedInfinite.auras[1].turnsRemaining, 0, "rejoin snapshots preserve infinite Aura duration")
+
+eventState.ending = true
+local lateApplied = AuraManager:HandleAuraApply(Addon.Client, {
+    "ranktest",
+    eventState.id,
+    caster.eventID,
+    target.eventID,
+    "ranktest:ward",
+    1,
+    0,
+    0,
+}, "Caster")
+assertEqual(lateApplied, false, "late Aura packets do not resurrect an ending event")
+eventState.ending = nil
 
 -- Autopilot uses the shared live rank resolver for direct values and carries
 -- that same snapshot through Aura application and future-value projection.

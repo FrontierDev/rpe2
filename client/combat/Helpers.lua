@@ -995,11 +995,24 @@ function Combat:ResolveResourceEffectAmount(context, effect)
     local amount = tonumber(type(effect) == "table" and effect.amount or nil) or 0
     local amountMode = tostring(type(effect) == "table" and effect.amountMode or "flat")
     local auraEntry = type(context) == "table" and context.aura or nil
+    local casterUnit = type(context) == "table" and (context.casterUnit or context.caster) or nil
+    for index = 1, #(type(effect) == "table" and effect.statScaling or {}) do
+        local scaling = effect.statScaling[index]
+        local statRef = type(scaling) == "table" and tostring(scaling.statRef or "") or ""
+        if statRef ~= "" then
+            local statValue = type(Lookup.GetStatValue) == "function"
+                and Lookup.GetStatValue(casterUnit, statRef, 0)
+                or 0
+            amount = amount + ((tonumber(statValue) or 0) * (tonumber(scaling.coefficient) or 0))
+        end
+    end
     local rankContext = nil
-    if type(auraEntry) == "table" then
-        rankContext = { spellRankMultiplier = auraEntry.rankMultiplier }
-    elseif type(effect) == "table" and effect.scaleWithRank == true then
-        rankContext = context
+    if type(effect) ~= "table" or effect.scaleWithRank ~= false then
+        if type(auraEntry) == "table" then
+            rankContext = { spellRankMultiplier = auraEntry.rankMultiplier }
+        elseif type(effect) == "table" and effect.scaleWithRank == true then
+            rankContext = context
+        end
     end
     local rankedAmount = rankContext and Spellcasting.ApplySpellRankMultiplier(rankContext, amount) or amount
     if amountMode == "flat" then
@@ -1030,10 +1043,14 @@ function Combat:ResolveResourceEffectAmount(context, effect)
             resourceValue = tonumber((Profile.GetResolvedBaseResourceValue(resourceRef, {
                 includeAuraBonuses = false,
             }))) or 0
+        elseif type(Debug) == "table" and type(Debug.Internal) == "function" then
+            Debug.Internal(
+                "Resource percentage effect skipped: base resource unavailable ref=%s targetEventId=%s.",
+                resourceRef,
+                tostring(targetEventId or 0)
+            )
         end
-    end
-
-    if resourceValue <= 0 then
+    elseif amountMode == "max_percent" then
         resourceValue = tonumber(resourceEntry and resourceEntry.maxValue)
             or tonumber(resourceEntry and resourceEntry.currentValue)
             or 0

@@ -34,8 +34,16 @@ local function normalizeTurnCount(value, fallback)
     if numericValue == nil then
         numericValue = tonumber(fallback)
     end
-    if numericValue == nil or numericValue <= 0 then
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
         return 1
+    end
+    if numericValue == 0 then
+        return 0
     end
     return math.max(1, math.ceil(numericValue))
 end
@@ -118,9 +126,7 @@ local function buildIndependentStackTurns(state)
     if type(state.stackTurns) == "table" and #state.stackTurns > 0 then
         for index = 1, #state.stackTurns do
             local value = math.max(0, math.floor(tonumber(state.stackTurns[index]) or 0))
-            if value > 0 then
-                turns[#turns + 1] = value
-            end
+            turns[#turns + 1] = value
         end
         return turns
     end

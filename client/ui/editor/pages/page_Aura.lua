@@ -103,7 +103,10 @@ function DataEditor:BuildAuraPage(page)
             row:SetTestName("")
         end
         if row.SetStatus then
-            row:SetStatus(("%dt/%ds"):format(tonumber(aura and aura.duration) or 1, tonumber(aura and aura.maxStacks) or 1))
+            local duration = tonumber(aura and aura.duration)
+            row:SetStatus(duration == 0
+                and ("Infinite/%ds"):format(tonumber(aura and aura.maxStacks) or 1)
+                or ("%dt/%ds"):format(duration or 1, tonumber(aura and aura.maxStacks) or 1))
         end
         if row.SetDetail then
             row:SetDetail(aura and aura.description or "")

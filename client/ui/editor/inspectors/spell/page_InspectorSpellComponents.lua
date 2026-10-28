@@ -16,6 +16,29 @@ local function shallowCloneTable(value)
     return copy
 end
 
+local function normalizeAuraDuration(value, fallback)
+    local numericValue = tonumber(value)
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
+        numericValue = tonumber(fallback) or 1
+    end
+
+    if numericValue == 0 then
+        return 0
+    end
+
+    local normalized = math.floor(numericValue)
+    if normalized < 1 then
+        return math.max(1, math.floor(tonumber(fallback) or 1))
+    end
+
+    return normalized
+end
+
 local function getComponentTitle(component)
     local effectType = component and component.effect and component.effect.type or "damage"
     local phase = component and component.castPhase or "on_cast_end"
@@ -1217,7 +1240,7 @@ function DataEditor:BuildSpellInspectorComponentsPage(page)
         local component = self:GetSelectedSpellInspectorComponent()
         if component then
             self:CommitSelectedSpell(function()
-                component.effect.duration = tonumber(self.SpellInspectorApplyAuraDurationInput:GetText()) or 12
+                component.effect.duration = normalizeAuraDuration(self.SpellInspectorApplyAuraDurationInput:GetText(), 12)
             end)
         end
     end)

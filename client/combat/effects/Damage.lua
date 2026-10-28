@@ -1859,12 +1859,14 @@ function Combat:BeginHitCheck(context, effect, component)
     end
 
     local auraManager = getAuraManager()
-    if auraManager
+    local auraForcesAutoHit = auraManager
         and type(auraManager.ShouldForceAutoHitAgainstTarget) == "function"
         and auraManager:ShouldForceAutoHitAgainstTarget(entry.eventState, entry.defenderEventId) == true
-    then
+    local alwaysHits = type(entry.effect) == "table" and entry.effect.alwaysHits == true
+    if alwaysHits or auraForcesAutoHit then
+        local completionReason = alwaysHits and "always-hit" or "forced-hit"
         local forcedHitStartTime = timingEnabled and getNowMilliseconds() or nil
-        local completed, result = Combat:CompleteHitCheck(entry, RESULT_PASS, "forced-hit")
+        local completed, result = Combat:CompleteHitCheck(entry, RESULT_PASS, completionReason)
         if completed and type(Combat.RecordResolvedCombatAttackHistory) == "function" then
             Combat:RecordResolvedCombatAttackHistory(Client, entry, RESULT_PASS, RESULT_PASS, nil)
         end
@@ -1876,12 +1878,12 @@ function Combat:BeginHitCheck(context, effect, component)
             end
         end
         if timingEnabled then
-            appendTimingPart(timingParts, "forced-hit", getNowMilliseconds() - forcedHitStartTime)
+            appendTimingPart(timingParts, completionReason, getNowMilliseconds() - forcedHitStartTime)
             if profilerStartTime ~= nil then
                 appendTimingPart(timingParts, "profiler-total", getProfilerMilliseconds() - profilerStartTime, SPELLCAST_SLOW_TOTAL_MS)
             end
             logDamageTimingLine(
-                ("%s/%s forced-hit"):format(tostring(entry.spellRef or "spell"), tostring(entry.componentKey or "component")),
+                ("%s/%s %s"):format(tostring(entry.spellRef or "spell"), tostring(entry.componentKey or "component"), completionReason),
                 timingParts,
                 getNowMilliseconds() - totalStartTime,
                 SPELLCAST_SLOW_TOTAL_MS

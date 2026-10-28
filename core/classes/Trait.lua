@@ -51,6 +51,29 @@ local function normalizeRef(value)
     return ref
 end
 
+local function normalizeAuraDuration(value, fallback)
+    local numericValue = tonumber(value)
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
+        numericValue = tonumber(fallback) or 1
+    end
+
+    if numericValue == 0 then
+        return 0
+    end
+
+    local normalized = math.floor(numericValue)
+    if normalized < 1 then
+        return math.max(1, math.floor(tonumber(fallback) or 1))
+    end
+
+    return normalized
+end
+
 local function normalizeRefList(values)
     local normalized = {}
     local seen = {}
@@ -176,7 +199,7 @@ local function normalizeAutomaticAura(value)
         auraRef = auraRef,
         targetScope = normalizeAutoAuraTarget(value.targetScope),
         stacks = math.max(1, math.floor(tonumber(value.stacks) or 1)),
-        turns = math.max(1, math.floor(tonumber(value.turns) or 1)),
+        turns = normalizeAuraDuration(value.turns, 1),
         powerLevel = tonumber(value.powerLevel) or 0,
     }
 end
@@ -283,7 +306,7 @@ local function normalizeEventEffect(value)
             type = "apply_aura",
             auraRef = normalizeRef(value.auraRef),
             stacks = math.max(1, math.floor(tonumber(value.stacks) or tonumber(value.auraStacks) or 1)),
-            duration = math.max(1, math.floor(tonumber(value.duration) or tonumber(value.turns) or 12)),
+            duration = normalizeAuraDuration(value.duration ~= nil and value.duration or value.turns, 12),
             basePower = tonumber(value.basePower) or tonumber(value.powerLevel) or 0,
         }
     end

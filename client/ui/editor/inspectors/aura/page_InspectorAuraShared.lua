@@ -9,6 +9,43 @@ local UI = Addon.UI or {}
 local AuraClass = Addon.Internal and Addon.Internal.Database and Addon.Internal.Database.Classes and Addon.Internal.Database.Classes.Aura or nil
 local Combat = Addon.Client and Addon.Client.Combat or {}
 
+local function normalizeAuraDuration(value, fallback)
+    local numericValue = tonumber(value)
+    if numericValue == 0 then
+        return 0
+    end
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
+        numericValue = tonumber(fallback) or 1
+    end
+    return math.max(1, math.floor(numericValue))
+end
+
+function DataEditor:NormalizeAuraDuration(value, fallback)
+    return normalizeAuraDuration(value, fallback)
+end
+
+local function normalizeAuraTickRadius(value)
+    local numericValue = tonumber(value)
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue <= 0
+    then
+        return nil
+    end
+    return numericValue
+end
+
+function DataEditor:NormalizeAuraTickRadius(value)
+    return normalizeAuraTickRadius(value)
+end
+
 DataEditor.AuraInspectorSidePadding = DataEditor.AuraInspectorSidePadding or 8
 DataEditor.AuraInspectorControlHeight = DataEditor.AuraInspectorControlHeight or 20
 DataEditor.AuraInspectorFieldWidth = DataEditor.AuraInspectorFieldWidth or 236
@@ -16,6 +53,17 @@ DataEditor.AuraInspectorFieldWidth = DataEditor.AuraInspectorFieldWidth or 236
 local STACK_BEHAVIOR_ITEMS = {
     { label = "Refresh Duration", value = "refresh_duration" },
     { label = "Independent Duration", value = "independent_duration" },
+}
+
+local POLARITY_ITEMS = {
+    { label = "Legacy (automatic)", value = "" },
+    { label = "Helpful", value = "helpful" },
+    { label = "Harmful", value = "harmful" },
+}
+
+local TICK_TARGET_MODE_ITEMS = {
+    { label = "Single Target", value = "single" },
+    { label = "Nearby Players", value = "nearby_players" },
 }
 
 local EFFECT_TYPE_ITEMS = {
@@ -309,6 +357,14 @@ function DataEditor:GetAuraInspectorStackBehaviorItems()
     return STACK_BEHAVIOR_ITEMS
 end
 
+function DataEditor:GetAuraInspectorPolarityItems()
+    return POLARITY_ITEMS
+end
+
+function DataEditor:GetAuraInspectorTickTargetModeItems()
+    return TICK_TARGET_MODE_ITEMS
+end
+
 function DataEditor:GetAuraInspectorEffectTypeItems()
     return EFFECT_TYPE_ITEMS
 end
@@ -564,7 +620,7 @@ function DataEditor:NormalizeAuraInspectorEffect(effect)
         effect.type = "apply_aura"
         effect.auraRef = effect.auraRef ~= nil and tostring(effect.auraRef) ~= "" and tostring(effect.auraRef) or nil
         effect.stacks = math.max(1, math.floor(tonumber(effect.stacks) or tonumber(effect.auraStacks) or 1))
-        effect.duration = math.max(1, math.floor(tonumber(effect.duration) or tonumber(effect.turns) or 12))
+        effect.duration = normalizeAuraDuration(effect.duration ~= nil and effect.duration or effect.turns, 12)
         effect.basePower = tonumber(effect.basePower) or tonumber(effect.powerLevel) or 0
         effect.baseDamage = nil
         effect.baseAbsorption = nil
@@ -681,7 +737,7 @@ function DataEditor:NormalizeAuraInspectorEventEffect(effect)
         effect.type = "apply_aura"
         effect.auraRef = effect.auraRef ~= nil and tostring(effect.auraRef) ~= "" and tostring(effect.auraRef) or nil
         effect.stacks = math.max(1, math.floor(tonumber(effect.stacks) or tonumber(effect.auraStacks) or 1))
-        effect.duration = math.max(1, math.floor(tonumber(effect.duration) or tonumber(effect.turns) or 12))
+        effect.duration = normalizeAuraDuration(effect.duration ~= nil and effect.duration or effect.turns, 12)
         effect.basePower = tonumber(effect.basePower) or tonumber(effect.powerLevel) or 0
         effect.baseDamage = nil
         effect.baseHealing = nil

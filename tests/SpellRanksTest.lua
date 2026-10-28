@@ -126,11 +126,23 @@ local legacyResourceSpell = Spell.FromTable({ components = {
 } })
 assertEqual(legacyResourceSpell.components[1].effect.scaleWithRank, false, "legacy Resource effects default to unscaled")
 local scaledResourceSpell = Spell.FromTable({ components = {
-    { effect = { type = "resource", resourceRef = "mana", amount = 10, scaleWithRank = true } },
+    {
+        effect = {
+            type = "resource",
+            resourceRef = "mana",
+            amount = 10,
+            scaleWithRank = true,
+            statScaling = { { statRef = "power", coefficient = 0.5 } },
+        },
+    },
 } })
 assertEqual(scaledResourceSpell.components[1].effect.scaleWithRank, true, "Resource opt-in normalizes")
+assertEqual(scaledResourceSpell.components[1].effect.statScaling[1].statRef, "power", "Resource stat scaling normalizes")
+assertEqual(scaledResourceSpell.components[1].effect.statScaling[1].coefficient, 0.5, "Resource stat scaling coefficient normalizes")
 assertEqual(Spell.FromTable(scaledResourceSpell:ToTable()).components[1].effect.scaleWithRank, true,
     "Resource opt-in serializes")
+assertEqual(Spell.FromTable(scaledResourceSpell:ToTable()).components[1].effect.statScaling[1].statRef, "power",
+    "Resource stat scaling serializes")
 
 local useSpellRanksRule = findRule("character", "use_spell_ranks")
 assertEqual(useSpellRanksRule ~= nil, true, "Use Spell Ranks rule exists")
@@ -251,21 +263,38 @@ assertEqual(EffectCombat:ResolveResourceEffectAmount({ targetUnit = resourceTarg
 assertEqual(EffectCombat:ResolveResourceEffectAmount({ targetUnit = resourceTarget, spellRankMultiplier = 1 }, scaledPositiveResourceEffect), 50,
     "Rank 1 Resource baseline")
 
-local percentageEffect = { resourceRef = "mana", amount = 10, amountMode = "base_percent", scaleWithRank = true }
-local unscaledPercentageEffect = { resourceRef = "mana", amount = 10, amountMode = "base_percent", scaleWithRank = false }
+local percentageEffect = { resourceRef = "mana", amount = 10, amountMode = "max_percent", scaleWithRank = true }
+local unscaledPercentageEffect = { resourceRef = "mana", amount = 10, amountMode = "max_percent", scaleWithRank = false }
+local statScaledResourceEffect = {
+    resourceRef = "mana",
+    amount = 10,
+    amountMode = "max_percent",
+    scaleWithRank = false,
+    statScaling = { { statRef = "power", coefficient = 0.5 } },
+}
 assertEqual(EffectCombat:ResolveResourceEffectAmount({ targetUnit = resourceTarget, spellRankMultiplier = 1.1 }, percentageEffect), 11,
     "opted-in percentage Resource effect scales once")
 assertEqual(EffectCombat:ResolveResourceEffectAmount({ targetUnit = resourceTarget, spellRankMultiplier = 1.7 }, unscaledPercentageEffect), 10,
     "opted-out percentage Resource effect retains authored percentage")
+assertEqual(EffectCombat:ResolveResourceEffectAmount({
+    casterUnit = { stats = { power = 10 } },
+    targetUnit = resourceTarget,
+}, statScaledResourceEffect), 15, "Resource percentage effect adds caster stat scaling")
 local _, directResourceResult = EffectCombat:ExecuteResourceEffect({ targetUnit = resourceTarget, spellRankMultiplier = 1.1 }, scaledPositiveResourceEffect)
 assertEqual(directResourceResult.amount, 55, "direct Resource execution applies opt-in rank once")
 local _, auraResourceResult = alternateResourceEffect.Execute(alternateResourceEffect, {
     targetUnit = resourceTarget,
     aura = { rankMultiplier = 1.1 },
 }, positiveResourceEffect)
-assertEqual(auraResourceResult.amount, 55, "Aura Resource effect keeps source Aura rank propagation")
+assertEqual(auraResourceResult.amount, 50, "Aura Resource opt-out keeps authored magnitude")
+local _, scaledAuraResourceResult = alternateResourceEffect.Execute(alternateResourceEffect, {
+    targetUnit = resourceTarget,
+    aura = { rankMultiplier = 1.1 },
+}, scaledPositiveResourceEffect)
+assertEqual(scaledAuraResourceResult.amount, 55, "Aura Resource opt-in keeps source Aura rank propagation")
 local resourceContract = loadEffectFile("client/combat/effects/Resource.lua")
 assertEqual(resourceContract.defaults.scaleWithRank, false, "Resource contract defaults rank scaling off")
+assertEqual(#resourceContract.defaults.statScaling, 0, "Resource contract defaults stat scaling empty")
 
 local authoredSpell = {
     resourceCosts = { { resourceRef = "mana", amount = 30 } },

@@ -22,6 +22,29 @@ local normalizeConsumableTraitSkillBonuses = Shared.normalizeConsumableTraitSkil
 local normalizeConsumableTraitAutomaticAuras = Shared.normalizeConsumableTraitAutomaticAuras
 local normalizeConsumableTraitEvents = Shared.normalizeConsumableTraitEvents
 
+local function normalizeAuraDuration(value, fallback)
+    local numericValue = tonumber(value)
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
+        numericValue = tonumber(fallback) or 1
+    end
+
+    if numericValue == 0 then
+        return 0
+    end
+
+    local normalized = math.floor(numericValue)
+    if normalized < 1 then
+        return math.max(1, math.floor(tonumber(fallback) or 1))
+    end
+
+    return normalized
+end
+
 local function buildConsumablePage(self, page)
     local function handleMouseWheel(_, delta)
         local _, maxValue = self.ItemInspectorConsumableScrollBar:GetMinMaxValues()
@@ -679,7 +702,7 @@ local function buildConsumablePage(self, page)
                     auraRef = auraRef,
                     targetScope = self.ItemInspectorConsumableAutoAuraTargetDropdown:GetSelectedValue() or "self",
                     stacks = tonumber(self.ItemInspectorConsumableAutoAuraStacksInput:GetText()) or 1,
-                    turns = tonumber(self.ItemInspectorConsumableAutoAuraTurnsInput:GetText()) or 1,
+                    turns = normalizeAuraDuration(self.ItemInspectorConsumableAutoAuraTurnsInput:GetText(), 1),
                     powerLevel = tonumber(self.ItemInspectorConsumableAutoAuraPowerInput:GetText()) or 0,
                 },
             }
@@ -989,7 +1012,7 @@ local function buildConsumablePage(self, page)
                 type = "apply_aura",
                 auraRef = effectRef,
                 stacks = math.max(1, math.floor(amount)),
-                duration = math.max(1, math.floor(auxValue)),
+                duration = normalizeAuraDuration(auxValue, 12),
                 basePower = extraValue,
             }
         elseif effectType == "remove_aura" then

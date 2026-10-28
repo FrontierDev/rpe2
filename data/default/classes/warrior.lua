@@ -1,7 +1,7 @@
 local _, Addon = ...
 
 Addon.Data.DefaultDatasets:Register({
-    version = 50,
+    version = 53,
     dataset = {
         achievements = {},
         auras = {
@@ -763,6 +763,161 @@ Addon.Data.DefaultDatasets:Register({
                 id = "t05_warrior_heroism",
                 key = "t05_warrior_heroism",
                 name = "Battlegear of Heroism",
+            },
+            {
+                bonuses = {
+                    {
+                        requiredPieces = 2,
+                        skillBonuses = {},
+                        statBonuses = {},
+                        equipmentBonuses = {
+                            {
+                                description = "Restore 10 Rage when you successfully Parry an attack.",
+                                events = {
+                                    {
+                                        chance = 100,
+                                        combatEventId = "on_defence",
+                                        defenceStatRef = "f82db71a:tcn0s8kx",
+                                        effects = {
+                                            {
+                                                amount = 10,
+                                                amountMode = "flat",
+                                                resourceRef = "f82db71a:e2tfklq7",
+                                                type = "resource",
+                                            },
+                                        },
+                                        triggerTarget = "event_other",
+                                    },
+                                },
+                                name = "Immoveable Resolve",
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 4,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:u7b49vs9",
+                                value = 35,
+                            },
+                        },
+                        equipmentBonuses = {},
+                    },
+                    {
+                        requiredPieces = 6,
+                        skillBonuses = {},
+                        statBonuses = {},
+                        equipmentBonuses = {
+                            {
+                                description = "Successfully Parrying an attack has a 20% chance to counterattack the attacker for Physical damage.",
+                                events = {
+                                    {
+                                        chance = 20,
+                                        combatEventId = "on_defence",
+                                        defenceStatRef = "f82db71a:tcn0s8kx",
+                                        effects = {
+                                            {
+                                                amountMode = "flat",
+                                                baseDamage = 100,
+                                                damageSchoolRefs = {
+                                                    "f82db71a:v1azo4j6",
+                                                },
+                                                statScaling = {
+                                                    {
+                                                        coefficient = 0.20,
+                                                        statRef = "f82db71a:u7b49vs9",
+                                                    },
+                                                },
+                                                type = "damage",
+                                            },
+                                        },
+                                        triggerTarget = "event_source",
+                                    },
+                                },
+                                name = "Immoveable Retaliation",
+                            },
+                        },
+                    },
+                },
+                description = "Tier 2 Warrior tank armor set. RPE-adapted bonuses.",
+                icon = "interface/icons/inv_chest_plate16.blp",
+                id = "t2_warrior_tank",
+                key = "t2_warrior_tank",
+                name = "Immoveable Wrath",
+            },
+            {
+                bonuses = {
+                    {
+                        requiredPieces = 2,
+                        skillBonuses = {},
+                        statBonuses = {},
+                        equipmentBonuses = {
+                            {
+                                description = "Critical hits have a 20% chance to apply or refresh Rend on the target for 5 turns.",
+                                events = {
+                                    {
+                                        chance = 20,
+                                        combatEventId = "on_critical_hit",
+                                        effects = {
+                                            {
+                                                auraRef = "7bbb4cb9:jkptpqlh",
+                                                basePower = 0,
+                                                duration = 5,
+                                                stacks = 1,
+                                                type = "apply_aura",
+                                            },
+                                        },
+                                        triggerTarget = "event_other",
+                                    },
+                                },
+                                name = "Unstoppable Rend",
+                            },
+                        },
+                    },
+                    {
+                        requiredPieces = 4,
+                        skillBonuses = {},
+                        statBonuses = {
+                            {
+                                statRef = "f82db71a:gj9wxb0x",
+                                value = 5,
+                            },
+                        },
+                        equipmentBonuses = {},
+                    },
+                    {
+                        requiredPieces = 6,
+                        skillBonuses = {},
+                        statBonuses = {},
+                        equipmentBonuses = {
+                            {
+                                description = "Melee hits have a 20% chance to restore 10 Rage.",
+                                events = {
+                                    {
+                                        chance = 20,
+                                        combatEventId = "on_melee_hit",
+                                        effects = {
+                                            {
+                                                amount = 10,
+                                                amountMode = "flat",
+                                                resourceRef = "f82db71a:e2tfklq7",
+                                                type = "resource",
+                                            },
+                                        },
+                                        triggerTarget = "event_source",
+                                    },
+                                },
+                                name = "Unstoppable Momentum",
+                            },
+                        },
+                    },
+                },
+                description = "Tier 2 Warrior melee DPS armor set. RPE-adapted bonuses.",
+                icon = "interface/icons/inv_chest_plate16.blp",
+                id = "t2_warrior_dps",
+                key = "t2_warrior_dps",
+                name = "Unstoppable Wrath",
             },
         },
         items = {
@@ -4227,7 +4382,7 @@ Addon.Data.DefaultDatasets:Register({
                         castPhase = "on_cast_end",
                         castingGroup = "default",
                         effect = {
-                            alwaysHits = false,
+                            alwaysHits = true,
                             amountMode = "flat",
                             applyAura = true,
                             auraRef = "7bbb4cb9:sb4b9ef3",

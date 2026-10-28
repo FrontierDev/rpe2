@@ -76,6 +76,15 @@ local function formatTurnLabel(turns)
     return ("%d turns"):format(numericTurns)
 end
 
+local function buildTickTargetDescription(auraDefinition)
+    if type(auraDefinition) ~= "table" or auraDefinition.tickTargetMode ~= "nearby_players" then
+        return ""
+    end
+
+    local radius = tonumber(auraDefinition.tickRadiusYards) or 0
+    return ("Periodic effects affect nearby players within %g yards of a player target, or its active raid-marker group when applied to a non-player."):format(radius)
+end
+
 local function buildStackingDescription(auraDefinition, options)
     if type(auraDefinition) ~= "table" then
         return ""
@@ -1622,7 +1631,10 @@ function AuraDescriptionBuilder:BuildTooltipSectionTemplate(auraRef, options)
             spellDatasetId = type(options) == "table" and options.spellDatasetId or nil,
             nameText = ensureString(auraDefinition.name, ensureString(qualifiedAuraRef or auraRef, "Aura")),
             icon = ensureString(auraDefinition.icon, "Interface\\Icons\\INV_Misc_QuestionMark"),
-            descriptionText = TooltipTemplate.CombineText(payload.bodyText, payload.stackingText),
+            descriptionText = trimText(table.concat({
+                TooltipTemplate.CombineText(payload.bodyText, payload.stackingText),
+                buildTickTargetDescription(auraDefinition),
+            }, " ")),
             tokens = TooltipTemplate.MergeTokens(payload.bodyTokens, payload.stackingTokens),
             powerLevel = type(options) == "table" and options.powerLevel or nil,
             rankMultiplier = type(options) == "table" and options.rankMultiplier or nil,
@@ -1722,6 +1734,12 @@ function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
         end
         local resolvedDescriptionText, resolveError = self:ResolveTooltipTemplatePayload(auraDefinition, payload, resolvedOptions)
         local descriptionText = trimText(resolvedDescriptionText)
+        if descriptionText ~= "" then
+            descriptionText = trimText(table.concat({
+                descriptionText,
+                buildTickTargetDescription(auraDefinition),
+            }, " "))
+        end
         if descriptionText == "" then
             return {
                 auraRef = qualifiedAuraRef or auraRef,
@@ -1763,6 +1781,7 @@ function AuraDescriptionBuilder:BuildTooltipSection(auraRef, options)
     local descriptionText = trimText(table.concat({
         trimText(baseDescriptionText),
         trimText(stackingDescriptionText),
+        buildTickTargetDescription(auraDefinition),
     }, " "))
     if descriptionText == "" then
         return nil

@@ -155,6 +155,73 @@ function DataEditor:BuildAuraInspectorGeneralPage(page)
     self.AuraInspectorTagsInput:SetScript("OnEditFocusLost", commitTags)
     root:AddChild(self.AuraInspectorTagsInput)
 
+    root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorPolarityLabel", "Polarity"))
+    self.AuraInspectorPolarityDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorAuraInspectorPolarityDropdown", {
+        width = self.AuraInspectorFieldWidth,
+        height = 18,
+        items = self:GetAuraInspectorPolarityItems(),
+        onValueChanged = function(value)
+            if self._refreshingAuraInspector then
+                return
+            end
+
+            self:CommitSelectedAura(function(aura)
+                aura.polarity = (value == "helpful" or value == "harmful") and value or nil
+            end)
+        end,
+    })
+    root:AddChild(self.AuraInspectorPolarityDropdown)
+
+    root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorTickTargetModeLabel", "Tick Target Mode"))
+    self.AuraInspectorTickTargetModeDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorAuraInspectorTickTargetModeDropdown", {
+        width = self.AuraInspectorFieldWidth,
+        height = 18,
+        items = self:GetAuraInspectorTickTargetModeItems(),
+        onValueChanged = function(value)
+            if self._refreshingAuraInspector then
+                return
+            end
+
+            self:CommitSelectedAura(function(aura)
+                aura.tickTargetMode = value == "nearby_players" and "nearby_players" or "single"
+            end)
+            if type(self.RefreshAuraInspectorPage) == "function" then
+                self:RefreshAuraInspectorPage()
+            end
+        end,
+    })
+    root:AddChild(self.AuraInspectorTickTargetModeDropdown)
+
+    root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorTickRadiusLabel", "Tick Radius (yards)"))
+    self.AuraInspectorTickRadiusInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAuraInspectorTickRadiusInput", {
+        width = self.AuraInspectorFieldWidth,
+        height = self.AuraInspectorControlHeight,
+        text = "",
+        borderColor = UI.ResolveColor(nil, "panel.border"),
+    })
+    local commitTickRadius = function()
+        self:CommitSelectedAura(function(aura)
+            aura.tickRadiusYards = self:NormalizeAuraTickRadius(self.AuraInspectorTickRadiusInput:GetText())
+        end)
+        if type(self.RefreshAuraInspectorPage) == "function" then
+            self:RefreshAuraInspectorPage()
+        end
+    end
+    self.AuraInspectorTickRadiusInput:SetScript("OnEnterPressed", commitTickRadius)
+    self.AuraInspectorTickRadiusInput:SetScript("OnEditFocusLost", commitTickRadius)
+    root:AddChild(self.AuraInspectorTickRadiusInput)
+
+    self.AuraInspectorTickValidationText = UI.CreateText(root:GetFrame(), "RPEDataEditorAuraInspectorTickValidationText", "", {
+        fontFile = (UI.Constants and UI.Constants.FontFiles and UI.Constants.FontFiles.Default) or "Fonts\\FRIZQT__.TTF",
+        fontSize = (UI.Constants and UI.Constants.FontSizes and UI.Constants.FontSizes.Body) or 8,
+        textColor = UI.ResolveColor(nil, "warning"),
+        width = self.AuraInspectorFieldWidth,
+        height = 24,
+        justifyH = "LEFT",
+        wordWrap = true,
+    })
+    root:AddChild(self.AuraInspectorTickValidationText)
+
     root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorDurationLabel", "Duration"))
     self.AuraInspectorDurationInput = UI.CreateTextInput(root:GetFrame(), "RPEDataEditorAuraInspectorDurationInput", {
         width = self.AuraInspectorFieldWidth,
@@ -164,15 +231,39 @@ function DataEditor:BuildAuraInspectorGeneralPage(page)
     })
     self.AuraInspectorDurationInput:SetScript("OnEnterPressed", function()
         self:CommitSelectedAura(function(aura)
-            aura.duration = math.max(1, tonumber(self.AuraInspectorDurationInput:GetText()) or 1)
+            aura.duration = self:NormalizeAuraDuration(self.AuraInspectorDurationInput:GetText(), 1)
         end)
     end)
     self.AuraInspectorDurationInput:SetScript("OnEditFocusLost", function()
         self:CommitSelectedAura(function(aura)
-            aura.duration = math.max(1, tonumber(self.AuraInspectorDurationInput:GetText()) or 1)
+            aura.duration = self:NormalizeAuraDuration(self.AuraInspectorDurationInput:GetText(), 1)
         end)
     end)
     root:AddChild(self.AuraInspectorDurationInput)
+    self.AuraInspectorInfiniteDurationCheckbox = self:CreateAuraInspectorCheckbox(
+        root:GetFrame(),
+        "RPEDataEditorAuraInspectorInfiniteDurationCheckbox",
+        "Infinite (until event ends)",
+        false,
+        function(checked)
+            if self._refreshingAuraInspector then
+                return
+            end
+
+            self:CommitSelectedAura(function(aura)
+                if checked == true then
+                    aura.duration = 0
+                    return
+                end
+
+                aura.duration = self:NormalizeAuraDuration(self.AuraInspectorDurationInput:GetText(), 1)
+            end)
+            if type(self.RefreshAuraInspectorPage) == "function" then
+                self:RefreshAuraInspectorPage()
+            end
+        end
+    )
+    root:AddChild(self.AuraInspectorInfiniteDurationCheckbox)
 
     root:AddChild(self:BuildAuraInspectorLabel(root:GetFrame(), "RPEDataEditorAuraInspectorStackBehaviorLabel", "Stack Behavior"))
     self.AuraInspectorStackBehaviorDropdown = UI.CreateDropdown(root:GetFrame(), "RPEDataEditorAuraInspectorStackBehaviorDropdown", {

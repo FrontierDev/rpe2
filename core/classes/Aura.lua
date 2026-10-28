@@ -158,6 +158,33 @@ local function normalizeStackBehavior(value)
     return "refresh_duration"
 end
 
+local function normalizePolarity(value)
+    local polarity = string.lower(trimText(value))
+    if polarity == "helpful" or polarity == "harmful" then
+        return polarity
+    end
+
+    return nil
+end
+
+local function normalizeTickTargetMode(value)
+    return trimText(value) == "nearby_players" and "nearby_players" or "single"
+end
+
+local function normalizeTickRadius(value)
+    local radius = tonumber(value)
+    if radius == nil
+        or radius ~= radius
+        or radius == math.huge
+        or radius == -math.huge
+        or radius <= 0
+    then
+        return nil
+    end
+
+    return radius
+end
+
 local function normalizeBool(value, fallback)
     if type(value) == "boolean" then
         return value
@@ -242,6 +269,29 @@ local function normalizeNonNegativeNumber(value)
     end
 
     return math.max(0, numericValue)
+end
+
+local function normalizeAuraDuration(value, fallback)
+    local numericValue = tonumber(value)
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
+        numericValue = tonumber(fallback) or 1
+    end
+
+    if numericValue == 0 then
+        return 0
+    end
+
+    local normalized = math.floor(numericValue)
+    if normalized < 1 then
+        return math.max(1, math.floor(tonumber(fallback) or 1))
+    end
+
+    return normalized
 end
 
 local function normalizeCombatEventId(value)
@@ -333,7 +383,7 @@ local function normalizeEffect(value)
             type = "apply_aura",
             auraRef = normalizeRef(value.auraRef),
             stacks = math.max(1, math.floor(tonumber(value.stacks) or tonumber(value.auraStacks) or 1)),
-            duration = math.max(1, math.floor(tonumber(value.duration) or tonumber(value.turns) or 12)),
+            duration = normalizeAuraDuration(value.duration ~= nil and value.duration or value.turns, 12),
             basePower = tonumber(value.basePower) or tonumber(value.powerLevel) or 0,
         }
     end
@@ -345,6 +395,7 @@ local function normalizeEffect(value)
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
             scaleWithRank = value.scaleWithRank ~= false,
+            statScaling = normalizeStatScaling(value.statScaling),
         }
     end
 
@@ -405,7 +456,7 @@ local function normalizeEventEffect(value)
             type = "apply_aura",
             auraRef = normalizeRef(value.auraRef),
             stacks = math.max(1, math.floor(tonumber(value.stacks) or tonumber(value.auraStacks) or 1)),
-            duration = math.max(1, math.floor(tonumber(value.duration) or tonumber(value.turns) or 12)),
+            duration = normalizeAuraDuration(value.duration ~= nil and value.duration or value.turns, 12),
             basePower = tonumber(value.basePower) or tonumber(value.powerLevel) or 0,
         }
     end
@@ -425,6 +476,7 @@ local function normalizeEventEffect(value)
             amount = tonumber(value.amount) or tonumber(value.baseAmount) or 0,
             amountMode = normalizeAmountMode(value.amountMode),
             scaleWithRank = value.scaleWithRank ~= false,
+            statScaling = normalizeStatScaling(value.statScaling),
         }
     end
 
@@ -514,6 +566,9 @@ function Aura:New(data)
         stackBehavior = "refresh_duration",
         maxStacks = 1,
         tags = {},
+        polarity = nil,
+        tickTargetMode = "single",
+        tickRadiusYards = nil,
     }, Aura):Merge(data)
 end
 
@@ -533,8 +588,11 @@ function Aura:Merge(data)
     self.tooltipTemplate = normalizeBool(self.tooltipTemplate, false)
     self.tooltipTemplateData = normalizeAuraTooltipTemplateData(self.tooltipTemplateData)
     self.icon = ensureString(self.icon)
-    self.duration = math.max(1, math.floor(tonumber(self.duration) or 1))
+    self.duration = normalizeAuraDuration(self.duration, 1)
     self.stackBehavior = normalizeStackBehavior(self.stackBehavior)
+    self.polarity = normalizePolarity(self.polarity)
+    self.tickTargetMode = normalizeTickTargetMode(self.tickTargetMode)
+    self.tickRadiusYards = normalizeTickRadius(self.tickRadiusYards)
     self.maxStacks = math.max(1, math.floor(tonumber(self.maxStacks) or 1))
     self.effects = normalizeEffects(data.effects or self.effects)
     self.events = normalizeEvents(data.events or self.events)
@@ -557,6 +615,9 @@ function Aura:ToTable()
         stackBehavior = self.stackBehavior,
         maxStacks = self.maxStacks,
         tags = normalizeTags(self.tags),
+        polarity = self.polarity,
+        tickTargetMode = self.tickTargetMode,
+        tickRadiusYards = self.tickRadiusYards,
     }
 end
 
@@ -584,6 +645,9 @@ function Aura:Validate()
         if self.stackBehavior == "independent_duration" then
             errors[#errors + 1] = "Absorb effects do not support Independent Duration stacking in V1."
         end
+    end
+    if self.tickTargetMode == "nearby_players" and self.tickRadiusYards == nil then
+        errors[#errors + 1] = "Nearby Players tick targeting requires a positive finite tick radius."
     end
 
     return {

@@ -48,7 +48,8 @@ local function buildAuraSnapshot(eventId)
             and tonumber(entry.targetEventId)
             and tostring(entry.auraRef or "") ~= ""
             and (tonumber(entry.stacks) or 0) > 0
-            and (tonumber(entry.turnsRemaining) or 0) > 0
+            and tonumber(entry.turnsRemaining) ~= nil
+            and (tonumber(entry.turnsRemaining) or 0) >= 0
         then
             records[#records + 1] = entry
         end

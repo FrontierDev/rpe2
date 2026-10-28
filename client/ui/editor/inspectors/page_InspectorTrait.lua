@@ -52,6 +52,29 @@ local function ensureString(value)
     return tostring(value)
 end
 
+local function normalizeAuraDuration(value, fallback)
+    local numericValue = tonumber(value)
+    if numericValue == nil
+        or numericValue ~= numericValue
+        or numericValue == math.huge
+        or numericValue == -math.huge
+        or numericValue < 0
+    then
+        numericValue = tonumber(fallback) or 1
+    end
+
+    if numericValue == 0 then
+        return 0
+    end
+
+    local normalized = math.floor(numericValue)
+    if normalized < 1 then
+        return math.max(1, math.floor(tonumber(fallback) or 1))
+    end
+
+    return normalized
+end
+
 local function parseDatasetQualifiedRef(reference)
     local normalizedReference = ensureString(reference)
     if normalizedReference == "" then
@@ -219,7 +242,7 @@ local function normalizeTraitInspectorEventEffect(effect)
         effect.type = "apply_aura"
         effect.auraRef = ensureString(effect.auraRef) ~= "" and ensureString(effect.auraRef) or nil
         effect.stacks = math.max(1, math.floor(tonumber(effect.stacks) or tonumber(effect.auraStacks) or 1))
-        effect.duration = math.max(1, math.floor(tonumber(effect.duration) or tonumber(effect.turns) or 12))
+        effect.duration = normalizeAuraDuration(effect.duration ~= nil and effect.duration or effect.turns, 12)
         effect.basePower = tonumber(effect.basePower) or tonumber(effect.powerLevel) or 0
         effect.baseDamage = nil
         effect.baseHealing = nil
@@ -2209,7 +2232,7 @@ local function buildTraitInspectorEventsPage(self, page)
     end)
     bindInput("TraitInspectorEventAuraDurationInput", function()
         self:CommitSelectedTraitInspectorEventEffect(function(effect)
-            effect.duration = math.max(1, math.floor(tonumber(self.TraitInspectorEventAuraDurationInput:GetText()) or 12))
+            effect.duration = normalizeAuraDuration(self.TraitInspectorEventAuraDurationInput:GetText(), 12)
         end)
     end)
     bindInput("TraitInspectorEventBasePowerInput", function()

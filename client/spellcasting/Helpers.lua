@@ -1540,7 +1540,7 @@ function Spellcasting.RevertLastSpellImpact(client, eventState, targetUnit, cont
                 context,
                 operation.auraRef,
                 math.max(1, operation.stacks),
-                math.max(1, operation.turns),
+                operation.turns == 0 and 0 or math.max(1, math.floor(tonumber(operation.turns) or 1)),
                 operation.powerLevel,
                 operation.rankMultiplier
             )

@@ -50,12 +50,14 @@ local ResourceEffect = Combat:CreateEffectContract({
         resourceRef = nil,
         amount = 0,
         scaleWithRank = false,
+        statScaling = {},
         targetEvents = {},
     },
     fields = {
         "resourceRef",
         "amount",
         "scaleWithRank",
+        "statScaling",
         "targetEvents",
     },
     Execute = function(self, context, effect, component)
