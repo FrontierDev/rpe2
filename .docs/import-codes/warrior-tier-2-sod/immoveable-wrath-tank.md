@@ -2,7 +2,7 @@
 
 Season of Discovery Warrior Tier 2 Draconic tank set.
 
-Each block below is a standalone `RPE_DATASET_ENTRY_V1` import code for the Warrior dataset (`sb4b9ef3`).
+Each block below is a standalone `RPE_DATASET_ENTRY_V1` import code for the Warrior dataset (`7bbb4cb9`).
 
 ## Chestguard of Wrath
 
@@ -12,7 +12,7 @@ RPE_DATASET_ENTRY_V1
     format = "rpe-dataset-entry",
     version = 1,
     collectionKey = "items",
-    datasetId = "sb4b9ef3",
+    datasetId = "7bbb4cb9",
     entry = {
         allowWowConversion = false,
         armorWeight = "plate",
@@ -139,7 +139,7 @@ RPE_DATASET_ENTRY_V1
     format = "rpe-dataset-entry",
     version = 1,
     collectionKey = "items",
-    datasetId = "sb4b9ef3",
+    datasetId = "7bbb4cb9",
     entry = {
         allowWowConversion = false,
         armorWeight = "plate",
@@ -248,7 +248,7 @@ RPE_DATASET_ENTRY_V1
     format = "rpe-dataset-entry",
     version = 1,
     collectionKey = "items",
-    datasetId = "sb4b9ef3",
+    datasetId = "7bbb4cb9",
     entry = {
         allowWowConversion = false,
         armorWeight = "plate",
@@ -357,7 +357,7 @@ RPE_DATASET_ENTRY_V1
     format = "rpe-dataset-entry",
     version = 1,
     collectionKey = "items",
-    datasetId = "sb4b9ef3",
+    datasetId = "7bbb4cb9",
     entry = {
         allowWowConversion = false,
         armorWeight = "plate",
@@ -477,7 +477,7 @@ RPE_DATASET_ENTRY_V1
     format = "rpe-dataset-entry",
     version = 1,
     collectionKey = "items",
-    datasetId = "sb4b9ef3",
+    datasetId = "7bbb4cb9",
     entry = {
         allowWowConversion = false,
         armorWeight = "plate",
@@ -597,7 +597,7 @@ RPE_DATASET_ENTRY_V1
     format = "rpe-dataset-entry",
     version = 1,
     collectionKey = "items",
-    datasetId = "sb4b9ef3",
+    datasetId = "7bbb4cb9",
     entry = {
         allowWowConversion = false,
         armorWeight = "plate",
@@ -710,7 +710,7 @@ RPE_DATASET_ENTRY_V1
     format = "rpe-dataset-entry",
     version = 1,
     collectionKey = "items",
-    datasetId = "sb4b9ef3",
+    datasetId = "7bbb4cb9",
     entry = {
         allowWowConversion = false,
         armorWeight = "plate",
@@ -827,7 +827,7 @@ RPE_DATASET_ENTRY_V1
     format = "rpe-dataset-entry",
     version = 1,
     collectionKey = "items",
-    datasetId = "sb4b9ef3",
+    datasetId = "7bbb4cb9",
     entry = {
         allowWowConversion = false,
         armorWeight = "plate",
