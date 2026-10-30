@@ -36,8 +36,8 @@ local ACHIEVEMENT_TEXT_COLOR = "ffff00"
 local GUILD_TEXT_COLOR = "40ff40"
 local ACHIEVEMENT_EARNED = "You have earned the achievement %s!"
 local GUILD_ACHIEVEMENT_EARNED = "%s has earned the achievement %s!"
-local ITEM_GAIN_REPORT_OPCODE = type(Operations.GetOpcode) == "function"
-    and Operations:GetOpcode("ITEM_GAIN_REPORT") or nil
+local ITEM_GAIN_ANNOUNCEMENT_OPCODE = type(Operations.GetOpcode) == "function"
+    and Operations:GetOpcode("ITEM_GAIN_ANNOUNCEMENT") or nil
 local ITEM_GAIN_CATEGORIES = {
     crafted = true,
     received = true,
@@ -402,10 +402,10 @@ function LootNotifications:IsConnectedToActiveServer()
         and state.channelId ~= nil and state.channelId ~= ""
 end
 
-function LootNotifications:SendAcquisitionReport(event)
+function LootNotifications:SendAcquisitionAnnouncement(event)
     local state = Client.State
     if not self:IsConnectedToActiveServer()
-        or not ITEM_GAIN_REPORT_OPCODE
+        or not ITEM_GAIN_ANNOUNCEMENT_OPCODE
         or type(Comms.SendToChannel) ~= "function"
     then
         return false
@@ -421,7 +421,7 @@ function LootNotifications:SendAcquisitionReport(event)
         return false
     end
 
-    local sent = sender(Comms, state.channelId, ITEM_GAIN_REPORT_OPCODE, {
+    local sent = sender(Comms, state.channelId, ITEM_GAIN_ANNOUNCEMENT_OPCODE, {
         playerName,
         event.eventId,
         event.itemRef,
@@ -429,7 +429,7 @@ function LootNotifications:SendAcquisitionReport(event)
         event.quantity,
         event.category,
     }, {
-        opcode = ITEM_GAIN_REPORT_OPCODE,
+        opcode = ITEM_GAIN_ANNOUNCEMENT_OPCODE,
         scope = "client",
         onFailed = function()
             if self:RememberAcquisition(event) then
@@ -453,7 +453,10 @@ function LootNotifications:HandleCommittedAcquisition(event)
         return false
     end
 
-    if self:SendAcquisitionReport(normalized) then
+    if self:SendAcquisitionAnnouncement(normalized) then
+        if self:RememberAcquisition(normalized) then
+            self:RenderAcquisition(normalized)
+        end
         return true
     end
 
@@ -506,11 +509,10 @@ end
 function Client:HandleItemGainAnnouncement(arguments, sender, distribution, target)
     local state = self.State
     local senderName = normalizePlayerName(sender)
-    local hostName = normalizePlayerName(state and state.hostName)
     if type(state) ~= "table" or state.active ~= true
         or distribution ~= "CHANNEL"
         or tonumber(target) ~= tonumber(state.channelId)
-        or senderName == "" or hostName == "" or senderName ~= hostName
+        or senderName == ""
     then
         return false
     end
@@ -523,7 +525,11 @@ function Client:HandleItemGainAnnouncement(arguments, sender, distribution, targ
         quantity = arguments and arguments[5],
         category = arguments and arguments[6],
     })
-    if not event or not resolveItem(event.itemRef) or not LootNotifications:RememberAcquisition(event) then
+    if not event
+        or senderName ~= event.playerName
+        or not resolveItem(event.itemRef)
+        or not LootNotifications:RememberAcquisition(event)
+    then
         return false
     end
     return LootNotifications:RenderAcquisition(event)

@@ -636,18 +636,6 @@ Operations.Opcodes = Operations.Opcodes or {
             return client:HandleAuraRuntimeUpdateBatch(arguments, sender, distribution, target, message)
         end,
     },
-    [41] = {
-        key = "ITEM_GAIN_REPORT",
-        name = "item-gain-report",
-        ["function"] = function(arguments, sender, distribution, target, message)
-            local server = Addon.Server
-            if not server or type(server.HandleItemGainReport) ~= "function" then
-                return false
-            end
-
-            return server:HandleItemGainReport(arguments, sender, distribution, target, message)
-        end,
-    },
     [42] = {
         key = "ITEM_GAIN_ANNOUNCEMENT",
         name = "item-gain-announcement",
