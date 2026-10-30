@@ -185,4 +185,19 @@ page.categoryValue = "type:weapon"
 page:ApplyFilter()
 assertEqual(#page.filteredItems, 2, "weapon filter keeps both tiers")
 
+local quantityChanges = 0
+page.quantity = 3
+page.SetQuantity = function()
+    quantityChanges = quantityChanges + 1
+end
+page.quantityInput = {
+    SetText = function()
+        page:OnQuantityInputChanged({ GetText = function() return "3" end })
+    end,
+}
+page:UpdateQuantityText()
+assertEqual(quantityChanges, 0, "programmatic quantity text updates do not re-enter the quantity handler")
+page:OnQuantityInputChanged({ GetText = function() return "2" end })
+assertEqual(quantityChanges, 1, "user quantity edits still update the selection")
+
 print("TradingItemsTest passed")

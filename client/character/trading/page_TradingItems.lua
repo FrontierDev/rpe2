@@ -221,6 +221,7 @@ local function createInstance()
         page = 1,
         selectedItemKey = nil,
         quantity = 1,
+        updatingQuantityInput = false,
         processing = false,
         feedback = "",
         built = false,
@@ -612,8 +613,10 @@ function ItemsPage:BuildItemTooltip(row)
 end
 
 function ItemsPage:UpdateQuantityText()
-    if self.quantityInput then
+    if self.quantityInput and not self.updatingQuantityInput then
+        self.updatingQuantityInput = true
         self.quantityInput:SetText(tostring(self.quantity))
+        self.updatingQuantityInput = false
     end
 end
 
@@ -643,6 +646,13 @@ function ItemsPage:SetQuantity(value)
     self.quantity = math.max(1, math.min(maximum, numeric))
     self:UpdateQuantityText()
     self:RefreshDetails()
+end
+
+function ItemsPage:OnQuantityInputChanged(input)
+    if self.updatingQuantityInput then
+        return
+    end
+    self:SetQuantity(input:GetText())
 end
 
 function ItemsPage:RefreshDetails()
@@ -1071,7 +1081,7 @@ function ItemsPage:Build(parent, owner)
         justifyH = "CENTER",
     })
     self.quantityInput:SetScript("OnTextChanged", function(input)
-        self:SetQuantity(input:GetText())
+        self:OnQuantityInputChanged(input)
     end)
     self.quantityRow:AddChild(self.quantityInput)
     self.quantityUp = UI.CreateButton(self.quantityRow:GetFrame(), "RPETradingItemsQuantityUp", "+", 22, function()
