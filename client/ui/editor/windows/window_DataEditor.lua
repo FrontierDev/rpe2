@@ -51,6 +51,7 @@ local ENTRY_DEFINITIONS = {
     achievements = { className = "Achievement", singular = "Achievement", buttonLabel = "New Achievement", emptyName = "Unnamed Achievement", assignsId = true },
     guildSettings = { className = "GuildSetting", singular = "Guild Rank", buttonLabel = "New Guild Rank", emptyName = "Unnamed Guild Rank", assignsId = true },
     currencies = { className = "Currency", singular = "Currency", buttonLabel = "New Currency", emptyName = "Unnamed Currency", assignsId = true },
+    markets = { className = "Market", singular = "Market", buttonLabel = "New Market", emptyName = "Unnamed Market", assignsId = true },
 }
 
 local INSPECTOR_PAGE_BY_COLLECTION = {
@@ -72,6 +73,7 @@ local INSPECTOR_PAGE_BY_COLLECTION = {
     achievements = "achievement",
     guildSettings = "guildSetting",
     currencies = "currency",
+    markets = "market",
     races = "race",
     classes = "class",
 }
@@ -98,6 +100,7 @@ local DATA_PAGE_REFRESHER_BY_COLLECTION = {
     achievements = "RefreshAchievementDataPage",
     guildSettings = "RefreshGuildSettingDataPage",
     currencies = "RefreshCurrencyDataPage",
+    markets = "RefreshMarketDataPage",
 }
 
 local INSPECTOR_REFRESHER_BY_PAGE = {
@@ -122,6 +125,7 @@ local INSPECTOR_REFRESHER_BY_PAGE = {
     currency = "RefreshCurrencyInspectorPage",
     race = "RefreshRaceInspectorPage",
     class = "RefreshClassInspectorPage",
+    market = "RefreshMarketInspectorPage",
 }
 
 local INSPECTOR_SELECTION_GETTER_BY_PAGE = {
@@ -145,6 +149,7 @@ local INSPECTOR_SELECTION_GETTER_BY_PAGE = {
     currency = "GetSelectedCurrency",
     race = "GetSelectedRace",
     class = "GetSelectedClass",
+    market = "GetSelectedMarket",
 }
 
 local function collectionQueuesDependencyRecompute(collectionKey)
@@ -165,6 +170,7 @@ local function collectionQueuesDependencyRecompute(collectionKey)
         or collectionKey == "auras"
         or collectionKey == "achievements"
         or collectionKey == "guildSettings"
+        or collectionKey == "markets"
 end
 
 function DataEditor:GetEntryDefinition(collectionKey)
@@ -437,6 +443,8 @@ function DataEditor:CreateDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "race"
         elseif collectionKey == "classes" then
             self.ActiveInspectorPageKey = "class"
+        elseif collectionKey == "markets" then
+            self.ActiveInspectorPageKey = "market"
         end
     end
     self:RefreshAll()
@@ -496,6 +504,8 @@ function DataEditor:CloneSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = "race"
         elseif collectionKey == "classes" then
             self.ActiveInspectorPageKey = "class"
+        elseif collectionKey == "markets" then
+            self.ActiveInspectorPageKey = "market"
         end
     end
     self:RefreshAll()
@@ -561,6 +571,8 @@ function DataEditor:DeleteSelectedDatasetEntry(collectionKey)
             self.ActiveInspectorPageKey = nextIndex and "race" or "dataset"
         elseif collectionKey == "classes" then
             self.ActiveInspectorPageKey = nextIndex and "class" or "dataset"
+        elseif collectionKey == "markets" then
+            self.ActiveInspectorPageKey = nextIndex and "market" or "dataset"
         end
     end
     self:RefreshAll()
@@ -671,6 +683,7 @@ local CONTENT_PAGE_DEFINITIONS = {
     { key = "achievements", label = "Achievement", builder = "BuildAchievementPage" },
     { key = "guildSettings", label = "Guild Ranks", builder = "BuildGuildSettingPage" },
     { key = "currencies", label = "Currency", builder = "BuildCurrencyPage" },
+    { key = "markets", label = "Markets", builder = "BuildMarketsPage" },
 }
 
 function DataEditor:GetContentPageDefinitions()
@@ -1238,6 +1251,10 @@ end
 
 function DataEditor:GetSelectedClass()
     return self:GetSelectedDatasetEntry("classes")
+end
+
+function DataEditor:GetSelectedMarket()
+    return self:GetSelectedDatasetEntry("markets")
 end
 
 function DataEditor:GetSelectedItemSlot()
@@ -2280,6 +2297,7 @@ function DataEditor:ShowInspectorPage(pageKey)
         currency = "BuildCurrencyInspectorPage",
         race = "BuildRaceInspectorPage",
         class = "BuildClassInspectorPage",
+        market = "BuildMarketInspectorPage",
     }
 
     for key, _ in pairs(builders) do
@@ -2373,6 +2391,9 @@ function DataEditor:RefreshAll()
     if self.RefreshCurrencyDataPage then
         self:RefreshCurrencyDataPage()
     end
+    if self.RefreshMarketDataPage then
+        self:RefreshMarketDataPage()
+    end
     if self.RefreshDatasetInspectorPage then
         self:RefreshDatasetInspectorPage()
     end
@@ -2435,6 +2456,9 @@ function DataEditor:RefreshAll()
     end
     if self.RefreshClassInspectorPage then
         self:RefreshClassInspectorPage()
+    end
+    if self.RefreshMarketInspectorPage then
+        self:RefreshMarketInspectorPage()
     end
 
     self:ShowInspectorPage(self:NormalizeActiveInspectorPageKey())

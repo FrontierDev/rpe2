@@ -796,6 +796,12 @@ function Client:HandleLocalConfigurationChanged(reason)
         end
     end
 
+    local tradingWindow = self.UI and self.UI.Trading and self.UI.Trading.Window or nil
+    local tradingWindowInstance = type(tradingWindow) == "table" and tradingWindow._singleton or nil
+    if type(tradingWindowInstance) == "table" and type(tradingWindowInstance.RefreshVisible) == "function" then
+        tradingWindowInstance:RefreshVisible(normalizedReason)
+    end
+
     if self.BuildActionBarWidget then
         self:BuildActionBarWidget()
     end

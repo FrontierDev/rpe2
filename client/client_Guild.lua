@@ -668,21 +668,11 @@ local function buildDailyRewardPlan(setting, rewardList)
 end
 
 function Guild:GetDailyRewardResetState()
-    if type(Common.GetNow) ~= "function" or type(date) ~= "function" then return nil, "calendar-unavailable" end
-    local api = _G and _G.C_DateAndTime or nil
-    if not api or type(api.GetSecondsUntilDailyReset) ~= "function" then return nil, "calendar-unavailable" end
-    local okNow, now = pcall(Common.GetNow)
-    local okReset, remaining = pcall(api.GetSecondsUntilDailyReset)
-    now, remaining = tonumber(now), tonumber(remaining)
-    if not okNow or not now or not okReset or not remaining or remaining < 0 then return nil, "calendar-unavailable" end
-    remaining = math.floor(remaining)
-    local nextReset = now + remaining
-    local okCycle, cycleKey = pcall(date, "%Y-%m-%d", nextReset)
-    local okCurrent, currentDayKey = pcall(date, "%Y-%m-%d", now)
-    local okPrevious, previousCycleKey = pcall(date, "%Y-%m-%d", nextReset - 86400)
-    if not okCycle or not okCurrent or not okPrevious then return nil, "calendar-unavailable" end
-    if not tostring(cycleKey):match("^%d%d%d%d%-%d%d%-%d%d$") then return nil, "calendar-unavailable" end
-    return { secondsRemaining = remaining, cycleKey = cycleKey, currentDayKey = currentDayKey, previousCycleKey = previousCycleKey }
+    if type(Common.GetDailyResetState) ~= "function" then
+        return nil, "calendar-unavailable"
+    end
+
+    return Common.GetDailyResetState()
 end
 
 local function legacyClaimBelongsToCurrentCycle(claimDate, resetState)

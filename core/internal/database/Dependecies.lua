@@ -648,6 +648,34 @@ local function getGuildSettingSourceRefs(guildSetting)
     return refs
 end
 
+local function getMarketSourceRefs(market)
+    local refs = {}
+    if type(market) ~= "table" then
+        return refs
+    end
+
+    for index = 1, #(market.buyItemRefs or {}) do
+        local itemRef = market.buyItemRefs[index]
+        if type(itemRef) == "string" and itemRef ~= "" then
+            refs[#refs + 1] = itemRef
+        end
+    end
+
+    local sellRules = type(market.sellRules) == "table" and market.sellRules or {}
+    for index = 1, #(sellRules.itemRefs or {}) do
+        local itemRef = sellRules.itemRefs[index]
+        if type(itemRef) == "string" and itemRef ~= "" then
+            refs[#refs + 1] = itemRef
+        end
+    end
+
+    if type(market.trackerMarketRef) == "string" and market.trackerMarketRef ~= "" then
+        refs[#refs + 1] = market.trackerMarketRef
+    end
+
+    return refs
+end
+
 local function isDeletedReference(reference, deletedDatasetId, deletedRef)
     if type(reference) ~= "string" or reference == "" then
         return false
@@ -764,6 +792,66 @@ local function pruneGuildSettingReferences(guildSettings, deletedDatasetId, dele
     return mutated
 end
 
+local function pruneMarketItemReferences(markets, deletedDatasetId, deletedRef)
+    local mutated = false
+    for marketIndex = 1, #(markets or {}) do
+        local market = markets[marketIndex]
+        if type(market) == "table" then
+            for _, fieldName in ipairs({ "buyItemRefs" }) do
+                local keptRefs = {}
+                local fieldMutated = false
+                for refIndex = 1, #(market[fieldName] or {}) do
+                    local itemRef = market[fieldName][refIndex]
+                    if isDeletedReference(itemRef, deletedDatasetId, deletedRef) then
+                        fieldMutated = true
+                    else
+                        keptRefs[#keptRefs + 1] = itemRef
+                    end
+                end
+                if fieldMutated then
+                    market[fieldName] = keptRefs
+                    mutated = true
+                end
+            end
+
+            local sellRules = type(market.sellRules) == "table" and market.sellRules or nil
+            if sellRules then
+                local keptRefs = {}
+                local fieldMutated = false
+                for refIndex = 1, #(sellRules.itemRefs or {}) do
+                    local itemRef = sellRules.itemRefs[refIndex]
+                    if isDeletedReference(itemRef, deletedDatasetId, deletedRef) then
+                        fieldMutated = true
+                    else
+                        keptRefs[#keptRefs + 1] = itemRef
+                    end
+                end
+                if fieldMutated then
+                    sellRules.itemRefs = keptRefs
+                    mutated = true
+                end
+            end
+        end
+    end
+
+    return mutated
+end
+
+local function pruneMarketTrackerReferences(markets, deletedDatasetId, deletedRef)
+    local mutated = false
+    for marketIndex = 1, #(markets or {}) do
+        local market = markets[marketIndex]
+        if type(market) == "table"
+            and isDeletedReference(market.trackerMarketRef, deletedDatasetId, deletedRef)
+        then
+            market.trackerMarketRef = ""
+            mutated = true
+        end
+    end
+
+    return mutated
+end
+
 local function pruneDeletedDerivedSources(entry, deletedDatasetId, legacyField, refField)
     local mutated = false
     local keptSources = {}
@@ -846,6 +934,7 @@ function Dependecies.RecomputeDatasetDependencies(datasetId)
     local auras = ensureTable(dataset.auras)
     local achievements = ensureTable(dataset.achievements)
     local guildSettings = ensureTable(dataset.guildSettings)
+    local markets = ensureTable(dataset.markets)
 
     for index = 1, #units do
         local unit = units[index]
@@ -1042,6 +1131,19 @@ function Dependecies.RecomputeDatasetDependencies(datasetId)
         end
     end
 
+    for index = 1, #markets do
+        local market = markets[index]
+        local sourceRefs = getMarketSourceRefs(market)
+
+        for refIndex = 1, #sourceRefs do
+            local sourceDatasetId = Dependecies.ParseSourceStatRef(sourceRefs[refIndex])
+            if sourceDatasetId and sourceDatasetId ~= dataset.id and not seen[sourceDatasetId] then
+                dependencies[#dependencies + 1] = sourceDatasetId
+                seen[sourceDatasetId] = true
+            end
+        end
+    end
+
     for index = 1, #damageSchools do
         local damageSchool = damageSchools[index]
         local sourceRefs = getDamageSchoolSourceRefs(damageSchool)
@@ -1100,6 +1202,7 @@ function Dependecies.HandleDatasetDeleted(datasetId)
             local auras = ensureTable(dataset.auras)
             local achievements = ensureTable(dataset.achievements)
             local guildSettings = ensureTable(dataset.guildSettings)
+            local markets = ensureTable(dataset.markets)
 
             for index = 1, #units do
                 local unit = units[index]
@@ -1842,6 +1945,13 @@ function Dependecies.HandleDatasetDeleted(datasetId)
                 mutated = true
             end
 
+            if pruneMarketItemReferences(markets, datasetId, nil) then
+                mutated = true
+            end
+            if pruneMarketTrackerReferences(markets, datasetId, nil) then
+                mutated = true
+            end
+
             for index = 1, #damageSchools do
                 local damageSchool = damageSchools[index]
                 local mitigationDatasetId = damageSchool and Dependecies.ParseSourceStatRef(damageSchool.mitigationStatRef) or nil
@@ -2332,6 +2442,16 @@ function Dependecies.HandleDatasetEntryDeleted(datasetId, collectionKey, entry)
                     mutated = true
                 end
             end
+        end
+
+        if collectionKey == "items"
+            and pruneMarketItemReferences(ensureTable(dataset.markets), nil, deletedRef)
+        then
+            mutated = true
+        elseif collectionKey == "markets"
+            and pruneMarketTrackerReferences(ensureTable(dataset.markets), nil, deletedRef)
+        then
+            mutated = true
         end
 
         if collectionKey == "items"

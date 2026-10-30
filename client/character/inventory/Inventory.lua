@@ -1514,6 +1514,7 @@ function Inventory.GetItemVariants(datasetId, itemId)
         local first = bucket and bucket[1]
         if first then
             local variant = copyCanonicalRecord(first)
+            variant.stackKey = buckets[index].stackKey
             variant.quantity = 0
             for bucketIndex = 1, #bucket do
                 variant.quantity = variant.quantity

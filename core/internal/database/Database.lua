@@ -220,6 +220,7 @@ local DATASET_ENTRY_DEFINITIONS = {
     achievements = { className = "Achievement", singular = "Achievement", assignsId = true },
     guildSettings = { className = "GuildSetting", singular = "Guild Setting", assignsId = true },
     currencies = { className = "Currency", singular = "Currency", assignsId = true },
+    markets = { className = "Market", singular = "Market", assignsId = true },
 }
 
 local function ensureTable(value)
@@ -236,6 +237,10 @@ local function ensureString(value, fallback)
     end
 
     return tostring(value)
+end
+
+local function trimText(value)
+    return ensureString(value, ""):gsub("^%s+", ""):gsub("%s+$", "")
 end
 
 local function startsWith(text, prefix)
@@ -786,6 +791,29 @@ local function normalizeAchievements(value)
     return normalized
 end
 
+local function normalizeMarkets(value)
+    if type(value) ~= "table" then
+        return {}
+    end
+
+    local marketClass = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.Market
+        or nil
+    local normalized = {}
+    for index = 1, #value do
+        local source = type(value[index]) == "table" and value[index] or {}
+        if marketClass and type(marketClass.FromTable) == "function" and type(marketClass.ToTable) == "function" then
+            normalized[index] = marketClass.ToTable(marketClass.FromTable(deepCopy(source)))
+        else
+            normalized[index] = deepCopy(source)
+        end
+    end
+
+    return normalized
+end
+
 local function normalizeDatasetRecord(record, fallbackId, fallbackName)
     local data = ensureTable(record)
     local datasetId = ensureString(data.id or fallbackId, "")
@@ -835,6 +863,7 @@ local function normalizeDatasetRecord(record, fallbackId, fallbackName)
         achievements = normalizeAchievements(data.achievements),
         guildSettings = normalizeGuildSettings(data.guildSettings),
         currencies = ensureTable(data.currencies),
+        markets = normalizeMarkets(data.markets),
     }
 end
 
@@ -2154,9 +2183,151 @@ local function collectItemSetDiagnostics(datasetId)
     return diagnostics
 end
 
+local function parseQualifiedReference(reference)
+    local text = type(reference) == "string" and reference:gsub("^%s+", ""):gsub("%s+$", "") or ""
+    local referenceDatasetId, referenceEntryId = text:match("^([^:]+):([^:]+)$")
+    if not referenceDatasetId or referenceDatasetId == "" or not referenceEntryId or referenceEntryId == "" then
+        return nil, nil
+    end
+
+    return referenceDatasetId, referenceEntryId
+end
+
+local function isDatasetActivatedForValidation(root, datasetId)
+    for index = 1, #(root and root.activatedDatasets or {}) do
+        if tostring(root.activatedDatasets[index] or "") == tostring(datasetId or "") then
+            return true
+        end
+    end
+
+    return false
+end
+
+local function findDatasetEntryForValidation(root, datasetId, collectionKey, entryId)
+    local dataset = root and root.datasets and root.datasets[tostring(datasetId or "")] or nil
+    for index = 1, #(dataset and dataset[collectionKey] or {}) do
+        local entry = dataset[collectionKey][index]
+        if type(entry) == "table" and tostring(entry.id or "") == tostring(entryId or "") then
+            return dataset, entry
+        end
+    end
+
+    return dataset, nil
+end
+
+local function collectMarketDiagnostics(datasetId)
+    local diagnostics = {}
+    local root = Database.Datasets or rawget(_G, "RPEngineDatasetDB")
+    local datasets = type(root) == "table" and root.datasets or {}
+    local targetDataset = datasets and datasets[tostring(datasetId or "")] or nil
+    local marketClass = Addon.Internal
+        and Addon.Internal.Database
+        and Addon.Internal.Database.Classes
+        and Addon.Internal.Database.Classes.Market
+        or nil
+    if type(targetDataset) ~= "table" then
+        return diagnostics
+    end
+
+    local markets = ensureTable(targetDataset.markets)
+    local seenIds = {}
+    local function validateItemReference(reference, path)
+        local referenceDatasetId, itemId = parseQualifiedReference(reference)
+        if not referenceDatasetId then
+            diagnostics[#diagnostics + 1] = ("%s must be a qualified datasetId:itemId reference."):format(path)
+            return
+        end
+
+        local _, item = findDatasetEntryForValidation(root, referenceDatasetId, "items", itemId)
+        if not item then
+            diagnostics[#diagnostics + 1] = ("%s references missing item '%s'."):format(path, reference)
+        end
+    end
+
+    for marketIndex = 1, #markets do
+        local market = markets[marketIndex]
+        local marketId = type(market) == "table" and tostring(market.id or "") or ""
+        local marketPath = ("markets[%d]"):format(marketIndex)
+        if marketClass and type(marketClass.Validate) == "function" then
+            local valid, marketDiagnostics = marketClass.Validate(market)
+            if not valid then
+                for diagnosticIndex = 1, #marketDiagnostics do
+                    diagnostics[#diagnostics + 1] = ("%s: %s"):format(marketPath, marketDiagnostics[diagnosticIndex])
+                end
+            end
+        end
+
+        if marketId == "" then
+            diagnostics[#diagnostics + 1] = ("%s has an empty id."):format(marketPath)
+        elseif seenIds[marketId] then
+            diagnostics[#diagnostics + 1] = ("%s duplicates id '%s' also used at markets[%d].")
+                :format(marketPath, marketId, seenIds[marketId])
+        else
+            seenIds[marketId] = marketIndex
+        end
+
+        local marketType = type(market) == "table" and string.lower(trimText(market.marketType)) or ""
+        if marketType == "exchange" then
+            for refIndex = 1, #(market and market.buyItemRefs or {}) do
+                validateItemReference(
+                    market.buyItemRefs[refIndex],
+                    ("%s.buyItemRefs[%d]"):format(marketPath, refIndex)
+                )
+            end
+
+            local sellRules = type(market.sellRules) == "table" and market.sellRules or {}
+            for refIndex = 1, #(sellRules.itemRefs or {}) do
+                validateItemReference(
+                    sellRules.itemRefs[refIndex],
+                    ("%s.sellRules.itemRefs[%d]"):format(marketPath, refIndex)
+                )
+            end
+
+            local trackerRef = trimText(market.trackerMarketRef)
+            if trackerRef ~= "" then
+                local trackerDatasetId, trackerMarketId = parseQualifiedReference(trackerRef)
+                if not trackerDatasetId then
+                    diagnostics[#diagnostics + 1] = ("%s.trackerMarketRef must be a qualified datasetId:marketId reference.")
+                        :format(marketPath)
+                elseif trackerDatasetId == tostring(targetDataset.id or datasetId)
+                    and trackerMarketId == marketId
+                then
+                    diagnostics[#diagnostics + 1] = ("%s.trackerMarketRef cannot reference itself."):format(marketPath)
+                else
+                    local trackerDataset, trackerMarket = findDatasetEntryForValidation(
+                        root,
+                        trackerDatasetId,
+                        "markets",
+                        trackerMarketId
+                    )
+                    if not trackerDataset or not trackerMarket then
+                        diagnostics[#diagnostics + 1] = ("%s.trackerMarketRef references missing market '%s'.")
+                            :format(marketPath, trackerRef)
+                    elseif not isDatasetActivatedForValidation(root, trackerDatasetId) then
+                        diagnostics[#diagnostics + 1] = ("%s.trackerMarketRef references inactive dataset '%s'.")
+                            :format(marketPath, trackerDatasetId)
+                    elseif string.lower(trimText(trackerMarket.marketType)) ~= "tracker" then
+                        diagnostics[#diagnostics + 1] = ("%s.trackerMarketRef must target a tracker market.")
+                            :format(marketPath)
+                    end
+                end
+            end
+        elseif marketType == "tracker" and trimText(market.trackerMarketRef) ~= "" then
+            diagnostics[#diagnostics + 1] = ("%s.trackerMarketRef is only valid on exchange markets.")
+                :format(marketPath)
+        end
+    end
+
+    return diagnostics
+end
+
 function Database.ValidateDataset(datasetId)
     local normalizedId = ensureString(datasetId, "")
     local diagnostics = collectItemSetDiagnostics(normalizedId)
+    local marketDiagnostics = collectMarketDiagnostics(normalizedId)
+    for index = 1, #marketDiagnostics do
+        diagnostics[#diagnostics + 1] = marketDiagnostics[index]
+    end
     Database.DatasetValidationDiagnostics = Database.DatasetValidationDiagnostics or {}
     Database.DatasetValidationDiagnostics[normalizedId] = diagnostics
 
@@ -2435,6 +2606,10 @@ local function normalizeDatasetsCollection(root)
 
         if type(value) == "table" then
             dataset = applyTable(value, dataset)
+            -- applyTable preserves legacy dataset fields verbatim. Reapply the
+            -- Market schema after that lossless merge so legacy SavedVariables
+            -- receive the same deterministic normalization as imports.
+            dataset.markets = normalizeMarkets(dataset.markets)
         end
 
         normalized[dataset.id] = dataset
@@ -5017,6 +5192,7 @@ function Database.CreateDataset(name)
         achievements = {},
         guildSettings = {},
         currencies = {},
+        markets = {},
     }, datasetId, name)
 
     root.datasets[datasetId] = dataset
@@ -5591,6 +5767,24 @@ function Database.UpdateDatasetMetadata(datasetId, metadata)
 end
 
 function Database.RenameDatasetEntry(datasetId, collectionKey, entryIndex, newKey)
+    if collectionKey == "markets" then
+        local dataset = Database.GetDatasetByID(datasetId)
+        local index = tonumber(entryIndex)
+        local entries = dataset and ensureTable(dataset.markets) or nil
+        local entry = entries and index and entries[index] or nil
+        local normalizedName = trimText(newKey)
+        if not dataset or not entry then
+            return nil, "Market entry not found."
+        end
+        if normalizedName == "" then
+            return nil, "Market name must be non-empty."
+        end
+
+        entry.name = normalizedName
+        Database.NotifyDatasetEntryChanged(dataset.id, collectionKey)
+        return entry
+    end
+
     if collectionKey ~= "itemSets" then
         return nil, "Only Item Set entries have renameable keys."
     end
@@ -5674,7 +5868,8 @@ function Database.NotifyDatasetEntryChanged(datasetId, collectionKey, options)
             or collectionKey == "damageSchools"
             or collectionKey == "auras"
             or collectionKey == "achievements"
-            or collectionKey == "guildSettings")
+            or collectionKey == "guildSettings"
+            or collectionKey == "markets")
         and Dependecies and Dependecies.RecomputeDatasetDependencies then
         Dependecies.RecomputeDatasetDependencies(datasetId)
     end

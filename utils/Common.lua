@@ -33,6 +33,47 @@ function Common.GetNow()
     return 0
 end
 
+-- The daily reset boundary is shared by systems whose state is scoped to a
+-- WoW reset cycle.  Keep this independent of guild state so callers such as
+-- MarketRates work for characters who are not in a guild.
+function Common.GetDailyResetState()
+    if type(Common.GetNow) ~= "function" or type(date) ~= "function" then
+        return nil, "calendar-unavailable"
+    end
+
+    local api = _G and _G.C_DateAndTime or nil
+    if not api or type(api.GetSecondsUntilDailyReset) ~= "function" then
+        return nil, "calendar-unavailable"
+    end
+
+    local okNow, now = pcall(Common.GetNow)
+    local okReset, remaining = pcall(api.GetSecondsUntilDailyReset)
+    now, remaining = tonumber(now), tonumber(remaining)
+    if not okNow or not now or not okReset or not remaining or remaining < 0 then
+        return nil, "calendar-unavailable"
+    end
+
+    remaining = math.floor(remaining)
+    local nextReset = now + remaining
+    local okCycle, cycleKey = pcall(date, "%Y-%m-%d", nextReset)
+    local okCurrent, currentDayKey = pcall(date, "%Y-%m-%d", now)
+    local okPrevious, previousCycleKey = pcall(date, "%Y-%m-%d", nextReset - 86400)
+    if not okCycle or not okCurrent or not okPrevious then
+        return nil, "calendar-unavailable"
+    end
+    if not tostring(cycleKey):match("^%d%d%d%d%-%d%d%-%d%d$") then
+        return nil, "calendar-unavailable"
+    end
+
+    return {
+        secondsRemaining = remaining,
+        cycleKey = cycleKey,
+        currentDayKey = currentDayKey,
+        previousCycleKey = previousCycleKey,
+        cycleTimestamp = nextReset,
+    }
+end
+
 function Common.TrimForDebug(value, maxLength)
     local text = tostring(value or "")
     if string.len(text) <= maxLength then

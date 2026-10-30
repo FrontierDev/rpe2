@@ -71,6 +71,7 @@ core/internal/runtime/RuntimeTransaction.lua
 core/internal/Runtime.lua
 core/internal/database/Dependecies.lua
 core/internal/database/LootDependencies.lua
+core/classes/Market.lua
 core/internal/database/Database.lua
 core/internal/database/DatasetSchema21.lua
 core/internal/database/DatasetSchema22.lua
@@ -100,9 +101,11 @@ client/client_Session.lua
 client/client_Resources.lua
 client/client_Achievements.lua
 client/client_Guild.lua
+client/client_MarketRates.lua
 client/client_Commands.lua
 client/client_Help.lua
 client/character/inventory/Inventory.lua
+client/client_Trading.lua
 client/client_AchievementRewards.lua
 client/client_Crafting.lua
 client/conditions/Core.lua
@@ -387,6 +390,10 @@ client/character/guild/page_GuildRequisitionsContributions.lua
 client/character/guild/page_GuildAdmin.lua
 client/character/guild/page_GuildAdminRoles.lua
 client/character/guild/window_Guild.lua
+client/character/trading/page_TradingMarkets.lua
+client/character/trading/page_TradingChart.lua
+client/character/trading/page_TradingItems.lua
+client/character/trading/window_Trading.lua
 core/debug/Clipboard.lua
 server/ui/window_EventUnit.lua
 server/ui/window_EventUnitPresets.lua
@@ -427,6 +434,7 @@ client/ui/editor/pages/page_Interaction.lua
 client/ui/editor/pages/page_Achievement.lua
 client/ui/editor/pages/page_GuildSetting.lua
 client/ui/editor/pages/page_Currency.lua
+client/ui/editor/pages/page_Market.lua
 client/ui/editor/inspectors/page_InspectorDataset.lua
 client/ui/editor/inspectors/unit/page_InspectorUnitShared.lua
 client/ui/editor/inspectors/unit/page_InspectorUnitGeneral.lua
@@ -465,6 +473,7 @@ client/ui/editor/inspectors/page_InspectorItemSlot.lua
 client/ui/editor/inspectors/page_InspectorWeaponType.lua
 client/ui/editor/inspectors/page_InspectorDamageSchool.lua
 client/ui/editor/inspectors/page_InspectorCurrency.lua
+client/ui/editor/inspectors/page_InspectorMarket.lua
 client/ui/editor/inspectors/page_InspectorLoot.lua
 client/ui/editor/inspectors/page_InspectorLootDiagnostics.lua
 client/ui/editor/inspectors/page_InspectorAchievement.lua

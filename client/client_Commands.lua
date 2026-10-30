@@ -186,6 +186,22 @@ function ClientCommands:RegisterSlashCommands()
         return true
     end, "Show the guild window.")
 
+    local function openTrading(context)
+        if not Client.OpenTradingLauncherDestination then
+            context.router:Print("Trading UI is not available.", "warn")
+            return false
+        end
+
+        if not Client:OpenTradingLauncherDestination() then
+            return false
+        end
+        context.router:Print("Trading window shown.")
+        return true
+    end
+
+    register({ "trading" }, openTrading, "Show the trading window.")
+    register({ "trade" }, openTrading, "Show the trading window.")
+
     register({ "unlock" }, function(context)
         if Client:RequireSetupCompletion("widget-unlock") ~= true then
             return false
@@ -259,6 +275,14 @@ function Client:OpenGuildLauncherDestination()
     end
 
     return self:ShowGuildWindow()
+end
+
+function Client:OpenTradingLauncherDestination()
+    if not self.ShowTradingWindow then
+        return nil
+    end
+
+    return self:ShowTradingWindow()
 end
 
 function Client:OpenSpellbookLauncherDestination()

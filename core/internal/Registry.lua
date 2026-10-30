@@ -324,6 +324,17 @@ function Registry:GetActivatedDatasets()
     return datasets
 end
 
+local function isMarketDatasetActivated(datasetId)
+    local activatedIds = Database.ListActivatedDatasetIds and Database.ListActivatedDatasetIds() or {}
+    for index = 1, #activatedIds do
+        if tostring(activatedIds[index] or "") == tostring(datasetId or "") then
+            return true
+        end
+    end
+
+    return false
+end
+
 function Registry:GenerateActivatedDatasetsHash()
     local revision = getConfigurationRevision()
     local cached = self.DatasetHashCache
@@ -599,6 +610,117 @@ function Registry:ResolveItemReference(itemRef)
     end
 
     return resolveDatasetEntryByCollection(datasetId, itemId, "items")
+end
+
+local function resolveMarketReference(marketRef, visited)
+    local datasetId, marketId = parseDatasetQualifiedRef(marketRef)
+    if not datasetId or not marketId then
+        return nil, nil, "invalid-reference"
+    end
+    if not isMarketDatasetActivated(datasetId) then
+        return nil, nil, "inactive-dataset"
+    end
+
+    local dataset, market = resolveDatasetEntryByCollection(datasetId, marketId, "markets")
+    if not dataset or not market then
+        return nil, nil, "missing-market"
+    end
+
+    local marketType = tostring(market.marketType or ""):gsub("^%s+", ""):gsub("%s+$", ""):lower()
+    if marketType ~= "exchange" and marketType ~= "tracker" then
+        return nil, nil, "invalid-market-type"
+    end
+    if marketType == "tracker" then
+        if tostring(market.trackerMarketRef or ""):gsub("^%s+", ""):gsub("%s+$", "") ~= "" then
+            return nil, nil, "tracker-outgoing-reference"
+        end
+        return dataset, market
+    end
+
+    local trackerRef = tostring(market.trackerMarketRef or ""):gsub("^%s+", ""):gsub("%s+$", "")
+    if trackerRef == "" then
+        return dataset, market
+    end
+
+    visited = visited or {}
+    local qualifiedRef = ("%s:%s"):format(tostring(dataset.id), tostring(market.id))
+    if visited[qualifiedRef] then
+        return nil, nil, "tracker-cycle"
+    end
+    visited[qualifiedRef] = true
+
+    local trackerDatasetId, trackerMarketId = parseDatasetQualifiedRef(trackerRef)
+    if not trackerDatasetId or not trackerMarketId then
+        return nil, nil, "invalid-tracker-reference"
+    end
+    if trackerDatasetId == datasetId and trackerMarketId == marketId then
+        return nil, nil, "tracker-self-reference"
+    end
+    if not isMarketDatasetActivated(trackerDatasetId) then
+        return nil, nil, "inactive-tracker-dataset"
+    end
+
+    local trackerDataset, trackerMarket = resolveDatasetEntryByCollection(
+        trackerDatasetId,
+        trackerMarketId,
+        "markets"
+    )
+    if not trackerDataset or not trackerMarket then
+        return nil, nil, "missing-tracker-market"
+    end
+
+    local trackerType = tostring(trackerMarket.marketType or ""):gsub("^%s+", ""):gsub("%s+$", ""):lower()
+    if trackerType ~= "tracker" then
+        -- Resolve the destination recursively so malformed hand-authored data
+        -- cannot turn an exchange-to-exchange cycle into a valid selection.
+        if trackerType == "exchange" then
+            local _, _, reason = resolveMarketReference(trackerRef, visited)
+            if reason == "tracker-cycle" then
+                return nil, nil, reason
+            end
+        end
+        return nil, nil, "tracker-target-not-tracker"
+    end
+
+    return dataset, market
+end
+
+function Registry:ResolveMarketReference(marketRef)
+    return resolveMarketReference(marketRef)
+end
+
+function Registry:ListMarkets()
+    local markets = {}
+    local datasets = self:GetActivatedDatasets()
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        for marketIndex = 1, #(dataset and dataset.markets or {}) do
+            local market = dataset.markets[marketIndex]
+            local marketId = type(market) == "table" and tostring(market.id or "") or ""
+            if marketId ~= "" then
+                local marketRef = ("%s:%s"):format(tostring(dataset.id), marketId)
+                local resolvedDataset, resolvedMarket = self:ResolveMarketReference(marketRef)
+                if resolvedDataset and resolvedMarket then
+                    markets[#markets + 1] = {
+                        marketRef = marketRef,
+                        datasetId = tostring(dataset.id),
+                        marketId = marketId,
+                        dataset = dataset,
+                        market = market,
+                    }
+                end
+            end
+        end
+    end
+
+    table.sort(markets, function(left, right)
+        return tostring(left.marketRef or "") < tostring(right.marketRef or "")
+    end)
+    return markets
+end
+
+function Registry:ListActivatedMarkets()
+    return self:ListMarkets()
 end
 
 function Registry:ResolveItemSetByKey(datasetId, itemSetKey)

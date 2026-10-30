@@ -76,6 +76,7 @@ local GROUPS = {
             { label = "Inventory", action = "OpenInventoryLauncherDestination" },
             { label = "Setup", action = "OpenSetupLauncherDestination" },
             { label = "Guild", action = "OpenGuildLauncherDestination" },
+            { label = "Trading", action = "OpenTradingLauncherDestination" },
         },
     },
     {
