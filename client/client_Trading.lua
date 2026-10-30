@@ -316,6 +316,9 @@ local function buildQuote(marketContext, itemRef, item, mode, quantity, coeffici
         if not listContains(marketContext.market.buyItemRefs, itemRef, false) then
             return nil, makeError("item-not-for-sale", "The item is not in this Market's buy catalogue.", { itemRef = itemRef })
         end
+        if item.canTrade == false then
+            return nil, makeError("item-cannot-trade", "The item cannot be traded.", { itemRef = itemRef })
+        end
     else
         local allowed, sellReason = itemMatchesSellRules(marketContext.market, itemRef, item)
         if not allowed then
@@ -598,21 +601,44 @@ function Trading.GetMarketOffers(marketRef)
     if not marketContext then return nil, marketError end
 
     local coefficientPercent, cycleKey, rateError = getCurrentRate(marketContext.marketRef)
-    if coefficientPercent == nil then return nil, rateError end
-
     local offers = {}
     local seen = {}
+    local diagnostics = {
+        catalogueEntryCount = 0,
+        validEntryCount = 0,
+        invalidEntryCount = 0,
+        firstInvalidReason = nil,
+    }
     for index = 1, #(marketContext.market.buyItemRefs or {}) do
         local itemRef = trim(marketContext.market.buyItemRefs[index])
         if itemRef ~= "" and not seen[itemRef] then
             seen[itemRef] = true
+            diagnostics.catalogueEntryCount = diagnostics.catalogueEntryCount + 1
+            local offer = {
+                marketRef = marketContext.marketRef,
+                ref = itemRef,
+                itemRef = itemRef,
+                enabled = false,
+            }
             local dataset, item, itemError = resolveItem(itemRef)
             if not dataset and itemError
                 and (itemError.code == "registry-unavailable" or itemError.code == "registry-error")
             then
                 return nil, itemError
             end
-            if dataset and item then
+            if not dataset or not item then
+                offer.reason = itemError and itemError.code or "item-unavailable"
+                offer.error = itemError
+            elseif coefficientPercent == nil then
+                offer.datasetId = trim(dataset.id)
+                offer.itemId = trim(item.id)
+                offer.item = item
+                offer.reason = rateError and rateError.code or "market-rates-unavailable"
+                offer.error = rateError
+            else
+                offer.datasetId = trim(dataset.id)
+                offer.itemId = trim(item.id)
+                offer.item = item
                 local quote, quoteError = buildQuote(
                     marketContext,
                     itemRef,
@@ -626,26 +652,28 @@ function Trading.GetMarketOffers(marketRef)
                     quote.datasetId = trim(dataset.id)
                     quote.itemId = trim(item.id)
                     quote.item = item
-                    offers[#offers + 1] = {
-                        marketRef = marketContext.marketRef,
-                        ref = itemRef,
-                        itemRef = itemRef,
-                        datasetId = quote.datasetId,
-                        itemId = quote.itemId,
-                        item = item,
-                        quote = quote,
-                        unitCopper = quote.unitCopper,
-                        coefficientPercent = coefficientPercent,
-                        tariffPercent = quote.tariffPercent,
-                        cycleKey = cycleKey,
-                    }
-                elseif quoteError and quoteError.code ~= "invalid-item-price" then
-                    return nil, quoteError
+                    offer.quote = quote
+                    offer.unitCopper = quote.unitCopper
+                    offer.coefficientPercent = coefficientPercent
+                    offer.tariffPercent = quote.tariffPercent
+                    offer.cycleKey = cycleKey
+                    offer.enabled = true
+                else
+                    offer.reason = quoteError and quoteError.code or "item-unavailable"
+                    offer.error = quoteError
                 end
             end
+
+            if offer.enabled then
+                diagnostics.validEntryCount = diagnostics.validEntryCount + 1
+            else
+                diagnostics.invalidEntryCount = diagnostics.invalidEntryCount + 1
+                diagnostics.firstInvalidReason = diagnostics.firstInvalidReason or offer.reason
+            end
+            offers[#offers + 1] = offer
         end
     end
-    return offers
+    return offers, nil, diagnostics
 end
 
 function Trading.GetEligibleInventory(marketRef)
@@ -677,6 +705,18 @@ function Trading.GetEligibleInventory(marketRef)
     end
 
     local result = {}
+    local diagnostics = {
+        inventoryItemRefCount = #refs,
+        ruleMatchedItemCount = 0,
+        inspectedVariantCount = 0,
+        eligibleVariantCount = 0,
+        rejectedVariantCount = 0,
+        firstRejectedReason = nil,
+    }
+    local function rejectVariant(reason)
+        diagnostics.rejectedVariantCount = diagnostics.rejectedVariantCount + 1
+        diagnostics.firstRejectedReason = diagnostics.firstRejectedReason or reason
+    end
     for index = 1, #refs do
         local itemRef = refs[index]
         local dataset, item, itemError = resolveItem(itemRef)
@@ -687,6 +727,7 @@ function Trading.GetEligibleInventory(marketRef)
         else
             local allowedByRules = itemMatchesSellRules(marketContext.market, itemRef, item)
             if allowedByRules then
+                diagnostics.ruleMatchedItemCount = diagnostics.ruleMatchedItemCount + 1
                 local variantOk, variants = pcall(inventory.GetItemVariants, dataset.id, item.id)
                 if not variantOk or type(variants) ~= "table" then
                     return nil, makeError("inventory-api-unavailable", "Inventory variants could not be read.", {
@@ -696,7 +737,8 @@ function Trading.GetEligibleInventory(marketRef)
                 if variantOk and type(variants) == "table" then
                     for variantIndex = 1, #variants do
                         local variant = variants[variantIndex]
-                        local eligible = isSellEligible(item, variant, itemRef)
+                        diagnostics.inspectedVariantCount = diagnostics.inspectedVariantCount + 1
+                        local eligible, eligibilityReason = isSellEligible(item, variant, itemRef)
                         if eligible then
                             local quote, quoteError = buildQuote(
                                 marketContext,
@@ -733,18 +775,21 @@ function Trading.GetEligibleInventory(marketRef)
                                     tariffPercent = quote.tariffPercent,
                                     cycleKey = cycleKey,
                                 }
+                                diagnostics.eligibleVariantCount = diagnostics.eligibleVariantCount + 1
                             elseif quoteError and quoteError.code == "invalid-item-price" then
-                                -- An unpriced item is not an eligible trading row.
+                                rejectVariant(quoteError.code)
                             elseif quoteError then
                                 return nil, quoteError
                             end
+                        else
+                            rejectVariant(eligibilityReason)
                         end
                     end
                 end
             end
         end
     end
-    return result
+    return result, nil, diagnostics
 end
 
 function Trading.Quote(marketRef, itemRef, mode, quantity, variant)

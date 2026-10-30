@@ -27,13 +27,17 @@ local function clone(value, seen)
 end
 
 local function variantKey(record)
-    return table.concat({
+    local parts = {
         tostring(record.dataset),
         tostring(record.id),
         tostring(record.itemTier or "normal"),
         record.soulbound == true and "true" or "false",
         record.equipped == true and "equipped" or "bag",
-    }, "|")
+    }
+    if record.variantKey then
+        parts[#parts + 1] = tostring(record.variantKey)
+    end
+    return table.concat(parts, "|")
 end
 
 local items = {
@@ -65,6 +69,15 @@ local items = {
     ["items:no-trade"] = {
         id = "no-trade", itemType = "weapon", canSell = true, canTrade = false, sellPrice = 100,
     },
+    ["items:linen"] = {
+        id = "linen", itemType = "material", canSell = true, canTrade = true, sellPrice = 25,
+    },
+    ["items:wool"] = {
+        id = "wool", itemType = "material", canSell = true, canTrade = true, sellPrice = 50,
+    },
+    ["items:armor"] = {
+        id = "armor", itemType = "armor", canSell = true, canTrade = true, sellPrice = 100,
+    },
 }
 
 local market = {
@@ -92,6 +105,10 @@ local inventoryRecords = {
     { dataset = "items", id = "no-trade", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
     { dataset = "items", id = "sword", itemTier = "normal", soulbound = true, quantity = 1, modifications = {} },
     { dataset = "items", id = "sword", itemTier = "normal", soulbound = false, quantity = 1, modifications = {}, equipped = true },
+    { dataset = "items", id = "armor", itemTier = "normal", soulbound = false, quantity = 2, modifications = {}, variantKey = "armor-normal" },
+    { dataset = "items", id = "armor", itemTier = "heroic", soulbound = false, quantity = 3, modifications = {}, variantKey = "armor-heroic" },
+    { dataset = "items", id = "armor", itemTier = "normal", soulbound = true, quantity = 1, modifications = {}, variantKey = "armor-bound" },
+    { dataset = "items", id = "armor", itemTier = "normal", soulbound = false, quantity = 1, modifications = {}, equipped = true, variantKey = "armor-equipped" },
 }
 
 local currency = 1000
@@ -201,6 +218,19 @@ local offers = assert(Trading.GetMarketOffers("markets:exchange"))
 assertEqual(#offers, 1, "buy catalogue only exposes authored items")
 assertEqual(offers[1].unitCopper, 116, "buy price uses per-unit half-up tariff rounding")
 
+market.buyItemRefs = { "items:linen", "items:wool", "items:missing" }
+local catalogue, _, catalogueDiagnostics = assert(Trading.GetMarketOffers("markets:exchange"))
+assertEqual(#catalogue, 3, "every authored unique buy reference produces an offer row")
+assertEqual(catalogue[1].itemRef, "items:linen", "linen catalogue entry is retained")
+assertEqual(catalogue[2].itemRef, "items:wool", "wool catalogue entry is retained")
+assertEqual(catalogue[3].itemRef, "items:missing", "missing catalogue entry is retained")
+assertTrue(catalogue[1].enabled, "valid linen catalogue entry is enabled")
+assertTrue(catalogue[2].enabled, "valid wool catalogue entry is enabled")
+assertTrue(catalogue[3].enabled == false, "missing catalogue entry is disabled")
+assertEqual(catalogue[3].reason, "item-unavailable", "missing catalogue entry exposes its reason")
+assertEqual(catalogueDiagnostics.invalidEntryCount, 1, "catalogue diagnostics count invalid entries")
+market.buyItemRefs = { "items:potion" }
+
 local sellQuote = assert(Trading.Quote("markets:exchange", "items:potion", "sell", 1, {
     dataset = "items", id = "potion", itemTier = "normal", soulbound = false, quantity = 4,
     stackKey = "items|potion|normal|false|bag",
@@ -219,6 +249,23 @@ assertTrue(not eligibleKeys["items:quest:normal"], "quest items are rejected")
 assertTrue(not eligibleKeys["items:bound:normal"], "bound items are rejected")
 assertTrue(not eligibleKeys["items:no-sell:normal"], "non-sellable items are rejected")
 assertTrue(not eligibleKeys["items:no-trade:normal"], "non-tradable items are rejected")
+
+market.sellRules = { itemTypes = { "armor" } }
+local armorEligible, _, armorDiagnostics = assert(Trading.GetEligibleInventory("markets:exchange"))
+local armorKeys = {}
+for index = 1, #armorEligible do
+    armorKeys[armorEligible[index].stackKey] = true
+end
+assertTrue(armorKeys["items|armor|normal|false|bag|armor-normal"], "normal armor variant is eligible")
+assertTrue(armorKeys["items|armor|heroic|false|bag|armor-heroic"], "heroic armor variant is eligible")
+assertTrue(not armorKeys["items|armor|normal|true|bag|armor-bound"], "soulbound armor variant is rejected independently")
+assertTrue(not armorKeys["items|armor|normal|false|equipped|armor-equipped"], "equipped armor variant is rejected independently")
+assertEqual(armorDiagnostics.eligibleVariantCount, 2, "all eligible armor variants are retained")
+assertEqual(armorDiagnostics.rejectedVariantCount, 2, "only ineligible armor variants are rejected")
+market.sellRules = {
+    itemTypes = { "weapon", "consumable" },
+    consumableTypes = { "potion", "elixir", "flask" },
+}
 
 local bought, buyReason, buyDetail = Trading.TryBuy("markets:exchange", "items:potion", 2)
 assertTrue(bought, "buy succeeds")

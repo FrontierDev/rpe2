@@ -85,11 +85,7 @@ function TradingWindow:SelectMarket(marketRef, reason)
         )
     end
     if self.itemsPage then
-        self.itemsPage:SetMarket(
-            self.selectedMarketRef,
-            self.selectedMarket and self.selectedMarket.market or nil,
-            reason
-        )
+        self.itemsPage:SetMarket(self.selectedMarketRef, reason)
     end
     return self.selectedMarket
 end

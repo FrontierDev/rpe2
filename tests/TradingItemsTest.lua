@@ -57,13 +57,16 @@ local items = {
 local addon = Support.CreateAddon()
 addon.UI = {}
 addon.Utils = { Common = {} }
+local market = {
+    marketType = "exchange",
+    buyItemRefs = { "items:potion", "items:missing", "items:elixir" },
+}
 addon.Internal.Registry = {
-    ResolveItemReference = function(_, itemRef)
-        local item = items[itemRef]
-        if not item then
-            return nil, nil, "missing-item"
+    ResolveMarketReference = function(_, marketRef)
+        if marketRef == "markets:exchange" then
+            return { id = "markets" }, market
         end
-        return { id = "items" }, item
+        return nil, nil, "missing-market"
     end,
 }
 addon.Internal.Profile = {
@@ -73,18 +76,37 @@ addon.Internal.Profile = {
 }
 addon.Client = {
     Trading = {
-        Quote = function(marketRef, itemRef, mode, quantity)
+        GetMarketOffers = function(marketRef)
             if marketRef ~= "markets:exchange" then
                 return nil, { code = "missing-market" }
             end
-            local unit = itemRef == "items:potion" and 100 or itemRef == "items:elixir" and 200 or 50
-            if mode == "sell" then
-                unit = 40
-            end
             return {
-                itemRef = itemRef,
-                unitCopper = unit,
-                totalCopper = unit * quantity,
+                {
+                    itemRef = "items:potion",
+                    datasetId = "items",
+                    item = items["items:potion"],
+                    unitCopper = 100,
+                    enabled = true,
+                    quote = { unitCopper = 100, totalCopper = 100 },
+                },
+                {
+                    itemRef = "items:missing",
+                    enabled = false,
+                    reason = "missing-item",
+                },
+                {
+                    itemRef = "items:elixir",
+                    datasetId = "items",
+                    item = items["items:elixir"],
+                    unitCopper = 200,
+                    enabled = true,
+                    quote = { unitCopper = 200, totalCopper = 200 },
+                },
+            }, nil, {
+                catalogueEntryCount = 3,
+                validEntryCount = 2,
+                invalidEntryCount = 1,
+                firstInvalidReason = "missing-item",
             }
         end,
         GetEligibleInventory = function()
@@ -148,10 +170,17 @@ addon.Client = {
 Support.LoadAddonFile("client/character/trading/page_TradingItems.lua", addon)
 local page = addon.Client.UI.Trading.Items:New()
 page.marketRef = "markets:exchange"
-page.market = {
-    marketType = "exchange",
-    buyItemRefs = { "items:potion", "items:missing", "items:elixir" },
-}
+page.market = { marketType = "exchange", buyItemRefs = {} }
+
+assertEqual(page:ResolveMarket(), market, "qualified Market reference replaces stale Market data")
+market.buyItemRefs = { "items:sword" }
+assertEqual(page:ResolveMarket().buyItemRefs[1], "items:sword", "market edits are resolved from the qualified reference")
+market.buyItemRefs = { "items:potion", "items:missing", "items:elixir" }
+page.marketRef = "markets:missing"
+local unresolvedMarket, unresolvedReason = page:ResolveMarket()
+assertEqual(unresolvedMarket, nil, "invalid selected Market is rejected explicitly")
+assertEqual(unresolvedReason, "missing-market", "invalid selected Market exposes its resolver reason")
+page.marketRef = "markets:exchange"
 
 local buyRows = page:BuildBuyItems()
 assertEqual(#buyRows, 3, "buy rows retain missing authored entries")

@@ -62,7 +62,9 @@ local REASON_LABELS = {
     ["insufficient-currency"] = "Not enough RPE copper.",
     ["insufficient-items"] = "The selected variant does not have enough items.",
     ["invalid-inventory-variant"] = "The selected inventory variant is no longer valid.",
+    ["inactive-dataset"] = "The selected Market's dataset is not active.",
     ["invalid-item-price"] = "This item has no valid price.",
+    ["invalid-market-reference"] = "The selected Market reference is invalid.",
     ["item-cannot-sell"] = "This item cannot be sold.",
     ["item-cannot-trade"] = "This item cannot be traded.",
     ["item-grant-failed"] = "The item could not be granted.",
@@ -70,6 +72,7 @@ local REASON_LABELS = {
     ["item-unavailable"] = "This item is unavailable.",
     ["market-not-tradable"] = "Tracker markets do not support trading.",
     ["market-rates-unavailable"] = "The current Market rate is unavailable.",
+    ["market-unavailable"] = "The selected Market is unavailable.",
     ["missing-item"] = "This item is missing from the active datasets.",
     ["missing-market"] = "The Market is unavailable.",
     ["missing-tracker-market"] = "The linked tracker Market is unavailable.",
@@ -265,73 +268,107 @@ function ItemsPage:GetBalance()
     return math.floor(amount)
 end
 
-function ItemsPage:ResolveItem(itemRef)
-    if type(Registry.ResolveItemReference) ~= "function" then
-        return nil, nil, "registry-unavailable"
+function ItemsPage:ResolveMarket()
+    if not self.marketRef or self.marketRef == "" then
+        self.market = nil
+        return nil, "market-unavailable"
     end
-    local ok, dataset, item, reason = pcall(Registry.ResolveItemReference, Registry, itemRef)
+    if type(Registry.ResolveMarketReference) ~= "function" then
+        self.market = nil
+        return nil, "registry-unavailable"
+    end
+
+    local ok, dataset, market, reason = pcall(Registry.ResolveMarketReference, Registry, self.marketRef)
     if not ok then
-        return nil, nil, "registry-error"
+        self.market = nil
+        return nil, "registry-error"
     end
-    if type(dataset) ~= "table" or type(item) ~= "table" then
-        return nil, nil, tostring(reason or "item-unavailable")
+    if type(dataset) ~= "table" or type(market) ~= "table" then
+        self.market = nil
+        return nil, reason or "market-unavailable"
     end
-    return dataset, item
+
+    self.market = market
+    return market
+end
+
+local function buyEmptyStatus(diagnostics)
+    local count = math.max(0, math.floor(tonumber(diagnostics and diagnostics.catalogueEntryCount) or 0))
+    if count == 0 then
+        return "This Market's buy catalogue is empty."
+    end
+
+    local invalid = math.max(0, math.floor(tonumber(diagnostics and diagnostics.invalidEntryCount) or 0))
+    if invalid >= count then
+        return ("This Market's catalogue contains %d entries, but all are unavailable: %s"):format(
+            count,
+            formatReason(diagnostics and diagnostics.firstInvalidReason)
+        )
+    end
+    return "No catalogue items match this category."
+end
+
+local function sellEmptyStatus(diagnostics)
+    local matchedItems = math.max(0, math.floor(tonumber(diagnostics and diagnostics.ruleMatchedItemCount) or 0))
+    if matchedItems == 0 then
+        return "No inventory items match this Market's sell rules."
+    end
+
+    local rejected = math.max(0, math.floor(tonumber(diagnostics and diagnostics.rejectedVariantCount) or 0))
+    if rejected > 0 then
+        return ("%d inventory item type(s) match, but all eligible variants were rejected: %s"):format(
+            matchedItems,
+            formatReason(diagnostics and diagnostics.firstRejectedReason)
+        )
+    end
+    return "No eligible inventory variants match this Market."
 end
 
 function ItemsPage:BuildBuyItems()
+    if type(Trading.GetMarketOffers) ~= "function" then
+        return {}, "trade-api-unavailable"
+    end
+
+    local ok, entries, errorValue, diagnostics = pcall(Trading.GetMarketOffers, self.marketRef)
+    if not ok then
+        return {}, "transaction-failed"
+    end
+    if type(entries) ~= "table" then
+        return {}, type(errorValue) == "table" and errorValue.code or "market-unavailable"
+    end
+
     local rows = {}
-    local seen = {}
-    local authored = type(self.market) == "table" and self.market.buyItemRefs or {}
-    for index = 1, #authored do
-        local itemRef = trim(authored[index])
-        if itemRef ~= "" and not seen[itemRef] then
-            seen[itemRef] = true
-            local dataset, item, resolveReason = self:ResolveItem(itemRef)
+    local balance = self:GetBalance()
+    for index = 1, #entries do
+        local entry = entries[index]
+        local itemRef = trim(entry and (entry.itemRef or entry.ref))
+        if type(entry) == "table" and itemRef ~= "" then
             local row = {
                 mode = MODE_BUY,
                 itemRef = itemRef,
-                dataset = dataset,
-                item = item,
-                enabled = false,
-                reason = resolveReason,
+                dataset = type(entry.datasetId) == "string" and { id = entry.datasetId } or nil,
+                item = entry.item,
+                quote = entry.quote,
+                unitCopper = tonumber(entry.unitCopper),
+                enabled = entry.enabled == true,
+                reason = entry.reason,
+                error = entry.error,
             }
-            if item then
-                local ok, quote, quoteError
-                if type(Trading.Quote) == "function" then
-                    ok, quote, quoteError = pcall(Trading.Quote, self.marketRef, itemRef, MODE_BUY, 1)
-                else
-                    quoteError = { code = "trade-api-unavailable" }
-                end
-                if ok and type(quote) == "table" then
-                    row.quote = quote
-                    row.unitCopper = tonumber(quote.unitCopper)
-                    row.enabled = isFinite(row.unitCopper) and row.unitCopper > 0
-                    if not row.enabled then
-                        row.reason = "invalid-item-price"
-                    else
-                        local balance = self:GetBalance()
-                        if balance == nil then
-                            row.enabled = false
-                            row.reason = "currency-api-unavailable"
-                        elseif row.unitCopper > balance then
-                            row.enabled = false
-                            row.reason = "insufficient-currency"
-                        end
-                    end
-                elseif type(quoteError) == "table" then
-                    row.reason = type(quoteError) == "table" and quoteError.code or "item-unavailable"
-                    row.error = quoteError
-                elseif ok then
-                    row.reason = "item-unavailable"
-                else
-                    row.reason = "transaction-failed"
-                end
+            if row.enabled and (not isFinite(row.unitCopper) or row.unitCopper <= 0) then
+                row.enabled = false
+                row.reason = "invalid-item-price"
+            elseif row.enabled and balance == nil then
+                row.enabled = false
+                row.reason = "currency-api-unavailable"
+            elseif row.enabled and row.unitCopper > balance then
+                row.enabled = false
+                row.reason = "insufficient-currency"
             end
             row.key = makeVariantKey(row)
             rows[#rows + 1] = row
         end
     end
+
     table.sort(rows, function(left, right)
         local leftName = lower(itemName(left.item, left.itemRef))
         local rightName = lower(itemName(right.item, right.itemRef))
@@ -340,14 +377,14 @@ function ItemsPage:BuildBuyItems()
         end
         return left.itemRef < right.itemRef
     end)
-    return rows
+    return rows, nil, diagnostics
 end
 
 function ItemsPage:BuildSellItems()
     if type(Trading.GetEligibleInventory) ~= "function" then
         return {}, "trade-api-unavailable"
     end
-    local ok, entries, errorValue = pcall(Trading.GetEligibleInventory, self.marketRef)
+    local ok, entries, errorValue, diagnostics = pcall(Trading.GetEligibleInventory, self.marketRef)
     if not ok then
         return {}, "transaction-failed"
     end
@@ -389,7 +426,7 @@ function ItemsPage:BuildSellItems()
         end
         return trim(left.stackKey) < trim(right.stackKey)
     end)
-    return rows
+    return rows, nil, diagnostics
 end
 
 function ItemsPage:BuildCategories()
@@ -554,7 +591,7 @@ function ItemsPage:UpdateRows()
         end
     end
 
-    if total == 0 then
+    if total == 0 or self.statusText then
         local text = self.statusText or "No tradable items match this category."
         self.emptyText:SetText(text)
         setShown(self.emptyText, true, 34)
@@ -788,19 +825,17 @@ function ItemsPage:Refresh(reason)
     end
     local previousCategory = self:GetCategoryValue()
     local previousPage = self.page
+    local market, marketReason = self:ResolveMarket()
     if self.marketContext then
-        if self.marketRef and self.market then
-            self.marketContext:SetText(("Market: %s"):format(self.marketRef))
-        else
-            self.marketContext:SetText("")
-        end
+        self.marketContext:SetText(market and ("Market: %s"):format(self.marketRef) or "")
     end
-    if not self.market or lower(self.market.marketType) ~= "exchange" then
+    if not market or lower(market.marketType) ~= "exchange" then
         self.items = {}
         self.filteredItems = {}
         self.categories = { { value = "all", label = "All Items" } }
         self.categoryValue = "all"
-        self.statusText = self.market and "Tracker markets do not support trading." or "Select an exchange Market to trade items."
+        self.statusText = market and "Tracker markets do not support trading."
+            or (self.marketRef and formatReason(marketReason) or "Select an exchange Market to trade items.")
         self.selectedItemKey = nil
         self:UpdateRows()
         self:RefreshDetails()
@@ -808,12 +843,16 @@ function ItemsPage:Refresh(reason)
     end
 
     if self.mode == MODE_BUY then
-        self.items = self:BuildBuyItems()
-        self.statusText = #self.items == 0 and "No items are listed by this Market." or nil
+        local buyItems, errorCode, diagnostics = self:BuildBuyItems()
+        self.items = buyItems
+        local invalidCount = math.max(0, math.floor(tonumber(diagnostics and diagnostics.invalidEntryCount) or 0))
+        self.statusText = errorCode and formatReason(errorCode)
+            or (#buyItems == 0 and buyEmptyStatus(diagnostics)
+                or (invalidCount == #buyItems and buyEmptyStatus(diagnostics) or nil))
     else
-        local sellItems, errorCode = self:BuildSellItems()
+        local sellItems, errorCode, diagnostics = self:BuildSellItems()
         self.items = sellItems
-        self.statusText = errorCode and formatReason(errorCode) or (#sellItems == 0 and "No eligible inventory variants match this Market." or nil)
+        self.statusText = errorCode and formatReason(errorCode) or (#sellItems == 0 and sellEmptyStatus(diagnostics) or nil)
     end
     self:BuildCategories()
     if findCategoryIndex(self.categories, previousCategory) then
@@ -1123,10 +1162,10 @@ function ItemsPage:Build(parent, owner)
     return self.root
 end
 
-function ItemsPage:SetMarket(marketRef, market, reason)
+function ItemsPage:SetMarket(marketRef, reason)
     local changed = self.marketRef ~= marketRef
     self.marketRef = type(marketRef) == "string" and marketRef or nil
-    self.market = market
+    self.market = nil
     if changed then
         self.page = 1
         self.selectedItemKey = nil
