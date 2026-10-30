@@ -662,10 +662,20 @@ local function getMarketSourceRefs(market)
     end
 
     local sellRules = type(market.sellRules) == "table" and market.sellRules or {}
-    for index = 1, #(sellRules.itemRefs or {}) do
-        local itemRef = sellRules.itemRefs[index]
-        if type(itemRef) == "string" and itemRef ~= "" then
-            refs[#refs + 1] = itemRef
+    local referenceFields = {
+        "itemRefs",
+        "weaponTypeRefs",
+        "slotRefs",
+        "targetSlotRefs",
+        "targetWeaponTypeRefs",
+    }
+    for fieldIndex = 1, #referenceFields do
+        local fieldName = referenceFields[fieldIndex]
+        for index = 1, #(sellRules[fieldName] or {}) do
+            local reference = sellRules[fieldName][index]
+            if type(reference) == "string" and reference ~= "" then
+                refs[#refs + 1] = reference
+            end
         end
     end
 

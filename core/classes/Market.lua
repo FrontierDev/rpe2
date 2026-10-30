@@ -71,7 +71,15 @@ local function normalizeSellRules(value)
     return {
         itemRefs = normalizeStringList(source.itemRefs),
         itemTypes = normalizeStringList(source.itemTypes),
+        armorWeights = normalizeStringList(source.armorWeights),
+        weaponTypeRefs = normalizeStringList(source.weaponTypeRefs),
+        slotRefs = normalizeStringList(source.slotRefs),
         consumableTypes = normalizeStringList(source.consumableTypes),
+        consumableElixirTypes = normalizeStringList(source.consumableElixirTypes),
+        modificationKinds = normalizeStringList(source.modificationKinds),
+        targetSlotRefs = normalizeStringList(source.targetSlotRefs),
+        targetWeaponTypeRefs = normalizeStringList(source.targetWeaponTypeRefs),
+        targetArmorWeights = normalizeStringList(source.targetArmorWeights),
     }
 end
 
@@ -95,7 +103,15 @@ function Market:New(data)
         sellRules = {
             itemRefs = {},
             itemTypes = {},
+            armorWeights = {},
+            weaponTypeRefs = {},
+            slotRefs = {},
             consumableTypes = {},
+            consumableElixirTypes = {},
+            modificationKinds = {},
+            targetSlotRefs = {},
+            targetWeaponTypeRefs = {},
+            targetArmorWeights = {},
         },
     }, Market):Merge(data)
 end
@@ -148,7 +164,15 @@ function Market:Merge(data)
         self.sellRules = {
             itemRefs = {},
             itemTypes = {},
+            armorWeights = {},
+            weaponTypeRefs = {},
+            slotRefs = {},
             consumableTypes = {},
+            consumableElixirTypes = {},
+            modificationKinds = {},
+            targetSlotRefs = {},
+            targetWeaponTypeRefs = {},
+            targetArmorWeights = {},
         }
     end
 
@@ -178,7 +202,15 @@ function Market:ToTable()
         normalized.sellRules = {
             itemRefs = {},
             itemTypes = {},
+            armorWeights = {},
+            weaponTypeRefs = {},
+            slotRefs = {},
             consumableTypes = {},
+            consumableElixirTypes = {},
+            modificationKinds = {},
+            targetSlotRefs = {},
+            targetWeaponTypeRefs = {},
+            targetArmorWeights = {},
         }
     end
 

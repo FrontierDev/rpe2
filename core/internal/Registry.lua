@@ -612,6 +612,15 @@ function Registry:ResolveItemReference(itemRef)
     return resolveDatasetEntryByCollection(datasetId, itemId, "items")
 end
 
+function Registry:ResolveItemSlotReference(itemSlotRef)
+    local datasetId, itemSlotId = parseDatasetQualifiedRef(itemSlotRef)
+    if not datasetId or not itemSlotId then
+        return nil, nil
+    end
+
+    return resolveDatasetEntryByCollection(datasetId, itemSlotId, "itemSlots")
+end
+
 local function resolveMarketReference(marketRef, visited)
     local datasetId, marketId = parseDatasetQualifiedRef(marketRef)
     if not datasetId or not marketId then

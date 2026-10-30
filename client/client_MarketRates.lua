@@ -10,11 +10,13 @@ local MarketRates = Client.MarketRates or {}
 Client.MarketRates = MarketRates
 
 local CACHE_KEY = "marketRatesHistory"
-local CACHE_VERSION = 1
+local CACHE_VERSION = 2
 local HISTORY_LENGTH = 14
 local MAX_CACHED_MARKETS = 64
 local HASH_MODULUS = 2147483647
-local PRNG_MULTIPLIER = 48271
+local MIX_MULTIPLIER_A = 2246822507
+local MIX_MULTIPLIER_B = 3266489909
+local MIX_MULTIPLIER_C = 48271
 local MINIMUM_COEFFICIENT_PERCENT = -95
 
 MarketRates._cacheLoaded = MarketRates._cacheLoaded == true
@@ -86,8 +88,29 @@ local function hashText(text)
     return hash
 end
 
+local function multiplyMod(left, right)
+    local result = 0
+    local multiplicand = math.floor(left or 0) % HASH_MODULUS
+    local multiplier = math.floor(right or 0)
+
+    while multiplier > 0 do
+        if multiplier % 2 == 1 then
+            result = (result + multiplicand) % HASH_MODULUS
+        end
+        multiplicand = (multiplicand + multiplicand) % HASH_MODULUS
+        multiplier = math.floor(multiplier / 2)
+    end
+
+    return result
+end
+
 local function deterministicUnit(seed)
-    local state = (seed * PRNG_MULTIPLIER) % HASH_MODULUS
+    local state = (math.floor(seed or 0) + 2654435769) % HASH_MODULUS
+    state = multiplyMod(state, MIX_MULTIPLIER_A)
+    state = (state + math.floor(state / 32768)) % HASH_MODULUS
+    state = multiplyMod(state, MIX_MULTIPLIER_B)
+    state = (state + (math.floor(state / 65536) * 33) + ((state % 65536) * 17)) % HASH_MODULUS
+    state = multiplyMod(state, MIX_MULTIPLIER_C)
     return state / (HASH_MODULUS - 1)
 end
 
@@ -218,7 +241,7 @@ local function getDefinitionSignature(definition)
         return nil, activationError
     end
 
-    local parts = { "version=1;activated=", activationSignature, ";" }
+    local parts = { "version=2;activated=", activationSignature, ";" }
     appendMarketSignature(parts, "market", definition.market)
     appendSignatureValue(parts, "market.ref", definition.ref)
     if definition.tracker then

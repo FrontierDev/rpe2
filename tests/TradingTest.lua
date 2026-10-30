@@ -46,7 +46,11 @@ local items = {
         canSell = true, canTrade = true, sellPrice = 100,
     },
     ["items:elixir"] = {
-        id = "elixir", itemType = "consumable", consumableType = "elixir",
+        id = "elixir", itemType = "consumable", consumableType = "elixir", consumableElixirType = "battle",
+        canSell = true, canTrade = true, sellPrice = 100,
+    },
+    ["items:guardian-elixir"] = {
+        id = "guardian-elixir", itemType = "consumable", consumableType = "elixir", consumableElixirType = "guardian",
         canSell = true, canTrade = true, sellPrice = 100,
     },
     ["items:food"] = {
@@ -54,7 +58,13 @@ local items = {
         canSell = true, canTrade = true, sellPrice = 100,
     },
     ["items:sword"] = {
-        id = "sword", itemType = "weapon", canSell = true, canTrade = true, sellPrice = 100,
+        id = "sword", itemType = "weapon", weaponTypeRef = "definitions:sword", validSlotRefs = { "definitions:main-hand" }, canSell = true, canTrade = true, sellPrice = 100,
+    },
+    ["items:axe"] = {
+        id = "axe", itemType = "weapon", weaponTypeRef = "definitions:axe", validSlotRefs = { "definitions:main-hand" }, canSell = true, canTrade = true, sellPrice = 100,
+    },
+    ["items:offhand-sword"] = {
+        id = "offhand-sword", itemType = "weapon", weaponTypeRef = "definitions:sword", validSlotRefs = { "definitions:off-hand" }, canSell = true, canTrade = true, sellPrice = 100,
     },
     ["items:quest"] = {
         id = "quest", itemType = "quest", canSell = true, canTrade = true, sellPrice = 100,
@@ -76,7 +86,25 @@ local items = {
         id = "wool", itemType = "material", canSell = true, canTrade = true, sellPrice = 50,
     },
     ["items:armor"] = {
-        id = "armor", itemType = "armor", canSell = true, canTrade = true, sellPrice = 100,
+        id = "armor", itemType = "armor", armorWeight = "cloth", validSlotRefs = { "definitions:head" }, canSell = true, canTrade = true, sellPrice = 100,
+    },
+    ["items:plate-armor"] = {
+        id = "plate-armor", itemType = "armor", armorWeight = "plate", validSlotRefs = { "definitions:head" }, canSell = true, canTrade = true, sellPrice = 100,
+    },
+    ["items:leg-armor"] = {
+        id = "leg-armor", itemType = "armor", armorWeight = "cloth", validSlotRefs = { "definitions:legs" }, canSell = true, canTrade = true, sellPrice = 100,
+    },
+    ["items:modification-match"] = {
+        id = "modification-match", itemType = "modification", modificationKind = "enchant", targetSlotRefs = { "definitions:head" }, targetWeaponTypeRef = "definitions:sword", targetArmorWeight = "cloth", canSell = true, canTrade = true, sellPrice = 100,
+    },
+    ["items:modification-slot-miss"] = {
+        id = "modification-slot-miss", itemType = "modification", modificationKind = "enchant", targetSlotRefs = { "definitions:legs" }, targetWeaponTypeRef = "definitions:sword", targetArmorWeight = "cloth", canSell = true, canTrade = true, sellPrice = 100,
+    },
+    ["items:modification-weapon-miss"] = {
+        id = "modification-weapon-miss", itemType = "modification", modificationKind = "enchant", targetSlotRefs = { "definitions:head" }, targetWeaponTypeRef = "definitions:axe", targetArmorWeight = "cloth", canSell = true, canTrade = true, sellPrice = 100,
+    },
+    ["items:modification-armor-miss"] = {
+        id = "modification-armor-miss", itemType = "modification", modificationKind = "enchant", targetSlotRefs = { "definitions:head" }, targetWeaponTypeRef = "definitions:sword", targetArmorWeight = "plate", canSell = true, canTrade = true, sellPrice = 100,
     },
 }
 
@@ -98,6 +126,7 @@ local inventoryRecords = {
     { dataset = "items", id = "sword", itemTier = "heroic", soulbound = false, quantity = 3, modifications = {} },
     { dataset = "items", id = "potion", itemTier = "normal", soulbound = false, quantity = 4, modifications = {} },
     { dataset = "items", id = "elixir", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
+    { dataset = "items", id = "guardian-elixir", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
     { dataset = "items", id = "food", itemTier = "normal", soulbound = false, quantity = 5, modifications = {} },
     { dataset = "items", id = "quest", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
     { dataset = "items", id = "bound", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
@@ -109,6 +138,14 @@ local inventoryRecords = {
     { dataset = "items", id = "armor", itemTier = "heroic", soulbound = false, quantity = 3, modifications = {}, variantKey = "armor-heroic" },
     { dataset = "items", id = "armor", itemTier = "normal", soulbound = true, quantity = 1, modifications = {}, variantKey = "armor-bound" },
     { dataset = "items", id = "armor", itemTier = "normal", soulbound = false, quantity = 1, modifications = {}, equipped = true, variantKey = "armor-equipped" },
+    { dataset = "items", id = "plate-armor", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
+    { dataset = "items", id = "leg-armor", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
+    { dataset = "items", id = "axe", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
+    { dataset = "items", id = "offhand-sword", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
+    { dataset = "items", id = "modification-match", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
+    { dataset = "items", id = "modification-slot-miss", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
+    { dataset = "items", id = "modification-weapon-miss", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
+    { dataset = "items", id = "modification-armor-miss", itemTier = "normal", soulbound = false, quantity = 1, modifications = {} },
 }
 
 local currency = 1000
@@ -250,6 +287,89 @@ assertTrue(not eligibleKeys["items:bound:normal"], "bound items are rejected")
 assertTrue(not eligibleKeys["items:no-sell:normal"], "non-sellable items are rejected")
 assertTrue(not eligibleKeys["items:no-trade:normal"], "non-tradable items are rejected")
 
+local function eligibleItemRefs()
+    local rows = assert(Trading.GetEligibleInventory("markets:exchange"))
+    local refs = {}
+    for index = 1, #rows do
+        refs[rows[index].itemRef] = true
+    end
+    return refs
+end
+
+market.sellRules = {
+    itemTypes = { "armor" },
+    armorWeights = { "cloth" },
+    slotRefs = { "definitions:head" },
+}
+local armorRuleRefs = eligibleItemRefs()
+assertTrue(armorRuleRefs["items:armor"], "armor weight and slot filters accept a matching item")
+assertTrue(not armorRuleRefs["items:plate-armor"], "armor weight filter rejects non-matching armor")
+assertTrue(not armorRuleRefs["items:leg-armor"], "armor slot filter rejects non-matching armor")
+
+market.sellRules = {
+    itemTypes = { "weapon" },
+    weaponTypeRefs = { "definitions:sword" },
+    slotRefs = { "definitions:main-hand" },
+}
+local weaponRuleRefs = eligibleItemRefs()
+assertTrue(weaponRuleRefs["items:sword"], "weapon type and slot filters accept a matching item")
+assertTrue(not weaponRuleRefs["items:axe"], "weapon type filter rejects non-matching weapons")
+assertTrue(not weaponRuleRefs["items:offhand-sword"], "weapon slot filter rejects non-matching weapons")
+
+market.sellRules = {
+    itemTypes = { "consumable" },
+    consumableTypes = { "elixir" },
+    consumableElixirTypes = { "battle" },
+}
+local elixirRuleRefs = eligibleItemRefs()
+assertTrue(elixirRuleRefs["items:elixir"], "elixir subtype filter accepts a matching elixir")
+assertTrue(not elixirRuleRefs["items:guardian-elixir"], "elixir subtype filter rejects non-matching elixirs")
+assertTrue(not elixirRuleRefs["items:potion"], "consumable subtype filter rejects other consumables")
+
+market.sellRules = {
+    itemTypes = { "modification" },
+    modificationKinds = { "enchant" },
+    targetSlotRefs = { "definitions:head" },
+    targetWeaponTypeRefs = { "definitions:sword" },
+    targetArmorWeights = { "cloth" },
+}
+local modificationRuleRefs = eligibleItemRefs()
+assertTrue(modificationRuleRefs["items:modification-match"], "modification target filters accept a matching modification")
+assertTrue(not modificationRuleRefs["items:modification-slot-miss"], "modification target slot filter rejects non-matching modifications")
+assertTrue(not modificationRuleRefs["items:modification-weapon-miss"], "modification target weapon filter rejects non-matching modifications")
+assertTrue(not modificationRuleRefs["items:modification-armor-miss"], "modification target armor filter rejects non-matching modifications")
+
+market.sellRules = {
+    itemTypes = { "armor", "consumable" },
+    armorWeights = { "cloth" },
+    slotRefs = { "definitions:head" },
+    consumableTypes = { "potion" },
+}
+local multiTypeRuleRefs = eligibleItemRefs()
+assertTrue(multiTypeRuleRefs["items:armor"], "multi-type rules apply armor filters only to armor")
+assertTrue(multiTypeRuleRefs["items:potion"], "multi-type rules apply consumable filters only to consumables")
+
+market.sellRules = {
+    itemRefs = { "items:plate-armor", "items:no-sell" },
+    itemTypes = { "armor" },
+    armorWeights = { "cloth" },
+    slotRefs = { "definitions:head" },
+}
+local explicitRuleRefs = eligibleItemRefs()
+assertTrue(explicitRuleRefs["items:plate-armor"], "exact sell item references override type-specific filters")
+assertTrue(not explicitRuleRefs["items:no-sell"], "exact sell item references still require normal sellability")
+
+market.sellRules = { itemTypes = { "armor" }, armorWeights = {}, slotRefs = {} }
+local emptySubtypeRuleRefs = eligibleItemRefs()
+assertTrue(emptySubtypeRuleRefs["items:armor"], "empty armor subtype lists impose no additional restriction")
+assertTrue(emptySubtypeRuleRefs["items:plate-armor"], "empty armor weight list accepts all armor weights")
+assertTrue(emptySubtypeRuleRefs["items:leg-armor"], "empty slot list accepts all armor slots")
+
+market.sellRules = { itemTypes = { "consumable" }, consumableTypes = { "potion" } }
+local legacyConsumableRuleRefs = eligibleItemRefs()
+assertTrue(legacyConsumableRuleRefs["items:potion"], "legacy consumable subtype rules remain supported")
+assertTrue(not legacyConsumableRuleRefs["items:elixir"], "legacy consumable subtype rules still restrict consumables")
+
 market.sellRules = { itemTypes = { "armor" } }
 local armorEligible, _, armorDiagnostics = assert(Trading.GetEligibleInventory("markets:exchange"))
 local armorKeys = {}
@@ -260,7 +380,7 @@ assertTrue(armorKeys["items|armor|normal|false|bag|armor-normal"], "normal armor
 assertTrue(armorKeys["items|armor|heroic|false|bag|armor-heroic"], "heroic armor variant is eligible")
 assertTrue(not armorKeys["items|armor|normal|true|bag|armor-bound"], "soulbound armor variant is rejected independently")
 assertTrue(not armorKeys["items|armor|normal|false|equipped|armor-equipped"], "equipped armor variant is rejected independently")
-assertEqual(armorDiagnostics.eligibleVariantCount, 2, "all eligible armor variants are retained")
+assertEqual(armorDiagnostics.eligibleVariantCount, 4, "all eligible armor variants are retained")
 assertEqual(armorDiagnostics.rejectedVariantCount, 2, "only ineligible armor variants are rejected")
 market.sellRules = {
     itemTypes = { "weapon", "consumable" },

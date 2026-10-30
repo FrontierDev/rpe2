@@ -14,14 +14,14 @@ local TradingWindow = TradingUI.Window or {}
 TradingUI.Window = TradingWindow
 TradingWindow.__index = TradingWindow
 
-local WINDOW_WIDTH = 960
-local WINDOW_HEIGHT = 500
-local MIN_WINDOW_WIDTH = 720
-local MIN_WINDOW_HEIGHT = 400
+local WINDOW_WIDTH = 840
+local WINDOW_HEIGHT = 440
+local MIN_WINDOW_WIDTH = 680
+local MIN_WINDOW_HEIGHT = 360
 local CONTENT_INSET_X = 8
 local CONTENT_INSET_TOP = 28
 local CONTENT_INSET_BOTTOM = 8
-local PANEL_INSET = 6
+local PANEL_INSET = 4
 
 local function createInstance()
     local instance = setmetatable({
@@ -102,6 +102,9 @@ function TradingWindow:BuildWindow()
         if frame and frame.SetSize then
             frame:SetSize(WINDOW_WIDTH, WINDOW_HEIGHT)
         end
+        if self.itemsPage and self.itemsPage.built ~= true and self.itemPanel then
+            self:BuildItemHost(self.itemPanel:GetContentFrame())
+        end
         return self.window
     end
 
@@ -140,7 +143,7 @@ function TradingWindow:BuildWindow()
         expandWidth = true,
         expandHeight = true,
         weight = 1,
-        spacing = 6,
+        spacing = 4,
         fitChildrenWidth = true,
         fitChildrenHeight = true,
     })

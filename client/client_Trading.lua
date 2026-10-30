@@ -224,6 +224,19 @@ local function listContains(values, expected, caseInsensitive)
     return false
 end
 
+local function listsIntersect(leftValues, rightValues, caseInsensitive)
+    if type(leftValues) ~= "table" or type(rightValues) ~= "table" then
+        return false
+    end
+    for index = 1, #leftValues do
+        local expected = caseInsensitive and lower(leftValues[index]) or trim(leftValues[index])
+        if expected ~= "" and listContains(rightValues, expected, caseInsensitive) then
+            return true
+        end
+    end
+    return false
+end
+
 local function itemMatchesSellRules(market, itemRef, item)
     local rules = type(market and market.sellRules) == "table" and market.sellRules or {}
     local itemRefs = type(rules.itemRefs) == "table" and rules.itemRefs or {}
@@ -232,19 +245,68 @@ local function itemMatchesSellRules(market, itemRef, item)
         return false, "market-sell-policy-empty"
     end
 
-    local matches = listContains(itemRefs, itemRef, false)
-    if not matches then
-        matches = listContains(itemTypes, lower(item.itemType), true)
+    -- Exact item references are explicit allows. Normal inventory sellability is
+    -- still checked by isSellEligible before a quote can be used.
+    if listContains(itemRefs, itemRef, false) then
+        return true
     end
-    if not matches then
+
+    local itemType = lower(item and item.itemType)
+    if not listContains(itemTypes, itemType, true) then
         return false, "item-not-sellable-at-market"
     end
 
     local consumableTypes = type(rules.consumableTypes) == "table" and rules.consumableTypes or {}
-    if lower(item.itemType) == "consumable" and #consumableTypes > 0
-        and not listContains(consumableTypes, lower(item.consumableType), true)
-    then
-        return false, "consumable-type-not-allowed"
+    if itemType == "armor" then
+        local armorWeights = type(rules.armorWeights) == "table" and rules.armorWeights or {}
+        local slotRefs = type(rules.slotRefs) == "table" and rules.slotRefs or {}
+        if #armorWeights > 0 and not listContains(armorWeights, lower(item.armorWeight), true) then
+            return false, "armor-weight-not-allowed"
+        end
+        if #slotRefs > 0 and not listsIntersect(slotRefs, item.validSlotRefs, false) then
+            return false, "item-slot-not-allowed"
+        end
+    elseif itemType == "weapon" then
+        local weaponTypeRefs = type(rules.weaponTypeRefs) == "table" and rules.weaponTypeRefs or {}
+        local slotRefs = type(rules.slotRefs) == "table" and rules.slotRefs or {}
+        if #weaponTypeRefs > 0 and not listContains(weaponTypeRefs, trim(item.weaponTypeRef), false) then
+            return false, "weapon-type-not-allowed"
+        end
+        if #slotRefs > 0 and not listsIntersect(slotRefs, item.validSlotRefs, false) then
+            return false, "item-slot-not-allowed"
+        end
+    elseif itemType == "consumable" then
+        local consumableType = lower(item.consumableType)
+        if #consumableTypes > 0 and not listContains(consumableTypes, consumableType, true) then
+            return false, "consumable-type-not-allowed"
+        end
+        local elixirTypes = type(rules.consumableElixirTypes) == "table" and rules.consumableElixirTypes or {}
+        if consumableType == "elixir" and #elixirTypes > 0
+            and not listContains(elixirTypes, lower(item.consumableElixirType), true)
+        then
+            return false, "consumable-elixir-type-not-allowed"
+        end
+    elseif itemType == "modification" then
+        local modificationKinds = type(rules.modificationKinds) == "table" and rules.modificationKinds or {}
+        local targetSlotRefs = type(rules.targetSlotRefs) == "table" and rules.targetSlotRefs or {}
+        local targetWeaponTypeRefs = type(rules.targetWeaponTypeRefs) == "table" and rules.targetWeaponTypeRefs or {}
+        local targetArmorWeights = type(rules.targetArmorWeights) == "table" and rules.targetArmorWeights or {}
+        if #modificationKinds > 0 and not listContains(modificationKinds, lower(item.modificationKind), true) then
+            return false, "modification-kind-not-allowed"
+        end
+        if #targetSlotRefs > 0 and not listsIntersect(targetSlotRefs, item.targetSlotRefs, false) then
+            return false, "modification-target-slot-not-allowed"
+        end
+        if #targetWeaponTypeRefs > 0
+            and not listContains(targetWeaponTypeRefs, trim(item.targetWeaponTypeRef), false)
+        then
+            return false, "modification-target-weapon-type-not-allowed"
+        end
+        if #targetArmorWeights > 0
+            and not listContains(targetArmorWeights, lower(item.targetArmorWeight), true)
+        then
+            return false, "modification-target-armor-weight-not-allowed"
+        end
     end
 
     return true

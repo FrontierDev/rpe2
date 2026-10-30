@@ -25,6 +25,72 @@ local FILTER_NAV_HEIGHT = 20
 local PAGE_NAV_HEIGHT = 20
 local PAGE_BUTTON_WIDTH = 24
 local PAGE_TEXT_WIDTH = 82
+local MARKET_INDEX_WIDTH = 56
+local MARKET_ROW_HORIZONTAL_PADDING = 8
+local MARKET_ROW_TEXT_GAP = 6
+
+local function measureText(fontString, text)
+    if not fontString or not fontString.SetText then
+        return 0
+    end
+
+    fontString:SetText(text or "")
+    if fontString.GetStringWidth then
+        return tonumber(fontString:GetStringWidth()) or 0
+    end
+
+    return 0
+end
+
+local function fitTextWithEllipsis(fontString, fullText, maxWidth)
+    local text = tostring(fullText or "")
+    local width = math.max(0, tonumber(maxWidth) or 0)
+    if text == "" then
+        return ""
+    end
+
+    if width <= 0 or measureText(fontString, text) <= width then
+        return width > 0 and text or ""
+    end
+
+    local ellipsis = "..."
+    if measureText(fontString, ellipsis) > width then
+        return ""
+    end
+
+    local low = 0
+    local high = #text
+    local best = ellipsis
+    while low <= high do
+        local middle = math.floor((low + high) / 2)
+        local candidate = text:sub(1, middle) .. ellipsis
+        if measureText(fontString, candidate) <= width then
+            best = candidate
+            low = middle + 1
+        else
+            high = middle - 1
+        end
+    end
+
+    return best
+end
+
+local function refreshMarketName(row)
+    if not row or not row.nameLabel then
+        return
+    end
+
+    local name = row._marketName or ""
+    local rowFrame = row.GetFrame and row:GetFrame() or nil
+    local rowWidth = rowFrame and rowFrame.GetWidth and rowFrame:GetWidth() or 0
+    local width = rowWidth - (MARKET_ROW_HORIZONTAL_PADDING * 2) - MARKET_INDEX_WIDTH - MARKET_ROW_TEXT_GAP
+    if width <= 0 then
+        return
+    end
+
+    row.nameLabel:SetWidth(width)
+    row.nameLabel:SetText(fitTextWithEllipsis(row.nameLabel, name, width))
+end
 
 local function trim(value)
     return tostring(value or ""):match("^%s*(.-)%s*$") or ""
@@ -194,9 +260,11 @@ function MarketsPage:UpdateRows()
             local indexLabel = trim(marketDefinition.index)
             local displayIndex = indexLabel ~= "" and indexLabel or "--"
             local typeLabel = marketType == "exchange" and "Exchange" or "Tracker"
-            local label = ("[%s] %s (%s)"):format(displayIndex, getMarketName(market), typeLabel)
             row._marketRef = market.marketRef
-            row:SetText(label)
+            row._marketName = getMarketName(market)
+            row:SetText("")
+            row.indexLabel:SetText(("[%s]"):format(displayIndex))
+            refreshMarketName(row)
             row:SetTooltip({
                 type = "custom",
                 title = getMarketName(market),
@@ -209,6 +277,7 @@ function MarketsPage:UpdateRows()
             local selected = market.marketRef == self.selectedMarketRef
             local textColor = UI.ResolveColor(nil, selected and "accent" or "text.primary")
             row:SetLabelColor(textColor.r, textColor.g, textColor.b, textColor.a)
+            row.indexLabel:SetTextColor(textColor.r, textColor.g, textColor.b, textColor.a)
             if row.background and row.background.SetColorTexture then
                 local background = UI.ResolveColor(nil, selected and "tab.bar" or "list.rowBackground")
                 row.background:SetColorTexture(background.r, background.g, background.b, background.a)
@@ -216,7 +285,9 @@ function MarketsPage:UpdateRows()
             setShown(row, true, MARKET_ROW_HEIGHT)
         else
             row._marketRef = nil
+            row._marketName = nil
             row:SetText("")
+            row.indexLabel:SetText("")
             row:SetTooltip(nil)
             setShown(row, false, 0)
         end
@@ -236,6 +307,9 @@ function MarketsPage:UpdateRows()
     self.previousPageButton:SetEnabled(self.page > 1)
     self.nextPageButton:SetEnabled(self.page < pageCount)
     self.listLayout:RefreshLayout()
+    for rowIndex = 1, #self.rows do
+        refreshMarketName(self.rows[rowIndex])
+    end
 end
 
 function MarketsPage:SelectMarket(marketRef)
@@ -381,6 +455,27 @@ function MarketsPage:Build(parent, owner)
             backgroundColor = UI.ResolveColor(nil, "list.rowBackground"),
             labelColor = UI.ResolveColor(nil, "text.primary"),
         })
+        local rowFrame = row:GetFrame()
+        row.nameLabel = row.label
+        row.label:ClearAllPoints()
+        row.label:SetPoint("LEFT", rowFrame, "LEFT", MARKET_ROW_HORIZONTAL_PADDING, 0)
+        row.label:SetJustifyH("LEFT")
+        row.label:SetWordWrap(false)
+
+        row.indexLabel = rowFrame:CreateFontString(nil, "OVERLAY")
+        row.indexLabel:SetPoint("RIGHT", rowFrame, "RIGHT", -MARKET_ROW_HORIZONTAL_PADDING, 0)
+        row.indexLabel:SetWidth(MARKET_INDEX_WIDTH)
+        row.indexLabel:SetJustifyH("RIGHT")
+        row.indexLabel:SetWordWrap(false)
+        local font, fontSize, fontFlags = row.label:GetFont()
+        if font then
+            row.indexLabel:SetFont(font, fontSize, fontFlags)
+        end
+        local indexColor = UI.ResolveColor(nil, "text.primary")
+        row.indexLabel:SetTextColor(indexColor.r, indexColor.g, indexColor.b, indexColor.a)
+        rowFrame:HookScript("OnSizeChanged", function()
+            refreshMarketName(row)
+        end)
         self.rows[index] = row
         self.listLayout:AddChild(row)
     end

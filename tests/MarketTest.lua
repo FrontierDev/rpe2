@@ -32,6 +32,17 @@ root.datasets = {
         },
         markets = {},
     },
+    definitions = {
+        id = "definitions",
+        name = "Definitions",
+        weaponTypes = {
+            { id = "sword", name = "Sword" },
+        },
+        itemSlots = {
+            { id = "head", name = "Head" },
+        },
+        markets = {},
+    },
     trackers = {
         id = "trackers",
         name = "Trackers",
@@ -65,13 +76,21 @@ root.datasets = {
                 sellRules = {
                     itemRefs = { "items:potion", "items:potion" },
                     itemTypes = { "weapon", " weapon " },
+                    armorWeights = { "cloth", " cloth " },
+                    weaponTypeRefs = { "definitions:sword", "definitions:sword" },
+                    slotRefs = { "definitions:head", "definitions:head" },
                     consumableTypes = { "potion" },
+                    consumableElixirTypes = { "battle", "battle" },
+                    modificationKinds = { "enchant", "enchant" },
+                    targetSlotRefs = { "definitions:head", "definitions:head" },
+                    targetWeaponTypeRefs = { "definitions:sword", "definitions:sword" },
+                    targetArmorWeights = { "cloth", "cloth" },
                 },
             }):ToTable(),
         },
     },
 }
-root.activatedDatasets = { "items", "trackers", "exchanges" }
+root.activatedDatasets = { "items", "definitions", "trackers", "exchanges" }
 Database.Datasets = root
 Database.Dependecies.RecomputeAllDatasetDependencies()
 
@@ -82,6 +101,9 @@ assertEqual(tracker.tariffPercent, 0, "tracker markets disable tariffs")
 assertEqual(root.datasets.exchanges.markets[1].index, "SWE", "market index is trimmed and uppercased")
 assertEqual(#root.datasets.exchanges.markets[1].buyItemRefs, 1, "market item references are deduplicated")
 assertEqual(#root.datasets.exchanges.markets[1].sellRules.itemRefs, 1, "sell item references are deduplicated")
+assertEqual(#root.datasets.exchanges.markets[1].sellRules.weaponTypeRefs, 1, "sell weapon type references are deduplicated")
+assertEqual(#root.datasets.exchanges.markets[1].sellRules.slotRefs, 1, "sell item slot references are deduplicated")
+assertEqual(#root.datasets.exchanges.markets[1].sellRules.targetWeaponTypeRefs, 1, "sell target weapon type references are deduplicated")
 assertEqual(root.datasets.exchanges.markets[1].name, "Stormwind Stock Exchange", "market name is trimmed")
 
 local exchangeDataset, exchange = Registry:ResolveMarketReference("exchanges:stormwind")
@@ -90,11 +112,20 @@ assertEqual(exchange.id, "stormwind", "qualified market references resolve by ma
 local listedMarkets = Registry:ListMarkets()
 assertEqual(#listedMarkets, 2, "market listing contains only valid markets from activated datasets")
 assertEqual(listedMarkets[1].marketRef, "exchanges:stormwind", "market listing is deterministic")
-assertTrue(Database.Dependecies.RecomputeDatasetDependencies("exchanges")[1] == "items", "item market references contribute dependencies")
-assertTrue(Database.Dependecies.RecomputeDatasetDependencies("exchanges")[2] == "trackers", "tracker market references contribute dependencies")
+local dependencies = Database.Dependecies.RecomputeDatasetDependencies("exchanges")
+local dependencySet = {}
+for index = 1, #dependencies do dependencySet[dependencies[index]] = true end
+assertTrue(dependencySet.items, "item market references contribute dependencies")
+assertTrue(dependencySet.definitions, "typed market references contribute dependencies")
+assertTrue(dependencySet.trackers, "tracker market references contribute dependencies")
 
 local validationOk, validationDiagnostics = Database.ValidateDataset("exchanges")
 assertTrue(validationOk, "valid exchange and tracker references pass validation: " .. table.concat(validationDiagnostics, "; "))
+root.datasets.exchanges.markets[1].sellRules.weaponTypeRefs = { "definitions:missing" }
+local invalidRulesOk, invalidRulesDiagnostics = Database.ValidateDataset("exchanges")
+assertTrue(not invalidRulesOk, "missing typed market references fail dataset validation")
+assertTrue(table.concat(invalidRulesDiagnostics, "\n"):find("weaponTypeRefs", 1, true) ~= nil, "missing typed market references report their field")
+root.datasets.exchanges.markets[1].sellRules.weaponTypeRefs = { "definitions:sword" }
 
 local created = Database.CreateDatasetEntry("exchanges", "markets")
 assertEqual(#created.id, 8, "new markets receive stable eight-character IDs")
@@ -116,12 +147,12 @@ local exportedDataset = assert(Database.ExportDataset("exchanges"))
 local importedDataset = assert(Database.ImportDataset(exportedDataset))
 assertEqual(importedDataset.markets[1].trackerMarketRef, "trackers:daily", "full dataset export/import preserves tracker references")
 
-root.activatedDatasets = { "items", "exchanges" }
+root.activatedDatasets = { "items", "definitions", "exchanges" }
 local inactiveDataset, inactiveMarket = Registry:ResolveMarketReference("exchanges:stormwind")
 assertEqual(inactiveDataset, nil, "inactive tracker dependencies do not resolve")
 assertEqual(inactiveMarket, nil, "inactive tracker dependencies do not resolve a market")
 
-root.activatedDatasets = { "items", "trackers", "exchanges" }
+root.activatedDatasets = { "items", "definitions", "trackers", "exchanges" }
 assert(Database.DeleteDatasetEntry("trackers", "markets", 1), "tracker deletion succeeds")
 assertEqual(root.datasets.exchanges.markets[1].trackerMarketRef, "", "deleted tracker references are pruned")
 assertEqual(Registry:ResolveMarketReference("exchanges:stormwind").id, "exchanges", "exchange remains resolvable without an optional tracker")

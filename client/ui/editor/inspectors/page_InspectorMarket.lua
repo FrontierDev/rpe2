@@ -9,6 +9,7 @@ local UI = Addon.UI or {}
 local Database = Addon.Internal and Addon.Internal.Database or {}
 local Registry = Addon.Internal and Addon.Internal.Registry or {}
 local MarketClass = Database.Classes and Database.Classes.Market or nil
+local ItemInspectorShared = DataEditor.ItemInspectorShared or {}
 
 local CONTROL_HEIGHT = 20
 local FIELD_WIDTH = 236
@@ -20,35 +21,37 @@ local MARKET_TYPE_ITEMS = {
     { label = "Tracker", value = "tracker" },
 }
 
-local ITEM_TYPE_ITEMS = {
-    { label = "Weapon", value = "weapon" },
-    { label = "Armor", value = "armor" },
-    { label = "Tool", value = "tool" },
-    { label = "Modification", value = "modification" },
-    { label = "Consumable", value = "consumable" },
-    { label = "Material", value = "material" },
-}
+local function buildSelectableItems(items, includeNone)
+    local selectable = {}
+    for index = 1, #(items or {}) do
+        local item = items[index]
+        if item and tostring(item.value or "") ~= ""
+            and (includeNone == true or tostring(item.value or "") ~= "none")
+        then
+            selectable[#selectable + 1] = item
+        end
+    end
+    return selectable
+end
 
-local CONSUMABLE_TYPE_ITEMS = {
-    { label = "Potion", value = "potion" },
-    { label = "Elixir", value = "elixir" },
-    { label = "Flask", value = "flask" },
-}
+local function buildAllowedValues(items)
+    local values = {}
+    for index = 1, #(items or {}) do
+        values[string.lower(tostring(items[index].value or ""))] = true
+    end
+    return values
+end
 
-local ALLOWED_ITEM_TYPES = {
-    weapon = true,
-    armor = true,
-    tool = true,
-    modification = true,
-    consumable = true,
-    material = true,
-}
-
-local ALLOWED_CONSUMABLE_TYPES = {
-    potion = true,
-    elixir = true,
-    flask = true,
-}
+-- These shared item definitions are the authoritative vocabulary for both
+-- item authoring and Market eligibility filters.
+local ITEM_TYPE_ITEMS = buildSelectableItems(ItemInspectorShared.ITEM_TYPE_ITEMS)
+local ARMOR_WEIGHT_ITEMS = buildSelectableItems(ItemInspectorShared.ARMOR_WEIGHT_ITEMS)
+local MODIFICATION_ARMOR_WEIGHT_ITEMS = buildSelectableItems(ItemInspectorShared.MODIFICATION_ARMOR_WEIGHT_ITEMS, true)
+local MODIFICATION_KIND_ITEMS = buildSelectableItems(ItemInspectorShared.MODIFICATION_KIND_ITEMS)
+local CONSUMABLE_TYPE_ITEMS = buildSelectableItems(ItemInspectorShared.CONSUMABLE_TYPE_ITEMS)
+local CONSUMABLE_ELIXIR_TYPE_ITEMS = buildSelectableItems(ItemInspectorShared.CONSUMABLE_ELIXIR_TYPE_ITEMS)
+local ALLOWED_ITEM_TYPES = buildAllowedValues(ITEM_TYPE_ITEMS)
+local ALLOWED_CONSUMABLE_TYPES = buildAllowedValues(CONSUMABLE_TYPE_ITEMS)
 
 local function trim(value)
     return tostring(value or ""):match("^%s*(.-)%s*$")
@@ -126,6 +129,55 @@ local function appendMissingDropdownValue(items, value, label)
     if reference ~= "" and not dropdownContains(items, reference) then
         items[#items + 1] = { label = label or ("Missing: " .. reference), value = reference }
     end
+end
+
+local function appendMissingDropdownValues(items, values, labelPrefix)
+    for index = 1, #(values or {}) do
+        local value = values[index]
+        appendMissingDropdownValue(items, value, (labelPrefix or "Missing") .. ": " .. trim(value))
+    end
+end
+
+local function copyDropdownItems(items, selectedValues, missingLabelPrefix)
+    local copy = {}
+    for index = 1, #(items or {}) do
+        local item = items[index]
+        copy[index] = { label = item.label, value = item.value }
+    end
+    appendMissingDropdownValues(copy, selectedValues, missingLabelPrefix)
+    return copy
+end
+
+local function buildActivatedCollectionItems(self, collectionKey, values, labelPrefix)
+    local items = {}
+    local datasets = self:GetDatasets() or {}
+    for datasetIndex = 1, #datasets do
+        local dataset = datasets[datasetIndex]
+        local datasetId = trim(dataset and dataset.id)
+        if datasetId ~= "" and (type(self.IsDatasetActivated) ~= "function" or self:IsDatasetActivated(datasetId)) then
+            local entries = dataset and dataset[collectionKey] or {}
+            for entryIndex = 1, #entries do
+                local entry = entries[entryIndex]
+                if entry and trim(entry.id) ~= "" then
+                    items[#items + 1] = {
+                        label = ("%s / %s"):format(self:GetDatasetDisplayName(dataset), self:GetEntryDisplayName(collectionKey, entry)),
+                        value = ("%s:%s"):format(datasetId, entry.id),
+                    }
+                end
+            end
+        end
+    end
+    appendMissingDropdownValues(items, values, labelPrefix)
+    return items
+end
+
+local function selectedValuesContain(values, expected)
+    for index = 1, #(values or {}) do
+        if string.lower(trim(values[index])) == expected then
+            return true
+        end
+    end
+    return false
 end
 
 local function addLabel(root, name, text)
@@ -212,6 +264,23 @@ local function validateQualifiedReference(reference, fieldName, errors)
     end
 end
 
+local function validateRuleReferenceList(values, fieldName, resolveMethod, errors, warnings)
+    for index = 1, #(values or {}) do
+        local reference = values[index]
+        local label = ("%s %d"):format(fieldName, index)
+        validateQualifiedReference(reference, label, errors)
+        if trim(reference) ~= "" and type(Registry[resolveMethod]) == "function" then
+            local _, entry = Registry[resolveMethod](Registry, reference)
+            local datasetId = trim(reference):match("^([^:]+):")
+            local active = type(Registry.IsDatasetActivated) ~= "function"
+                or Registry:IsDatasetActivated(datasetId)
+            if not entry or not active then
+                warnings[#warnings + 1] = ("Missing or inactive %s %s."):format(string.lower(fieldName), trim(reference))
+            end
+        end
+    end
+end
+
 local function getMarketValidation(self, dataset, market)
     local errors, warnings = {}, {}
     local marketType = string.lower(trim(market and market.marketType))
@@ -274,6 +343,10 @@ local function getMarketValidation(self, dataset, market)
                 errors[#errors + 1] = ("Consumable subtype '%s' is not allowed."):format(consumableType)
             end
         end
+        validateRuleReferenceList(sellRules.weaponTypeRefs, "Weapon type", "ResolveWeaponTypeReference", errors, warnings)
+        validateRuleReferenceList(sellRules.slotRefs, "Item slot", "ResolveItemSlotReference", errors, warnings)
+        validateRuleReferenceList(sellRules.targetSlotRefs, "Modification target slot", "ResolveItemSlotReference", errors, warnings)
+        validateRuleReferenceList(sellRules.targetWeaponTypeRefs, "Modification target weapon type", "ResolveWeaponTypeReference", errors, warnings)
         for indexValue = 1, #(sellRules.itemRefs or {}) do
             local reference = sellRules.itemRefs[indexValue]
             validateQualifiedReference(reference, ("Sell item %d"):format(indexValue), errors)
@@ -502,6 +575,41 @@ local function createItemCollectionEditor(self, root, prefix, title, getValues)
     self["MarketInspector" .. prefix .. "Actions"] = actions
 end
 
+local function createSellRuleDropdown(self, root, key, label, ruleField, items)
+    local group = UI.CreateLayout(UI.VerticalLayoutGroup, root:GetFrame(), "RPEDataEditorMarketInspector" .. key .. "Group", {
+        spacing = 2,
+        width = FIELD_WIDTH,
+        height = 34,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    group:AddChild(UI.CreateText(group:GetFrame(), "RPEDataEditorMarketInspector" .. key .. "Label", label, {
+        width = FIELD_WIDTH,
+        height = 12,
+        justifyH = "LEFT",
+        textColor = UI.ResolveColor(nil, "text.secondary"),
+    }))
+    local dropdown = UI.CreateDropdown(group:GetFrame(), "RPEDataEditorMarketInspector" .. key .. "Dropdown", {
+        width = FIELD_WIDTH,
+        height = CONTROL_HEIGHT,
+        items = items or {},
+        multiSelect = true,
+        showSelectionActions = false,
+        onValueChanged = function(values)
+            if not self._refreshingMarketInspector then
+                commitSelectedMarket(self, function(market)
+                    market.sellRules = market.sellRules or {}
+                    market.sellRules[ruleField] = values or {}
+                end)
+            end
+        end,
+    })
+    group:AddChild(dropdown)
+    root:AddChild(group)
+    self["MarketInspector" .. key .. "Group"] = group
+    self["MarketInspector" .. key .. "Dropdown"] = dropdown
+end
+
 function DataEditor:BuildMarketInspectorPage(parent)
     if self.MarketInspectorPage then
         return self.MarketInspectorPage
@@ -579,35 +687,18 @@ function DataEditor:BuildMarketInspectorPage(parent)
         return market.sellRules.itemRefs
     end)
 
-    addLabel(eligibility, "RPEDataEditorMarketInspectorSellTypesLabel", "Sell item types")
-    self.MarketInspectorSellTypesDropdown = UI.CreateDropdown(eligibility:GetFrame(), "RPEDataEditorMarketInspectorSellTypesDropdown", {
-        width = FIELD_WIDTH, height = CONTROL_HEIGHT, items = ITEM_TYPE_ITEMS, multiSelect = true,
-        onValueChanged = function(values)
-            if not self._refreshingMarketInspector then
-                commitSelectedMarket(self, function(market)
-                    market.sellRules = market.sellRules or {}
-                    market.sellRules.itemTypes = values or {}
-                end)
-            end
-        end,
-    })
-    eligibility:AddChild(self.MarketInspectorSellTypesDropdown)
+    createSellRuleDropdown(self, eligibility, "SellTypes", "Sell item types", "itemTypes", ITEM_TYPE_ITEMS)
+    createSellRuleDropdown(self, eligibility, "ArmorWeights", "Armor weights", "armorWeights", ARMOR_WEIGHT_ITEMS)
+    createSellRuleDropdown(self, eligibility, "WeaponTypes", "Weapon types", "weaponTypeRefs", {})
+    createSellRuleDropdown(self, eligibility, "ItemSlots", "Item slots", "slotRefs", {})
+    createSellRuleDropdown(self, eligibility, "ConsumableTypes", "Consumable subtypes", "consumableTypes", CONSUMABLE_TYPE_ITEMS)
+    createSellRuleDropdown(self, eligibility, "ConsumableElixirTypes", "Elixir subtypes", "consumableElixirTypes", CONSUMABLE_ELIXIR_TYPE_ITEMS)
+    createSellRuleDropdown(self, eligibility, "ModificationKinds", "Modification kinds", "modificationKinds", MODIFICATION_KIND_ITEMS)
+    createSellRuleDropdown(self, eligibility, "ModificationTargetSlots", "Modification target slots", "targetSlotRefs", {})
+    createSellRuleDropdown(self, eligibility, "ModificationTargetWeaponTypes", "Modification target weapon types", "targetWeaponTypeRefs", {})
+    createSellRuleDropdown(self, eligibility, "ModificationTargetArmorWeights", "Modification target armor weights", "targetArmorWeights", MODIFICATION_ARMOR_WEIGHT_ITEMS)
 
-    addLabel(eligibility, "RPEDataEditorMarketInspectorConsumableTypesLabel", "Consumable subtypes (when Consumable is selected)")
-    self.MarketInspectorConsumableTypesDropdown = UI.CreateDropdown(eligibility:GetFrame(), "RPEDataEditorMarketInspectorConsumableTypesDropdown", {
-        width = FIELD_WIDTH, height = CONTROL_HEIGHT, items = CONSUMABLE_TYPE_ITEMS, multiSelect = true,
-        onValueChanged = function(values)
-            if not self._refreshingMarketInspector then
-                commitSelectedMarket(self, function(market)
-                    market.sellRules = market.sellRules or {}
-                    market.sellRules.consumableTypes = values or {}
-                end)
-            end
-        end,
-    })
-    eligibility:AddChild(self.MarketInspectorConsumableTypesDropdown)
-
-    self.MarketInspectorHelpText = UI.CreateText(eligibility:GetFrame(), "RPEDataEditorMarketInspectorHelpText", "Sell rules match exact item refs or item types. A nonempty consumable subtype list further restricts consumables. No rules means no sale. Examples: weapons use itemTypes={weapon}; medical goods use itemTypes={consumable} with potion, elixir and flask.", {
+    self.MarketInspectorHelpText = UI.CreateText(eligibility:GetFrame(), "RPEDataEditorMarketInspectorHelpText", "Sell rules match exact item refs or selected item types. Type-specific filters are combined when present; empty filters add no restriction. Exact item refs override filters. No rules means no sale.", {
         width = FIELD_WIDTH, height = 54, justifyH = "LEFT", wordWrap = true,
         textColor = UI.ResolveColor(nil, "text.secondary"),
     })
@@ -669,13 +760,33 @@ function DataEditor:RefreshMarketInspectorPage()
     if self.MarketInspectorBuyScroll then self.MarketInspectorBuyScroll:SetItems(isExchange and (market.buyItemRefs or {}) or {}) end
     if self.MarketInspectorSellScroll then self.MarketInspectorSellScroll:SetItems(isExchange and ((market.sellRules or {}).itemRefs or {}) or {}) end
     local sellRules = market and market.sellRules or {}
-    if self.MarketInspectorSellTypesDropdown then
-        self.MarketInspectorSellTypesDropdown:SetSelectedValues(isExchange and (sellRules.itemTypes or {}) or {}, true)
-        setDropdownEnabled(self.MarketInspectorSellTypesDropdown, isExchange)
-    end
-    if self.MarketInspectorConsumableTypesDropdown then
-        self.MarketInspectorConsumableTypesDropdown:SetSelectedValues(isExchange and (sellRules.consumableTypes or {}) or {}, true)
-        setDropdownEnabled(self.MarketInspectorConsumableTypesDropdown, isExchange)
+    local selectedTypes = sellRules.itemTypes or {}
+    local showArmor = selectedValuesContain(selectedTypes, "armor")
+    local showWeapon = selectedValuesContain(selectedTypes, "weapon")
+    local showConsumable = selectedValuesContain(selectedTypes, "consumable")
+    local showModification = selectedValuesContain(selectedTypes, "modification")
+    local showElixir = showConsumable and selectedValuesContain(sellRules.consumableTypes, "elixir")
+    local sellRuleDropdowns = {
+        { key = "SellTypes", field = "itemTypes", items = copyDropdownItems(ITEM_TYPE_ITEMS, sellRules.itemTypes, "Unknown item type"), shown = true },
+        { key = "ArmorWeights", field = "armorWeights", items = copyDropdownItems(ARMOR_WEIGHT_ITEMS, sellRules.armorWeights, "Unknown armor weight"), shown = showArmor },
+        { key = "WeaponTypes", field = "weaponTypeRefs", items = buildActivatedCollectionItems(self, "weaponTypes", sellRules.weaponTypeRefs, "Missing weapon type"), shown = showWeapon },
+        { key = "ItemSlots", field = "slotRefs", items = buildActivatedCollectionItems(self, "itemSlots", sellRules.slotRefs, "Missing item slot"), shown = showArmor or showWeapon },
+        { key = "ConsumableTypes", field = "consumableTypes", items = copyDropdownItems(CONSUMABLE_TYPE_ITEMS, sellRules.consumableTypes, "Unknown consumable subtype"), shown = showConsumable },
+        { key = "ConsumableElixirTypes", field = "consumableElixirTypes", items = copyDropdownItems(CONSUMABLE_ELIXIR_TYPE_ITEMS, sellRules.consumableElixirTypes, "Unknown elixir subtype"), shown = showElixir },
+        { key = "ModificationKinds", field = "modificationKinds", items = copyDropdownItems(MODIFICATION_KIND_ITEMS, sellRules.modificationKinds, "Unknown modification kind"), shown = showModification },
+        { key = "ModificationTargetSlots", field = "targetSlotRefs", items = buildActivatedCollectionItems(self, "itemSlots", sellRules.targetSlotRefs, "Missing item slot"), shown = showModification },
+        { key = "ModificationTargetWeaponTypes", field = "targetWeaponTypeRefs", items = buildActivatedCollectionItems(self, "weaponTypes", sellRules.targetWeaponTypeRefs, "Missing weapon type"), shown = showModification },
+        { key = "ModificationTargetArmorWeights", field = "targetArmorWeights", items = copyDropdownItems(MODIFICATION_ARMOR_WEIGHT_ITEMS, sellRules.targetArmorWeights, "Unknown armor weight"), shown = showModification },
+    }
+    for ruleIndex = 1, #sellRuleDropdowns do
+        local definition = sellRuleDropdowns[ruleIndex]
+        local dropdown = self["MarketInspector" .. definition.key .. "Dropdown"]
+        if dropdown then
+            dropdown:SetItems(definition.items)
+            dropdown:SetSelectedValues(isExchange and (sellRules[definition.field] or {}) or {}, true)
+            setDropdownEnabled(dropdown, isExchange and definition.shown)
+        end
+        setShown(self["MarketInspector" .. definition.key .. "Group"], isExchange and definition.shown)
     end
 
     for _, prefix in ipairs({ "Buy", "Sell" }) do

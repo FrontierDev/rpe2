@@ -60,6 +60,16 @@ local markets = {
             trackerMarketRef = "",
         },
     },
+    ["trackers:volatile"] = {
+        dataset = { id = "trackers" },
+        market = {
+            id = "volatile",
+            marketType = "tracker",
+            baseCoefficientPercent = 0,
+            dailyVariationPercent = 10,
+            trackerMarketRef = "",
+        },
+    },
     ["exchanges:stormwind"] = {
         dataset = { id = "exchanges" },
         market = {
@@ -80,6 +90,37 @@ local markets = {
             dailyVariationPercent = 0,
             trackerMarketRef = "trackers:daily",
             trackerInfluencePercent = 25,
+        },
+    },
+    ["exchanges:volatile"] = {
+        dataset = { id = "exchanges" },
+        market = {
+            id = "volatile",
+            marketType = "exchange",
+            baseCoefficientPercent = 0,
+            dailyVariationPercent = 10,
+            trackerMarketRef = "",
+        },
+    },
+    ["exchanges:tracker-volatile"] = {
+        dataset = { id = "exchanges" },
+        market = {
+            id = "tracker-volatile",
+            marketType = "exchange",
+            baseCoefficientPercent = 0,
+            dailyVariationPercent = 0,
+            trackerMarketRef = "trackers:volatile",
+            trackerInfluencePercent = 100,
+        },
+    },
+    ["exchanges:floor"] = {
+        dataset = { id = "exchanges" },
+        market = {
+            id = "floor",
+            marketType = "exchange",
+            baseCoefficientPercent = -200,
+            dailyVariationPercent = 0,
+            trackerMarketRef = "",
         },
     },
     ["exchanges:invalid"] = {
@@ -155,17 +196,18 @@ local function resolveMarketReference(_, marketRef, visited)
     return entry.dataset, market
 end
 
-local function createAddon()
+local function createAddon(settings)
+    settings = settings or storedSettings
     local addon = Support.CreateAddon()
     addon.Internal.Database = {
         GetGlobalSetting = function(key, defaultValue)
-            if storedSettings[key] == nil then
+            if settings[key] == nil then
                 return clone(defaultValue)
             end
-            return clone(storedSettings[key])
+            return clone(settings[key])
         end,
         SetGlobalSetting = function(key, value)
-            storedSettings[key] = clone(value)
+            settings[key] = clone(value)
         end,
     }
     addon.Internal.Registry = {
@@ -201,6 +243,64 @@ assertHistory(firstHistory, "empty-cache history")
 assertTrue(storedSettings.marketRatesHistory ~= nil, "history is persisted in global settings")
 assertEqual(#firstHistory, 14, "empty-cache history is complete")
 
+local volatileHistory = assert(firstRates.GetHistory("exchanges:volatile"))
+assertHistory(volatileHistory, "volatile history")
+local expectedVolatileValues = {
+    -3.79, 9.33, -5.24, -1.19, 4.25, 2.64, 8.08,
+    0.36, 5.79, -1.93, 3.50, 8.94, 1.22, -4.12,
+}
+local volatileMinimum = math.huge
+local volatileMaximum = -math.huge
+local hasMeaningfulUpwardMove = false
+local hasMeaningfulDownwardMove = false
+for index = 1, #volatileHistory do
+    local value = volatileHistory[index].coefficientPercent
+    assertEqual(value, expectedVolatileValues[index], "volatile fixture is byte-for-byte deterministic")
+    volatileMinimum = math.min(volatileMinimum, value)
+    volatileMaximum = math.max(volatileMaximum, value)
+    if index > 1 then
+        local previous = volatileHistory[index - 1].coefficientPercent
+        hasMeaningfulUpwardMove = hasMeaningfulUpwardMove or value - previous >= 1
+        hasMeaningfulDownwardMove = hasMeaningfulDownwardMove or previous - value >= 1
+    end
+    assertTrue(value >= -10 and value <= 10, "volatile offset stays inside authored variation")
+end
+assertTrue(volatileMinimum <= -5, "volatile fixture reaches the lower half of its configured range")
+assertTrue(volatileMaximum >= 5, "volatile fixture reaches the upper half of its configured range")
+assertTrue(volatileMaximum - volatileMinimum >= 10, "volatile fixture spans a substantial configured range")
+assertTrue(hasMeaningfulUpwardMove, "volatile fixture contains meaningful upward movement")
+assertTrue(hasMeaningfulDownwardMove, "volatile fixture contains meaningful downward movement")
+
+local floorHistory = assert(firstRates.GetHistory("exchanges:floor"))
+for index = 1, #floorHistory do
+    assertEqual(floorHistory[index].coefficientPercent, -95, "minimum coefficient safety floor remains enforced")
+end
+
+local staleStorage = clone(storedSettings)
+staleStorage.marketRatesHistory.version = 1
+staleStorage.marketRatesHistory.markets["exchanges:volatile"].signature = "version=1;stale"
+staleStorage.marketRatesHistory.markets["exchanges:volatile"].values[volatileHistory[#volatileHistory].dayKey] = 999
+local invalidatedRates = createAddon(staleStorage).Client.MarketRates
+local invalidatedHistory = assert(invalidatedRates.GetHistory("exchanges:volatile"))
+for index = 1, #volatileHistory do
+    assertEqual(
+        invalidatedHistory[index].coefficientPercent,
+        volatileHistory[index].coefficientPercent,
+        "cache version invalidation replaces stale deterministic values"
+    )
+end
+assertEqual(staleStorage.marketRatesHistory.version, 2, "cache version is rewritten after invalidation")
+
+local trackerHistory = assert(firstRates.GetHistory("trackers:volatile"))
+local linkedTrackerHistory = assert(firstRates.GetHistory("exchanges:tracker-volatile"))
+for index = 1, #trackerHistory do
+    assertEqual(
+        linkedTrackerHistory[index].coefficientPercent,
+        trackerHistory[index].coefficientPercent,
+        "tracker contribution uses the tracker seed independently"
+    )
+end
+
 local fixedHistory = assert(firstRates.GetHistory("exchanges:fixed"))
 for index = 1, #fixedHistory do
     assertEqual(fixedHistory[index].coefficientPercent, 15, "tracker influence is applied")
@@ -223,6 +323,20 @@ for index = 1, #firstHistory do
     assertEqual(reloadedHistory[index].coefficientPercent, firstHistory[index].coefficientPercent, "reload and lookup order do not change values")
 end
 assertHistory(trackerFirstHistory, "tracker history")
+
+local independentFirst = assert(createAddon({}).Client.MarketRates.GetHistory("exchanges:volatile"))
+math.random()
+local independentSecondRates = createAddon({}).Client.MarketRates
+assert(independentSecondRates.GetHistory("trackers:volatile"))
+local independentSecond = assert(independentSecondRates.GetHistory("exchanges:volatile"))
+for index = 1, #independentFirst do
+    assertEqual(independentSecond[index].dayKey, independentFirst[index].dayKey, "identical clients keep the same dates")
+    assertEqual(
+        independentSecond[index].coefficientPercent,
+        independentFirst[index].coefficientPercent,
+        "identical clients produce the same deterministic series"
+    )
+end
 
 activeDatasets.trackers = false
 local inactiveHistory, inactiveError = reloadedRates.GetHistory("exchanges:stormwind")

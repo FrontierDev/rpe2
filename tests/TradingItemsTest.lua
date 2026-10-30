@@ -229,4 +229,38 @@ assertEqual(quantityChanges, 0, "programmatic quantity text updates do not re-en
 page:OnQuantityInputChanged({ GetText = function() return "2" end })
 assertEqual(quantityChanges, 1, "user quantity edits still update the selection")
 
+local itemBuildCount = 0
+local itemHost = {}
+addon.Client.UI.Trading.Items = {
+    New = function()
+        return {
+            built = false,
+            Build = function(self, parent, owner)
+                itemBuildCount = itemBuildCount + 1
+                assertEqual(parent, itemHost, "cached window rebuild uses the item panel content frame")
+                assertTrue(owner ~= nil, "cached window rebuild supplies the trading window owner")
+                self.built = true
+            end,
+        }
+    end,
+}
+addon.Client.UI.Trading.Markets = { New = function() return {} end }
+addon.Client.UI.Trading.Chart = { New = function() return {} end }
+Support.LoadAddonFile("client/character/trading/window_Trading.lua", addon)
+
+local tradingWindow = addon.Client.UI.Trading.Window:Get()
+tradingWindow.window = {
+    GetFrame = function()
+        return { SetSize = function() end }
+    end,
+}
+tradingWindow.itemPanel = {
+    GetContentFrame = function()
+        return itemHost
+    end,
+}
+tradingWindow:BuildWindow()
+assertEqual(itemBuildCount, 1, "cached window completes an unbuilt item page")
+assertTrue(tradingWindow.itemsPage.built, "cached window marks the rebuilt item page as complete")
+
 print("TradingItemsTest passed")

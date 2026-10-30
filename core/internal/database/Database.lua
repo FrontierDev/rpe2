@@ -2231,17 +2231,20 @@ local function collectMarketDiagnostics(datasetId)
 
     local markets = ensureTable(targetDataset.markets)
     local seenIds = {}
-    local function validateItemReference(reference, path)
-        local referenceDatasetId, itemId = parseQualifiedReference(reference)
+    local function validateCollectionReference(reference, collectionKey, entryLabel, path)
+        local referenceDatasetId, entryId = parseQualifiedReference(reference)
         if not referenceDatasetId then
-            diagnostics[#diagnostics + 1] = ("%s must be a qualified datasetId:itemId reference."):format(path)
+            diagnostics[#diagnostics + 1] = ("%s must be a qualified datasetId:entryId reference."):format(path)
             return
         end
 
-        local _, item = findDatasetEntryForValidation(root, referenceDatasetId, "items", itemId)
-        if not item then
-            diagnostics[#diagnostics + 1] = ("%s references missing item '%s'."):format(path, reference)
+        local _, entry = findDatasetEntryForValidation(root, referenceDatasetId, collectionKey, entryId)
+        if not entry then
+            diagnostics[#diagnostics + 1] = ("%s references missing %s '%s'."):format(path, entryLabel, reference)
         end
+    end
+    local function validateItemReference(reference, path)
+        validateCollectionReference(reference, "items", "item", path)
     end
 
     for marketIndex = 1, #markets do
@@ -2281,6 +2284,23 @@ local function collectMarketDiagnostics(datasetId)
                     sellRules.itemRefs[refIndex],
                     ("%s.sellRules.itemRefs[%d]"):format(marketPath, refIndex)
                 )
+            end
+            local sellRuleReferences = {
+                { field = "weaponTypeRefs", collection = "weaponTypes", label = "weapon type" },
+                { field = "slotRefs", collection = "itemSlots", label = "item slot" },
+                { field = "targetSlotRefs", collection = "itemSlots", label = "item slot" },
+                { field = "targetWeaponTypeRefs", collection = "weaponTypes", label = "weapon type" },
+            }
+            for referenceFieldIndex = 1, #sellRuleReferences do
+                local definition = sellRuleReferences[referenceFieldIndex]
+                for refIndex = 1, #(sellRules[definition.field] or {}) do
+                    validateCollectionReference(
+                        sellRules[definition.field][refIndex],
+                        definition.collection,
+                        definition.label,
+                        ("%s.sellRules.%s[%d]"):format(marketPath, definition.field, refIndex)
+                    )
+                end
             end
 
             local trackerRef = trimText(market.trackerMarketRef)

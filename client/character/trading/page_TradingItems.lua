@@ -24,20 +24,10 @@ local MODE_SELL = "sell"
 local ITEMS_PER_PAGE = 4
 local ROW_HEIGHT = 34
 local CONTROL_HEIGHT = 20
-local DETAIL_HEIGHT = 116
+local DETAIL_HEIGHT = 124
 local PAGE_BUTTON_WIDTH = 22
 local PAGE_TEXT_WIDTH = 74
 local MAX_QUANTITY = 2147483647
-
-local QUALITY_LABELS = {
-    poor = "Poor",
-    common = "Common",
-    uncommon = "Uncommon",
-    rare = "Rare",
-    epic = "Epic",
-    legendary = "Legendary",
-    artifact = "Artifact",
-}
 
 local TYPE_LABELS = {
     armor = "Armor",
@@ -107,9 +97,27 @@ local function titleCase(value)
     return text:sub(1, 1):upper() .. text:sub(2):lower()
 end
 
-local function qualityLabel(item)
+local function getQualityColor(item)
     local quality = lower(item and item.quality)
-    return QUALITY_LABELS[quality] or titleCase(quality)
+    if type(ITEM_QUALITY_COLORS) == "table" and ITEM_QUALITY_COLORS[quality] then
+        local color = ITEM_QUALITY_COLORS[quality]
+        return {
+            r = color.r or 1,
+            g = color.g or 1,
+            b = color.b or 1,
+            a = color.a or 1,
+        }
+    end
+
+    local fallback = {
+        poor = { r = 0.62, g = 0.62, b = 0.62, a = 1 },
+        common = { r = 1, g = 1, b = 1, a = 1 },
+        uncommon = { r = 0.12, g = 1, b = 0, a = 1 },
+        rare = { r = 0, g = 0.44, b = 0.87, a = 1 },
+        epic = { r = 0.64, g = 0.21, b = 0.93, a = 1 },
+        legendary = { r = 1, g = 0.5, b = 0, a = 1 },
+    }
+    return fallback[quality] or fallback.common
 end
 
 local function itemName(item, itemRef)
@@ -547,10 +555,6 @@ function ItemsPage:UpdateRows()
         local item = self.filteredItems[firstIndex + rowIndex - 1]
         if item then
             local displayName = itemName(item.item, item.itemRef)
-            local quality = qualityLabel(item.item)
-            if quality ~= "" then
-                displayName = ("%s (%s)"):format(displayName, quality)
-            end
             local tier = lower(item.variant and item.variant.itemTier or item.item and item.item.itemTier)
             if tier ~= "" and tier ~= "normal" then
                 displayName = ("%s [%s]"):format(displayName, titleCase(tier))
@@ -572,7 +576,7 @@ function ItemsPage:UpdateRows()
                 return self:BuildItemTooltip(item)
             end)
             local selected = item.key == self.selectedItemKey
-            local nameColor = UI.ResolveColor(nil, selected and "accent" or "text.primary")
+            local nameColor = getQualityColor(item.item)
             if row.nameRegion and row.nameRegion.SetTextColor then
                 row.nameRegion:SetTextColor(nameColor.r, nameColor.g, nameColor.b, nameColor.a)
             end
@@ -695,10 +699,13 @@ end
 function ItemsPage:RefreshDetails()
     local row = self:GetSelectedItem()
     local balance = self:GetBalance()
-    self.balanceText:SetText(balance and ("RPE Copper: " .. formatCopper(balance)) or "RPE Copper: unavailable")
+    self.balanceText:SetText(balance and ("Available Funds: " .. formatCopper(balance)) or "Available Funds: unavailable")
     self.feedbackText:SetText(self.feedback or "")
     if not row then
+        self.detailIcon:SetTexture(DEFAULT_ICON)
         self.detailName:SetText("Select an item to trade.")
+        local defaultColor = UI.ResolveColor(nil, "text.primary")
+        self.detailName:SetTextColor(defaultColor.r, defaultColor.g, defaultColor.b, defaultColor.a)
         self.quantity = 1
         self:UpdateQuantityText()
         self.quantityPreview:SetText("")
@@ -715,7 +722,10 @@ function ItemsPage:RefreshDetails()
     if tier ~= "" and tier ~= "normal" then
         displayName = ("%s [%s]"):format(displayName, titleCase(tier))
     end
+    self.detailIcon:SetTexture(row.item and row.item.icon or DEFAULT_ICON)
     self.detailName:SetText(displayName)
+    local nameColor = getQualityColor(row.item)
+    self.detailName:SetTextColor(nameColor.r, nameColor.g, nameColor.b, nameColor.a)
 
     local ok, quote, quoteError = false, nil, nil
     if row.enabled ~= false and type(Trading.Quote) == "function" then
@@ -1027,7 +1037,7 @@ function ItemsPage:Build(parent, owner)
         expandWidth = true,
         expandHeight = true,
         weight = 1,
-        spacing = 2,
+        spacing = 1,
         fitChildrenWidth = true,
         fitChildrenHeight = false,
     })
@@ -1048,8 +1058,11 @@ function ItemsPage:Build(parent, owner)
         })
         row:SetParent(self.listLayout:GetFrame())
         row:Create()
-        row:SetScript("OnClick", function()
-            self:SelectItem(row._itemKey)
+        local rowFrame = row:GetFrame()
+        rowFrame:HookScript("OnMouseUp", function(_, button)
+            if button == "LeftButton" then
+                self:SelectItem(row._itemKey)
+            end
         end)
         self.rows[index] = row
         self.listLayout:AddChild(row)
@@ -1078,14 +1091,34 @@ function ItemsPage:Build(parent, owner)
         spacing = 2,
     })
     self.root:AddChild(self.detailRoot)
-    self.detailName = UI.CreateText(self.detailRoot:GetFrame(), "RPETradingItemsDetailName", "Select an item to trade.", {
-        height = 16,
+    self.detailHeader = UI.CreateLayout(UI.HorizontalLayoutGroup, self.detailRoot:GetFrame(), "RPETradingItemsDetailHeader", {
+        height = 30,
         expandWidth = true,
+        spacing = 6,
+        fitChildrenWidth = true,
+        fitChildrenHeight = false,
+    })
+    self.detailRoot:AddChild(self.detailHeader)
+    self.detailIcon = UI.Image:New({
+        name = "RPETradingItemsDetailIcon",
+        width = 30,
+        height = 30,
+        texture = DEFAULT_ICON,
+        border = false,
+    })
+    self.detailIcon:SetParent(self.detailHeader:GetFrame())
+    self.detailIcon:Create()
+    self.detailHeader:AddChild(self.detailIcon)
+    self.detailName = UI.CreateText(self.detailHeader:GetFrame(), "RPETradingItemsDetailName", "Select an item to trade.", {
+        height = 30,
+        expandWidth = true,
+        weight = 1,
         justifyH = "LEFT",
+        justifyV = "MIDDLE",
         textColor = UI.ResolveColor(nil, "text.primary"),
     })
-    self.detailRoot:AddChild(self.detailName)
-    self.balanceText = UI.CreateText(self.detailRoot:GetFrame(), "RPETradingItemsBalance", "RPE Copper: unavailable", {
+    self.detailHeader:AddChild(self.detailName)
+    self.balanceText = UI.CreateText(self.detailRoot:GetFrame(), "RPETradingItemsBalance", "Available funds unavailable", {
         height = 14,
         expandWidth = true,
         justifyH = "LEFT",
